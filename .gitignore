@@ -1,0 +1,13 @@
+# data
+data/
+*.parquet
+*.csv
+*.xlsx
+
+# python
+__pycache__/
+.venv/
+.env
+
+# streamlit
+.streamlit/secrets.toml
