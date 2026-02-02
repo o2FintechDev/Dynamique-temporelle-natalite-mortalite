@@ -52,7 +52,8 @@ class CachedHttpClient:
             resp = self.session.request(method, url, headers=headers, params=params, data=data, timeout=timeout)
             from_cache = getattr(resp, "from_cache", False)
             content_type = resp.headers.get("Content-Type", "")
-
+            text = resp.text or ""
+            
             if resp.status_code >= 400:
                 body = (resp.text or "").strip()
                 raise ApiError(
