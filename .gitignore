@@ -1,13 +1,19 @@
-# data
-data/
-*.parquet
-*.csv
-*.xlsx
-
-# python
+# Python
 __pycache__/
+*.pyc
 .venv/
+.ipynb_checkpoints/
+
+# Env / secrets
 .env
 
-# streamlit
-.streamlit/secrets.toml
+# Streamlit
+.streamlit/
+
+# Cache & outputs
+cache/
+outputs/
+
+# OS
+.DS_Store
+Thumbs.db
