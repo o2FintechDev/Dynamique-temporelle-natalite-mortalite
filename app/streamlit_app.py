@@ -2,9 +2,18 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]  # remonte de /app vers /
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 
 import streamlit as st
-
+from src.utils.settings import settings
+from src.utils.paths import make_run_id, ensure_dirs
+from src.utils.session_state import get_session
+from src.utils.logger import get_logger
 from src.utils.settings import settings
 from src.utils.paths import make_run_id, ensure_dirs
 from src.utils.session_state import get_session
