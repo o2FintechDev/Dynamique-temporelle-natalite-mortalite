@@ -1,15 +1,17 @@
-# venv
-.venv/
+# python
 __pycache__/
 *.pyc
+.venv/
+venv/
 
-# Streamlit
-.streamlit/secrets.toml
-
-# caches / outputs
+# streamlit/cache/outputs
+app/cache/
+app/outputs/
 cache/
 outputs/
 
-# OS
+# os
 .DS_Store
-Thumbs.db
+
+# secrets
+.env
