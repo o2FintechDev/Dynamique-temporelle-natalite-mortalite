@@ -1,12 +1,21 @@
 from __future__ import annotations
+import re
+from src.agent.schemas import Intent
 
-def detect_intent(text: str) -> str:
-    t = text.lower().strip()
+_PATTERNS: list[tuple[Intent, list[str]]] = [
+    ("export", [r"\bexport\b", r"\blatex\b", r"\bpdf\b", r"\breport\b"]),
+    ("explore", [r"\bexplor", r"\bplot\b", r"\bgraph", r"\bvisual", r"\bdescrib", r"\bcoverage\b"]),
+    ("diagnose", [r"\badf\b", r"\bpp\b", r"\bstation", r"\bacf\b", r"\bpacf\b", r"\btest\b"]),
+    ("model", [r"\barima\b", r"\bvar\b", r"\bmodel", r"\bfit\b"]),
+    ("summarize", [r"\bsummar", r"\bsynth", r"\bnarrat"]),
+]
 
-    if any(k in t for k in ["qualité", "couverture", "trous", "missing", "completude", "complétude"]):
-        return "quality"
-    if any(k in t for k in ["compare", "vs", "corr", "relation", "liaison"]):
-        return "compare"
-    if any(k in t for k in ["synthèse", "résume", "resume", "bilan", "conclusion"]):
-        return "synthesize"
-    return "explore"
+def classify_intent(text: str) -> Intent:
+    t = (text or "").lower().strip()
+    if not t:
+        return "unknown"
+    for intent, pats in _PATTERNS:
+        for p in pats:
+            if re.search(p, t):
+                return intent
+    return "unknown"

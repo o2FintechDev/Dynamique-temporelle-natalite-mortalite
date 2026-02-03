@@ -1,80 +1,105 @@
 from __future__ import annotations
-import uuid
+from dataclasses import dataclass
+from pathlib import Path
+import json
 import pandas as pd
 
-from src.data_pipeline.loader import load_dataset
-from src.data_pipeline.quality import per_column_missingness
-from src.data_pipeline.coverage_report import data_coverage_report
-from src.visualization.charts import line_series, compare_two
+from src.data_pipeline.loader import load_local_excel
+from src.data_pipeline.harmonize import harmonize_monthly_index
+from src.data_pipeline.coverage_report import coverage_report
+from src.visualization.charts import save_timeseries_png, FigureSpec
+from src.visualization.tables import save_table_csv
+from src.utils.logger import get_logger
+from src.utils.settings import settings
+from src.agent.schemas import Artefact
 
-def _id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:10]}"
+log = get_logger("agent.tools", settings.log_level)
 
-def tool_load_dataset(state: dict) -> dict:
-    df, meta = load_dataset()
-    state["df"] = df
-    return {
-        "artifact_id": _id("meta"),
-        "kind": "json",
-        "title": "Métadonnées dataset",
-        "payload": meta.__dict__,
-    }
+@dataclass
+class ToolContext:
+    run_id: str
+    run_dirs: any  # RunPaths
+    memory: dict
 
-def tool_describe_variable(state: dict, var: str) -> dict:
-    df: pd.DataFrame = state["df"]
-    s = df[var]
-    desc = {
-        "variable": var,
-        "n_total": int(len(s)),
-        "n_non_null": int(s.notna().sum()),
-        "min": (float(s.min()) if s.notna().any() else None),
-        "max": (float(s.max()) if s.notna().any() else None),
-        "mean": (float(s.mean()) if s.notna().any() else None),
-        "start": (s.dropna().index.min().date().isoformat() if s.notna().any() else None),
-        "end": (s.dropna().index.max().date().isoformat() if s.notna().any() else None),
-    }
-    return {"artifact_id": _id("metrics"), "kind": "metrics", "title": f"Stats descriptives: {var}", "payload": desc}
+def _next_id(ctx: ToolContext, prefix: str) -> str:
+    n = ctx.memory.setdefault("_counters", {}).setdefault(prefix, 0) + 1
+    ctx.memory["_counters"][prefix] = n
+    return f"{prefix}_{n:03d}"
 
-def tool_plot_series(state: dict, var: str) -> dict:
-    df: pd.DataFrame = state["df"]
-    fig = line_series(df, var, title=f"{var} (mensuel)")
-    return {"artifact_id": _id("fig"), "kind": "figure", "title": f"Série temporelle: {var}", "payload": fig}
+def tool_load_data(ctx: ToolContext) -> list[Artefact]:
+    raw = load_local_excel()
+    df_ms, meta = harmonize_monthly_index(raw, "Date")
+    ctx.memory["df_ms"] = df_ms
+    ctx.memory["harmonize_meta"] = meta
 
-def tool_plot_compare(state: dict, var1: str, var2: str) -> dict:
-    df: pd.DataFrame = state["df"]
-    fig = compare_two(df, var1, var2, title=f"{var1} vs {var2} (mensuel)")
-    return {"artifact_id": _id("fig"), "kind": "figure", "title": f"Comparaison: {var1} vs {var2}", "payload": fig}
+    # artefact metric meta
+    aid = _next_id(ctx, "metric")
+    path = ctx.run_dirs.metrics_dir / f"{aid}_harmonize_meta.json"
+    path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
-def tool_compute_correlation(state: dict, var1: str, var2: str) -> dict:
-    df: pd.DataFrame = state["df"]
-    d = df[[var1, var2]].dropna()
-    corr = float(d[var1].corr(d[var2])) if len(d) >= 3 else None
-    payload = {"var1": var1, "var2": var2, "n_pairs": int(len(d)), "pearson_corr": corr}
-    return {"artifact_id": _id("metrics"), "kind": "metrics", "title": f"Corrélation: {var1} vs {var2}", "payload": payload}
+    return [
+        Artefact(
+            artefact_id=aid,
+            kind="metric",
+            name="harmonize_meta",
+            path=str(path),
+            meta=meta,
+        )
+    ]
 
-def tool_coverage_report(state: dict) -> dict:
-    df: pd.DataFrame = state["df"]
-    rep = data_coverage_report(df)
-    return {"artifact_id": _id("json"), "kind": "json", "title": "Data coverage report", "payload": rep}
+def tool_coverage_report(ctx: ToolContext) -> list[Artefact]:
+    df_ms: pd.DataFrame = ctx.memory["df_ms"]
+    table, meta = coverage_report(df_ms)
 
-def tool_missingness_table(state: dict) -> dict:
-    df: pd.DataFrame = state["df"]
-    tab = per_column_missingness(df)
-    return {"artifact_id": _id("table"), "kind": "table", "title": "Valeurs manquantes par variable", "payload": tab}
+    aid_t = _next_id(ctx, "table")
+    p_csv = ctx.run_dirs.tables_dir / f"{aid_t}_coverage.csv"
+    save_table_csv(table, p_csv)
 
-def tool_key_metrics_pack(state: dict, vars: list[str]) -> dict:
-    df: pd.DataFrame = state["df"]
-    out = []
+    aid_m = _next_id(ctx, "metric")
+    p_meta = ctx.run_dirs.metrics_dir / f"{aid_m}_coverage_meta.json"
+    p_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    return [
+        Artefact(artefact_id=aid_t, kind="table", name="coverage_report", path=str(p_csv), meta={"shape": list(table.shape)}),
+        Artefact(artefact_id=aid_m, kind="metric", name="coverage_meta", path=str(p_meta), meta=meta),
+    ]
+
+def tool_plot_timeseries(ctx: ToolContext, vars: list[str]) -> list[Artefact]:
+    df_ms: pd.DataFrame = ctx.memory["df_ms"]
+    artefacts: list[Artefact] = []
     for v in vars:
-        if v in df.columns:
-            s = df[v]
-            out.append({
-                "variable": v,
-                "n_non_null": int(s.notna().sum()),
-                "mean": float(s.mean()) if s.notna().any() else None,
-                "min": float(s.min()) if s.notna().any() else None,
-                "max": float(s.max()) if s.notna().any() else None,
-                "start": s.dropna().index.min().date().isoformat() if s.notna().any() else None,
-                "end": s.dropna().index.max().date().isoformat() if s.notna().any() else None,
-            })
-    return {"artifact_id": _id("table"), "kind": "table", "title": "Pack métriques clés", "payload": pd.DataFrame(out)}
+        s = df_ms[v]
+        aid = _next_id(ctx, "fig")
+        p = ctx.run_dirs.figures_dir / f"{aid}_{v}.png"
+        save_timeseries_png(s, p, FigureSpec(title=f"Série mensuelle (niveau) — {v}", xlabel="Date", ylabel=v))
+        artefacts.append(Artefact(artefact_id=aid, kind="figure", name=f"timeseries_{v}", path=str(p), meta={"var": v}))
+    return artefacts
+
+def tool_describe_stats(ctx: ToolContext, vars: list[str]) -> list[Artefact]:
+    df_ms: pd.DataFrame = ctx.memory["df_ms"]
+    desc = df_ms[vars].describe().T
+    aid = _next_id(ctx, "table")
+    p = ctx.run_dirs.tables_dir / f"{aid}_describe.csv"
+    save_table_csv(desc.reset_index(names="variable"), p)
+    return [Artefact(artefact_id=aid, kind="table", name="describe_stats", path=str(p), meta={"vars": vars})]
+
+# --- econometrics wrappers (artefacts) ---
+from src.econometrics.diagnostics import acf_pacf_artefacts, stationarity_tests_artefacts, decide_ts_ds
+from src.econometrics.univariate import fit_univariate_grid_artefacts
+from src.econometrics.multivariate import fit_var_artefacts
+
+def tool_acf_pacf(ctx: ToolContext, var: str, lags: int = 48) -> list[Artefact]:
+    return acf_pacf_artefacts(ctx, var=var, lags=lags)
+
+def tool_stationarity_tests(ctx: ToolContext, var: str) -> list[Artefact]:
+    return stationarity_tests_artefacts(ctx, var=var)
+
+def tool_ts_ds_decision(ctx: ToolContext, var: str) -> list[Artefact]:
+    _, a = decide_ts_ds(ctx, var=var)
+    return [a]
+
+def tool_fit_univariate_models(ctx: ToolContext, var: str, max_p: int = 3, max_q: int = 3, max_d: int = 1) -> list[Artefact]:
+    return fit_univariate_grid_artefacts(ctx, var=var, max_p=max_p, max_q=max_q, max_d=max_d)
+
+def tool_fit_var_model(ctx: ToolContext, vars: list[str], max_lag: int = 6) -> list[Artefact]:
+    return fit_var_artefacts(ctx, vars=vars, max_lag=max_lag)

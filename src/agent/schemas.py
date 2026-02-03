@@ -2,28 +2,19 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 from typing import Any, Literal
 
-Intent = Literal["explore", "compare", "quality", "synthesize"]
+Intent = Literal["explore", "diagnose", "model", "summarize", "export", "unknown"]
 
 class ToolCall(BaseModel):
-    name: str
-    args: dict[str, Any] = Field(default_factory=dict)
+    tool: str
+    params: dict[str, Any] = Field(default_factory=dict)
 
 class Plan(BaseModel):
     intent: Intent
-    tool_calls: list[ToolCall]
-    notes: str = ""
+    calls: list[ToolCall]
 
-class Artifact(BaseModel):
-    artifact_id: str
-    kind: Literal["table", "figure", "metrics", "json"]
-    title: str
-    payload: Any
+class Artefact(BaseModel):
+    artefact_id: str
+    kind: Literal["figure", "table", "metric", "text", "file"]
+    name: str
+    path: str
     meta: dict[str, Any] = Field(default_factory=dict)
-
-class EvidenceSentence(BaseModel):
-    sentence: str
-    evidence_ids: list[str]
-
-class Narrative(BaseModel):
-    title: str
-    bullets: list[EvidenceSentence]

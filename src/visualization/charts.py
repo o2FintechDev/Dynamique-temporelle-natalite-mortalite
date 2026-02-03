@@ -1,22 +1,27 @@
 from __future__ import annotations
+from dataclasses import dataclass
+from pathlib import Path
+import matplotlib.pyplot as plt
 import pandas as pd
-import plotly.express as px
 
-def line_series(df: pd.DataFrame, y: str, title: str | None = None):
-    d = df[[y]].reset_index().rename(columns={"index": "Date"})
-    fig = px.line(d, x="Date", y=y, title=title or f"Série: {y}")
-    fig.update_layout(margin=dict(l=20, r=20, t=50, b=20))
-    return fig
+@dataclass(frozen=True)
+class FigureSpec:
+    title: str
+    xlabel: str = ""
+    ylabel: str = ""
 
-def compare_two(df: pd.DataFrame, y1: str, y2: str, title: str | None = None):
-    d = df[[y1, y2]].reset_index().rename(columns={"index": "Date"})
-    d = d.melt(id_vars="Date", value_vars=[y1, y2], var_name="variable", value_name="value")
-    fig = px.line(d, x="Date", y="value", color="variable", title=title or f"Comparaison: {y1} vs {y2}")
-    fig.update_layout(margin=dict(l=20, r=20, t=50, b=20))
-    return fig
-
-def scatter(df: pd.DataFrame, x: str, y: str, title: str | None = None):
-    d = df[[x, y]].dropna().reset_index()
-    fig = px.scatter(d, x=x, y=y, trendline="ols", title=title or f"Relation: {x} vs {y}")
-    fig.update_layout(margin=dict(l=20, r=20, t=50, b=20))
-    return fig
+def save_timeseries_png(
+    series: pd.Series,
+    path: Path,
+    spec: FigureSpec,
+) -> None:
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(series.index, series.values)
+    ax.set_title(spec.title)
+    ax.set_xlabel(spec.xlabel)
+    ax.set_ylabel(spec.ylabel)
+    fig.autofmt_xdate()
+    fig.tight_layout()
+    fig.savefig(path, dpi=160)
+    plt.close(fig)

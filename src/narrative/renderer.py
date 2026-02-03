@@ -1,37 +1,40 @@
 from __future__ import annotations
-from typing import Any
-import pandas as pd
+from typing import Iterable
+from src.agent.schemas import Artefact
+from src.narrative.rules import Sentence, render_sentence, audit_narrative
 
-from src.utils import SessionStore
+def build_mvp_narrative(artefacts: list[Artefact]) -> tuple[str, dict]:
+    ids = {a.artefact_id for a in artefacts}
 
-from .rules import narrative_from_artefacts
+    # MVP: synthèse factuelle sur coverage + harmonisation + présence figures/stats
+    has_cov = next((a for a in artefacts if a.name == "coverage_report"), None)
+    has_desc = next((a for a in artefacts if a.name == "describe_stats"), None)
+    has_hmeta = next((a for a in artefacts if a.name == "harmonize_meta"), None)
+    figs = [a for a in artefacts if a.kind == "figure"]
 
-def build_evidence_bundle(store: SessionStore) -> dict[str, Any]:
-    bundle: dict[str, Any] = {}
+    sentences: list[Sentence] = []
+    if has_hmeta:
+        sentences.append(Sentence(
+            text="Les dates ont été normalisées en index mensuel month-start (MS) et la grille temporelle complète a été construite.",
+            artefact_ids=[has_hmeta.artefact_id],
+        ))
+    if has_cov:
+        sentences.append(Sentence(
+            text="Le Data Coverage Report est disponible (périodes par variable, volumes et taux de valeurs manquantes).",
+            artefact_ids=[has_cov.artefact_id],
+        ))
+    if figs:
+        sentences.append(Sentence(
+            text=f"{len(figs)} graphiques de séries en niveau ont été générés pour l’exploration initiale.",
+            artefact_ids=[figs[0].artefact_id],
+        ))
+    if has_desc:
+        sentences.append(Sentence(
+            text="Les statistiques descriptives de base (describe) ont été calculées pour les variables sélectionnées.",
+            artefact_ids=[has_desc.artefact_id],
+        ))
 
-    # récupérer derniers artefacts "kind"
-    wide = next((a for a in reversed(store.list()) if a.meta.get("kind") == "wide"), None)
-    cov = next((a for a in reversed(store.list()) if a.meta.get("kind") == "coverage"), None)
-    desc = next((a for a in reversed(store.list()) if a.meta.get("kind") == "describe"), None)
-
-    if wide:
-        bundle["wide_id"] = wide.artefact_id
-        bundle["wide"] = wide.payload
-    if cov:
-        bundle["coverage_id"] = cov.artefact_id
-        bundle["coverage"] = cov.payload
-    if desc:
-        bundle["describe_id"] = desc.artefact_id
-        bundle["describe"] = desc.payload
-
-    return bundle
-
-def render_constrained_narrative(store: SessionStore) -> str:
-    bundle = build_evidence_bundle(store)
-    lines = narrative_from_artefacts(bundle)
-
-    # audit: chaque phrase doit contenir un tag [aXXXX]
-    for ln in lines:
-        if "[" not in ln or "]" not in ln:
-            raise ValueError("Audit narration échoué: phrase sans référence artefact.")
-    return "\n".join(f"- {ln}" for ln in lines)
+    text = "\n".join(render_sentence(s) for s in sentences) if sentences else ""
+    ok, problems = audit_narrative(text, ids)
+    audit = {"ok": ok, "problems": problems, "n_sentences": len(sentences)}
+    return text, audit
