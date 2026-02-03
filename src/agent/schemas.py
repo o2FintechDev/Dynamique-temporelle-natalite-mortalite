@@ -13,7 +13,7 @@ class Plan(BaseModel):
     intent: Intent
     calls: list[ToolCall]
 
-class Artifact(BaseModel):
+class Artefact(BaseModel):
     artifact_id: str
     kind: Literal["figure", "table", "metric", "text", "file"]
     name: str
