@@ -1,53 +1,56 @@
 from __future__ import annotations
-import re
-from src.data_api import VARIABLES
-from .schema import Plan, ToolCall, Intent
+from src.agent.schemas import Plan, ToolCall
+from src.agent.intent import detect_intent
 
-def _match_variables(user_text: str) -> list[str]:
-    """
-    Matching simple:
-    - si l’utilisateur cite un variable_id exact: on le prend
-    - sinon matching par mots-clés présents dans label
-    """
-    txt = user_text.lower()
-    hits = []
+KNOWN_VARS = [
+    "Nb_naissances","Nb_décès","solde_naturel","taux_naissances","taux_décès",
+    "Croissance_Naturelle","Nb_mariages","IPC","Taux_chômage","Masse_Monétaire","Population"
+]
 
-    for vid, spec in VARIABLES.items():
-        if re.search(rf"\b{re.escape(vid.lower())}\b", txt):
-            hits.append(vid)
-
-    if hits:
-        return hits
-
-    for vid, spec in VARIABLES.items():
-        lab = spec.label.lower()
-        # match grossier par tokens significatifs
-        tokens = [t for t in re.split(r"[^a-z0-9]+", lab) if len(t) >= 4]
-        score = sum(1 for t in tokens if t in txt)
-        if score >= 2:
-            hits.append(vid)
-
-    # fallback: si rien, renvoyer un set “démo”
-    return hits or ["unrate_us", "cpi_us"]
-
-def infer_intent(user_text: str) -> Intent:
-    t = user_text.lower()
-    if any(k in t for k in ["compare", "compar", "vs", "diff", "écart", "corré"]):
-        return "compare"
-    if any(k in t for k in ["synth", "résume", "resume", "conclusion", "insight"]):
-        return "summarize"
-    return "explore"
+def _pick_vars(text: str) -> list[str]:
+    found = []
+    for v in KNOWN_VARS:
+        if v.lower() in text.lower():
+            found.append(v)
+    return found
 
 def make_plan(user_text: str) -> Plan:
-    intent = infer_intent(user_text)
-    vars_ = _match_variables(user_text)
+    intent = detect_intent(user_text)
+    vars_ = _pick_vars(user_text)
 
-    tool_calls = [
-        ToolCall(tool_name="build_wide_monthly", params={"variable_ids": vars_}),
-        ToolCall(tool_name="make_coverage_report", params={}),
-        ToolCall(tool_name="make_describe", params={}),
-        ToolCall(tool_name="make_timeseries_plot", params={"title": f"Séries mensuelles: {', '.join(vars_)}"}),
+    calls: list[ToolCall] = [ToolCall(name="load_dataset", args={})]
+
+    if intent == "explore":
+        y = vars_[0] if vars_ else "Nb_naissances"
+        calls += [
+            ToolCall(name="describe_variable", args={"var": y}),
+            ToolCall(name="plot_series", args={"var": y}),
+        ]
+        note = f"Exploration centrée sur {y}."
+        return Plan(intent="explore", tool_calls=calls, notes=note)
+
+    if intent == "compare":
+        y1 = vars_[0] if len(vars_) >= 1 else "Nb_naissances"
+        y2 = vars_[1] if len(vars_) >= 2 else "Nb_décès"
+        calls += [
+            ToolCall(name="describe_variable", args={"var": y1}),
+            ToolCall(name="describe_variable", args={"var": y2}),
+            ToolCall(name="plot_compare", args={"var1": y1, "var2": y2}),
+            ToolCall(name="compute_correlation", args={"var1": y1, "var2": y2}),
+        ]
+        note = f"Comparaison {y1} vs {y2}."
+        return Plan(intent="compare", tool_calls=calls, notes=note)
+
+    if intent == "quality":
+        calls += [
+            ToolCall(name="coverage_report", args={}),
+            ToolCall(name="missingness_table", args={}),
+        ]
+        return Plan(intent="quality", tool_calls=calls, notes="Contrôle couverture + valeurs manquantes.")
+
+    # synthesize
+    calls += [
+        ToolCall(name="coverage_report", args={}),
+        ToolCall(name="key_metrics_pack", args={"vars": vars_ or ["Nb_naissances","Nb_décès","IPC","Taux_chômage"]}),
     ]
-
-    rationale = f"Intention={intent}. Variables={vars_}. Production: table harmonisée + couverture + descriptif + graphique."
-    return Plan(intent=intent, rationale=rationale, tool_calls=tool_calls)
+    return Plan(intent="synthesize", tool_calls=calls, notes="Synthèse basée sur métriques + couverture.")

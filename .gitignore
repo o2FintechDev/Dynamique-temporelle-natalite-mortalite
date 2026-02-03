@@ -1,16 +1,12 @@
-# Python
+# venv
+.venv/
 __pycache__/
 *.pyc
-.venv/
-.ipynb_checkpoints/
-
-# Env / secrets
-.env
 
 # Streamlit
-.streamlit/
+.streamlit/secrets.toml
 
-# Cache & outputs
+# caches / outputs
 cache/
 outputs/
 
