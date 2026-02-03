@@ -1,3 +1,4 @@
+# src/agent/schemas.py
 from __future__ import annotations
 from pydantic import BaseModel, Field
 from typing import Any, Literal
@@ -12,8 +13,8 @@ class Plan(BaseModel):
     intent: Intent
     calls: list[ToolCall]
 
-class Artefact(BaseModel):
-    artefact_id: str
+class Artifact(BaseModel):
+    artifact_id: str
     kind: Literal["figure", "table", "metric", "text", "file"]
     name: str
     path: str
