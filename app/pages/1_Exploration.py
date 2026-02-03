@@ -36,7 +36,7 @@ if df is None:
 st.subheader("Aperçu (index mensuel MS)")
 st.dataframe(df.head(12))
 
-vars_default = ["taux_naissances", "taux_décès", "Croissance Naturelle"]
+vars_default = ["taux_naissances", "taux_décès", "Croissance_Naturelle"]
 st.subheader("Séries (niveau)")
 cols = st.columns(3)
 for i, v in enumerate(vars_default):

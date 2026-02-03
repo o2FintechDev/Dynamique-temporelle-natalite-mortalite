@@ -11,7 +11,7 @@ EXPECTED_COLUMNS = [
     "Date",
     "taux_naissances",
     "taux_décès",
-    "Croissance Naturelle",
+    "Croissance_Naturelle",
     "Nb_mariages",
     "IPC",
     "Masse_Monétaire",

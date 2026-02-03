@@ -1,3 +1,4 @@
+# app/streamlit_app.py
 from __future__ import annotations
 import json
 import subprocess
@@ -61,7 +62,7 @@ def persist_manifest(run_dir: Path, plan: dict, artefacts: list[dict], narrative
 
 if run_clicked:
     intent = classify_intent(user_text)
-    plan = make_plan(intent, user_text).model_dump()
+    plan = make_plan(intent, user_text).dict()  # FIXED: Changed .model_dump() to .dict()
 
     payload_for_id = {"user_text": user_text, "intent": plan["intent"], "calls": plan["calls"]}
     run_id = make_run_id(payload_for_id)
@@ -73,7 +74,7 @@ if run_clicked:
     narrative, audit = build_mvp_narrative(artefacts)
 
     # Persist run bundle
-    artefacts_dump = [a.model_dump() for a in artefacts]
+    artefacts_dump = [a.dict() for a in artefacts]  # FIXED: Changed .model_dump() to .dict()
     persist_manifest(run_dirs.run_dir, plan, artefacts_dump, narrative, audit)
 
     sess.current_run_id = run_id

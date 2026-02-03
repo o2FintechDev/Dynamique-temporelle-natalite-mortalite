@@ -13,7 +13,9 @@ def harmonize_monthly_index(df: pd.DataFrame, date_col: str = "Date") -> tuple[p
 
     # Index mensuel month-start (MS)
     out = out.set_index(date_col)
-    out.index = out.index.to_period("M").to_timestamp("MS")
+    out.index = out.index.to_period("M").to_timestamp()
+    # OUTRE possibilité:
+    # out.index = out.index.to_period("M").to_timestamp(how='start')
 
     # Déduire fréquence + construire grille complète mensuelle
     start = out.index.min()

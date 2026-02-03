@@ -17,7 +17,7 @@ def load_settings() -> Settings:
     root = Path(__file__).resolve().parents[2]  # src/utils -> project root
     return Settings(
         project_root=root,
-        data_path=root / "data" / "bdd_natalité_mortalité_clean.xlsx",
+        data_path=root / "data" / "bdd_natalite_mortalite_clean.xlsx",
         app_cache_dir=root / "app" / "cache",
         outputs_dir=root / "app" / "outputs",
     )

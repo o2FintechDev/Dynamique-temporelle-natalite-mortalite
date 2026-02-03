@@ -1,7 +1,7 @@
 from __future__ import annotations
 from src.agent.schemas import Plan, ToolCall, Intent
 
-DEFAULT_VARS = ["taux_naissances", "taux_décès", "Croissance Naturelle"]
+DEFAULT_VARS = ["taux_naissances", "taux_décès", "Croissance_Naturelle"]
 
 def make_plan(intent: Intent, user_text: str) -> Plan:
     if intent in ("unknown", "explore"):
