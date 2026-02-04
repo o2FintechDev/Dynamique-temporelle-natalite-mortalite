@@ -1,10 +1,11 @@
+# agent/executor.py
 from __future__ import annotations
 
 import platform
 from typing import Any
-import matplotlib.figure as mpl_fig
 
 import pandas as pd
+import matplotlib.figure as mpl_fig
 
 from src.agent.schemas import Plan, ExecutionResult, ArtefactRef, Manifest
 from src.agent.tools import get_tool
@@ -13,12 +14,13 @@ from src.utils import get_logger
 
 log = get_logger("agent.executor")
 
+
 class AgentExecutor:
     """
     Exécute un Plan:
       - appelle tools.py (mapping strict)
       - persiste systématiquement les sorties via RunWriter
-      - produit un manifest.json canonique
+      - produit un manifest.json canonique + lookup[label]=path
     """
     def __init__(self, user_query: str) -> None:
         self.user_query = user_query
@@ -36,8 +38,7 @@ class AgentExecutor:
             fn = get_tool(call.tool_name)
             out = fn(variables=call.variables, **call.params)  # dict sérialisable
 
-            # Convention de sorties:
-            # out may contain: {"tables": {slug: df}, "metrics": {slug: dict}, "models": {slug: obj}}
+            # tables
             if "tables" in out:
                 for slug, df in out["tables"].items():
                     if not isinstance(df, pd.DataFrame):
@@ -45,6 +46,7 @@ class AgentExecutor:
                     p = self.writer.save_table(df, slug)
                     artefacts.append(ArtefactRef(kind="table", path=str(p), label=slug))
 
+            # metrics
             if "metrics" in out:
                 for slug, payload in out["metrics"].items():
                     if not isinstance(payload, dict):
@@ -52,17 +54,20 @@ class AgentExecutor:
                     p = self.writer.save_metric(payload, slug)
                     artefacts.append(ArtefactRef(kind="metric", path=str(p), label=slug))
 
+            # models
             if "models" in out:
                 for slug, obj in out["models"].items():
                     p = self.writer.save_model_pickle(obj, slug)
                     artefacts.append(ArtefactRef(kind="model", path=str(p), label=slug))
+
+            # figures (validation stricte)
             if "figures" in out:
                 for slug, fig in out["figures"].items():
                     if not isinstance(fig, mpl_fig.Figure):
                         raise TypeError(f"Figure '{slug}' doit être un matplotlib.figure.Figure.")
                     p = self.writer.save_figure(fig, slug)
                     artefacts.append(ArtefactRef(kind="figure", path=str(p), label=slug))
-        
+
         result = ExecutionResult(
             run_id=self.writer.ctx.run_id,
             intent=plan.intent,
@@ -70,6 +75,21 @@ class AgentExecutor:
             tools_called=tools_called,
             artefacts=artefacts,
         )
+
+        # lookup rapide: label -> path (labels non nuls)
+        lookup: dict[str, str] = {}
+        for a in artefacts:
+            if a.label:
+                # en cas de collision de label, on suffixe (défensif)
+                if a.label not in lookup:
+                    lookup[a.label] = a.path
+                else:
+                    i = 2
+                    nk = f"{a.label}_{i}"
+                    while nk in lookup:
+                        i += 1
+                        nk = f"{a.label}_{i}"
+                    lookup[nk] = a.path
 
         manifest = Manifest(
             run_id=self.writer.ctx.run_id,
@@ -83,6 +103,7 @@ class AgentExecutor:
                 "python": platform.python_version(),
                 "platform": platform.platform(),
             },
+            lookup=lookup,
         ).model_dump()
 
         mp = self.writer.save_manifest(manifest)

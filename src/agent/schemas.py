@@ -38,3 +38,6 @@ class Manifest(BaseModel):
     variables: list[str]
     artefacts: list[dict[str, Any]] = Field(default_factory=list)
     versions: dict[str, str] = Field(default_factory=dict)
+
+    # NEW: accès direct artefact par label (ex: manifest.lookup["acf_plot"] -> path)
+    lookup: dict[str, str] = Field(default_factory=dict)
