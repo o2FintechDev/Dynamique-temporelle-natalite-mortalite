@@ -1,30 +1,39 @@
 from __future__ import annotations
-import pandas as pd
-import numpy as np
 
-def coverage_report(df_ms: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
-    # df_ms index = MS
-    rep_rows = []
-    for col in df_ms.columns:
-        s = df_ms[col]
-        non_na = s.dropna()
-        rep_rows.append({
-            "variable": col,
-            "start": non_na.index.min().date().isoformat() if len(non_na) else None,
-            "end": non_na.index.max().date().isoformat() if len(non_na) else None,
-            "n_obs": int(len(non_na)),
-            "n_missing": int(s.isna().sum()),
-            "missing_rate": float(s.isna().mean()) if len(s) else 1.0,
+import pandas as pd
+from src.utils import get_logger
+
+log = get_logger("data_pipeline.coverage_report")
+
+def coverage_report(df: pd.DataFrame, *, variables: list[str]) -> pd.DataFrame:
+    """
+    Rapport de couverture simple:
+      variable | start | end | n_obs | missing_n | missing_pct
+    """
+    if "Date" not in df.columns:
+        raise ValueError("Colonne 'Date' absente.")
+
+    df = df.copy()
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+    df = df.sort_values("Date")
+
+    rows = []
+    n_total = df.shape[0]
+    for v in variables:
+        if v not in df.columns:
+            continue
+        s = df[["Date", v]]
+        s_non = s.dropna()
+        missing_n = int(s[v].isna().sum())
+        rows.append({
+            "variable": v,
+            "start": None if s_non.empty else s_non["Date"].min(),
+            "end": None if s_non.empty else s_non["Date"].max(),
+            "n_obs": int(s_non.shape[0]),
+            "missing_n": missing_n,
+            "missing_pct": (missing_n / n_total * 100.0) if n_total else None,
         })
 
-    table = pd.DataFrame(rep_rows).sort_values("variable")
-    holes = int(df_ms.isna().any(axis=1).sum())
-    meta = {
-        "n_rows": int(len(df_ms)),
-        "n_cols": int(df_ms.shape[1]),
-        "n_rows_with_any_missing": holes,
-        "period_start": df_ms.index.min().date().isoformat() if len(df_ms) else None,
-        "period_end": df_ms.index.max().date().isoformat() if len(df_ms) else None,
-        "freq": "MS",
-    }
-    return table, meta
+    rep = pd.DataFrame(rows).sort_values("variable")
+    log.info(f"Coverage report created: rows={rep.shape[0]}")
+    return rep

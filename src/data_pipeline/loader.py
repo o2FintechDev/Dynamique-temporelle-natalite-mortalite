@@ -1,38 +1,23 @@
 from __future__ import annotations
-import pandas as pd
+
 from pathlib import Path
+import pandas as pd
 
-from src.utils.logger import get_logger
-from src.utils.settings import settings
+from src.utils import get_logger
+from src.utils.paths import data_dir
 
-log = get_logger("data_pipeline.loader", settings.log_level)
+log = get_logger("data_pipeline.loader")
 
-EXPECTED_COLUMNS = [
-    "Date",
-    "taux_naissances",
-    "taux_décès",
-    "Croissance_Naturelle",
-    "Nb_mariages",
-    "IPC",
-    "Masse_Monétaire",
-]
+DATA_FILE = "bdd_natalite_mortalite_clean.xlsx"
 
-class DataSchemaError(ValueError):
-    pass
-
-def load_local_excel(path: Path | None = None) -> pd.DataFrame:
-    p = path or settings.data_path
-    if not p.exists():
-        raise FileNotFoundError(f"Fichier introuvable: {p}")
-
-    df = pd.read_excel(p, engine="openpyxl")
-    cols = list(df.columns)
-
-    if cols != EXPECTED_COLUMNS:
-        raise DataSchemaError(
-            "Colonnes inattendues.\n"
-            f"Attendu (ordre exact): {EXPECTED_COLUMNS}\n"
-            f"Reçu: {cols}"
-        )
-
+def load_clean_dataset() -> pd.DataFrame:
+    """
+    Charge la source unique locale:
+      data/bdd_natalite_mortalite_clean.xlsx
+    """
+    path = data_dir() / DATA_FILE
+    if not path.exists():
+        raise FileNotFoundError(f"Fichier introuvable: {path}")
+    df = pd.read_excel(path)
+    log.info(f"Loaded dataset: shape={df.shape} path={path}")
     return df

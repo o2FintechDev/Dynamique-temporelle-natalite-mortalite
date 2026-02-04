@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import platform
 from typing import Any
+import matplotlib.figure as mpl_fig
 
 import pandas as pd
 
@@ -55,11 +56,13 @@ class AgentExecutor:
                 for slug, obj in out["models"].items():
                     p = self.writer.save_model_pickle(obj, slug)
                     artefacts.append(ArtefactRef(kind="model", path=str(p), label=slug))
-
-            # Figures: volontairement gérées plus tard (charts.py) mais même logique attendue:
-            # out["figures"] = {slug: matplotlib_figure} (optionnel, J2)
-            # -> on implémentera l’export figure J2 pour éviter les divergences.
-
+            if "figures" in out:
+                for slug, fig in out["figures"].items():
+                    if not isinstance(fig, mpl_fig.Figure):
+                        raise TypeError(f"Figure '{slug}' doit être un matplotlib.figure.Figure.")
+                    p = self.writer.save_figure(fig, slug)
+                    artefacts.append(ArtefactRef(kind="figure", path=str(p), label=slug))
+        
         result = ExecutionResult(
             run_id=self.writer.ctx.run_id,
             intent=plan.intent,
