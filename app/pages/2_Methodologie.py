@@ -1,60 +1,82 @@
 from __future__ import annotations
 
 import streamlit as st
-from src.utils.session_state import get_state
-from src.utils.run_reader import read_manifest, latest_table, latest_figure, read_table_csv
 
-st.title("2 — Méthodologie (diagnostics TS)")
+from src.utils.run_reader import RunManager, read_table_csv, read_metric_json
 
-state = get_state()
-run_id = state.selected_run_id
+
+st.title("2 — Méthodologie (lecture stricte des artefacts)")
+
+run_id = RunManager.get_latest_run_id()
 if not run_id:
-    st.warning("Aucune run sélectionnée.")
+    st.warning("Aucune donnée disponible. Lancez une analyse depuis l'accueil.")
     st.stop()
 
+manifest = RunManager.load_manifest(run_id)
 st.caption(f"Run: {run_id}")
-st.json(read_manifest(run_id))
+st.json(manifest)
 
 st.divider()
 st.subheader("ACF / PACF")
 
-p_acf = latest_figure(run_id, "acf_")
-p_pacf = latest_figure(run_id, "pacf_")
+# Labels attendus (issus des slugs utilisés dans executor: label = slug)
+# Exemple: y='taux_naissances' => 'acf_taux_naissances', 'pacf_taux_naissances'
+# Si ton y est dynamique, tu peux le lire depuis manifest['variables'] ou faire un select.
+y = None
+vars_ = manifest.get("variables") or []
+# heuristique: prend la première variable si présente
+if vars_:
+    y = vars_[0]
+
+if not y:
+    st.info("Variable cible inconnue dans le manifest. Lance une run avec variables explicites.")
+    st.stop()
+
+label_acf = f"acf_{y}"
+label_pacf = f"pacf_{y}"
+label_tab = f"acf_pacf_{y}"
+label_adf = f"adf_{y}"
+label_lb = f"ljungbox_diff_{y}"
+
 c1, c2 = st.columns(2)
 
 with c1:
-    if p_acf:
-        st.image(str(p_acf), use_container_width=True)
-        st.caption(str(p_acf))
+    p = RunManager.get_artefact_path(label_acf, run_id=run_id)
+    if p:
+        st.image(str(p), use_container_width=True)
+        st.caption(str(p))
     else:
-        st.info("Figure ACF absente (lancer une run avec eco_diagnostics).")
+        st.info("Donnée non disponible pour ce type de run (ACF).")
 
 with c2:
-    if p_pacf:
-        st.image(str(p_pacf), use_container_width=True)
-        st.caption(str(p_pacf))
+    p = RunManager.get_artefact_path(label_pacf, run_id=run_id)
+    if p:
+        st.image(str(p), use_container_width=True)
+        st.caption(str(p))
     else:
-        st.info("Figure PACF absente.")
+        st.info("Donnée non disponible pour ce type de run (PACF).")
 
 st.divider()
 st.subheader("Table ACF/PACF")
-p_tab = latest_table(run_id, "acf_pacf_")
-if p_tab:
-    st.dataframe(read_table_csv(p_tab), use_container_width=True)
-    st.caption(str(p_tab))
+p = RunManager.get_artefact_path(label_tab, run_id=run_id)
+if p:
+    st.dataframe(read_table_csv(p), use_container_width=True)
+    st.caption(str(p))
 else:
-    st.info("Table ACF/PACF absente.")
+    st.info("Donnée non disponible pour ce type de run (table ACF/PACF).")
 
-st.divider()
-st.subheader("Tests de stationnarité (ADF + KPSS si dispo)")
-p_adf = latest_table(run_id, "adf_")
-if p_adf:
-    st.dataframe(read_table_csv(p_adf), use_container_width=True)
-    st.caption(str(p_adf))
+st.subheader("ADF (3 spécifications)")
+p = RunManager.get_artefact_path(label_adf, run_id=run_id)
+if p:
+    st.dataframe(read_table_csv(p), use_container_width=True)
+    st.caption(str(p))
 else:
-    st.info("ADF absent.")
+    st.info("Donnée non disponible pour ce type de run (ADF).")
 
-p_kpss = latest_table(run_id, "kpss_")
-if p_kpss:
-    st.dataframe(read_table_csv(p_kpss), use_container_width=True)
-    st.caption(str(p_kpss))
+st.subheader("Ljung-Box sur diff (proxy)")
+p = RunManager.get_artefact_path(label_lb, run_id=run_id)
+if p:
+    st.dataframe(read_table_csv(p), use_container_width=True)
+    st.caption(str(p))
+else:
+    st.info("Donnée non disponible pour ce type de run (Ljung-Box).")
