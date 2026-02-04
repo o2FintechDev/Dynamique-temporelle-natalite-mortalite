@@ -43,7 +43,7 @@ c1, c2 = st.columns(2)
 with c1:
     p = RunManager.get_artefact_path(label_acf, run_id=run_id)
     if p:
-        st.image(str(p), use_container_width=True)
+        st.image(str(p), width='stretch')
         st.caption(str(p))
     else:
         st.info("Donnée non disponible pour ce type de run (ACF).")
@@ -51,7 +51,7 @@ with c1:
 with c2:
     p = RunManager.get_artefact_path(label_pacf, run_id=run_id)
     if p:
-        st.image(str(p), use_container_width=True)
+        st.image(str(p), width='stretch')
         st.caption(str(p))
     else:
         st.info("Donnée non disponible pour ce type de run (PACF).")
@@ -60,7 +60,7 @@ st.divider()
 st.subheader("Table ACF/PACF")
 p = RunManager.get_artefact_path(label_tab, run_id=run_id)
 if p:
-    st.dataframe(read_table_csv(p), use_container_width=True)
+    st.dataframe(read_table_csv(p), width='stretch')
     st.caption(str(p))
 else:
     st.info("Donnée non disponible pour ce type de run (table ACF/PACF).")
@@ -68,7 +68,7 @@ else:
 st.subheader("ADF (3 spécifications)")
 p = RunManager.get_artefact_path(label_adf, run_id=run_id)
 if p:
-    st.dataframe(read_table_csv(p), use_container_width=True)
+    st.dataframe(read_table_csv(p), width='stretch')
     st.caption(str(p))
 else:
     st.info("Donnée non disponible pour ce type de run (ADF).")
@@ -76,7 +76,7 @@ else:
 st.subheader("Ljung-Box sur diff (proxy)")
 p = RunManager.get_artefact_path(label_lb, run_id=run_id)
 if p:
-    st.dataframe(read_table_csv(p), use_container_width=True)
+    st.dataframe(read_table_csv(p), width='stretch')
     st.caption(str(p))
 else:
     st.info("Donnée non disponible pour ce type de run (Ljung-Box).")

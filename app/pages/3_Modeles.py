@@ -35,7 +35,7 @@ st.subheader("ARIMA — Grid (AIC/BIC)")
 label_grid = f"univariate_grid_{y}"
 p_grid = RunManager.get_artefact_path(label_grid, run_id=run_id)
 if p_grid:
-    st.dataframe(read_table_csv(p_grid), use_container_width=True)
+    st.dataframe(read_table_csv(p_grid), width='stretch')
     st.caption(str(p_grid))
 else:
     st.info("Donnée non disponible pour ce type de run (grid ARIMA). Lance une run avec 'Modélisation'.")
@@ -57,7 +57,7 @@ st.subheader("VAR — sélection de lag")
 label_var = "var_selection"
 p_var = RunManager.get_artefact_path(label_var, run_id=run_id)
 if p_var:
-    st.dataframe(read_table_csv(p_var), use_container_width=True)
+    st.dataframe(read_table_csv(p_var), width='stretch')
     st.caption(str(p_var))
 else:
     st.info("Donnée non disponible pour ce type de run (VAR).")
@@ -67,7 +67,7 @@ st.subheader("Granger — pairwise (optionnel)")
 label_granger = "granger_pairwise"
 p_g = RunManager.get_artefact_path(label_granger, run_id=run_id)
 if p_g:
-    st.dataframe(read_table_csv(p_g), use_container_width=True)
+    st.dataframe(read_table_csv(p_g), width='stretch')
     st.caption(str(p_g))
 else:
     st.info("Donnée non disponible pour ce type de run (Granger).")

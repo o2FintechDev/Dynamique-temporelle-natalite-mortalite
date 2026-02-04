@@ -37,7 +37,7 @@ cols = st.columns(3)
 with cols[0]:
     st.markdown("**Desc stats**")
     if p_desc:
-        st.dataframe(read_table_csv(p_desc), use_container_width=True)
+        st.dataframe(read_table_csv(p_desc), width='stretch')
         st.caption(str(p_desc))
     else:
         st.info("Artefact absent: desc_stats")
@@ -45,7 +45,7 @@ with cols[0]:
 with cols[1]:
     st.markdown("**Missing report**")
     if p_miss:
-        st.dataframe(read_table_csv(p_miss), use_container_width=True)
+        st.dataframe(read_table_csv(p_miss), width='stretch')
         st.caption(str(p_miss))
     else:
         st.info("Artefact absent: missing_report")
@@ -53,7 +53,7 @@ with cols[1]:
 with cols[2]:
     st.markdown("**Coverage report**")
     if p_cov:
-        st.dataframe(read_table_csv(p_cov), use_container_width=True)
+        st.dataframe(read_table_csv(p_cov), width='stretch')
         st.caption(str(p_cov))
     else:
         st.info("Artefact absent: coverage_report")
