@@ -50,7 +50,7 @@ if do_acf:
     artefacts = acf_pacf_artefacts(ctx, var=var, lags=48)
     st.success(f"Artefacts ACF/PACF générés: {len(artefacts)}")
     for a in artefacts:
-        st.write(f"- {a.artefact_id} | {a.name} | {a.path}")
+        st.write(f"- {a.artifact_id} | {a.name} | {a.path}")
         if a.kind == "figure":
             st.image(a.path)
 
@@ -58,14 +58,14 @@ if do_tests:
     artefacts = stationarity_tests_artefacts(ctx, var=var)
     st.success(f"Artefacts tests générés: {len(artefacts)}")
     for a in artefacts:
-        st.write(f"- {a.artefact_id} | {a.name} | {a.path}")
+        st.write(f"- {a.artifact_id} | {a.name} | {a.path}")
         if a.kind == "table":
             st.dataframe(pd.read_csv(a.path))
 
 if do_decide:
     decision, artefact = decide_ts_ds(ctx, var=var)
     st.success(f"Décision: {decision}")
-    st.write(f"- {artefact.artefact_id} | {artefact.name} | {artefact.path}")
+    st.write(f"- {artefact.artifact_id} | {artefact.name} | {artefact.path}")
     st.json(json.loads(Path(artefact.path).read_text(encoding="utf-8")))
 
 st.caption("Tous les résultats sont stockés en artefacts dans app/outputs/runs/<run_id>/artefacts/.")

@@ -100,9 +100,9 @@ def acf_pacf_artefacts(ctx: ToolContext, var: str, lags: int = 48) -> list[Artef
                         FigureSpec(title=f"PACF — {var}", xlabel="Lag", ylabel="PACF"))
 
     return [
-        Artefact(artefact_id=aid_t, kind="table", name=f"acf_pacf_{var}", path=str(p_csv), meta={"lags": lags}),
-        Artefact(artefact_id=aid_f1, kind="figure", name=f"acf_{var}", path=str(p1), meta={"lags": lags}),
-        Artefact(artefact_id=aid_f2, kind="figure", name=f"pacf_{var}", path=str(p2), meta={"lags": lags}),
+        Artefact(artifact_id=aid_t, kind="table", name=f"acf_pacf_{var}", path=str(p_csv), meta={"lags": lags}),
+        Artefact(artifact_id=aid_f1, kind="figure", name=f"acf_{var}", path=str(p1), meta={"lags": lags}),
+        Artefact(artifact_id=aid_f2, kind="figure", name=f"pacf_{var}", path=str(p2), meta={"lags": lags}),
     ]
 
 
@@ -161,7 +161,7 @@ def stationarity_tests_artefacts(ctx: ToolContext, var: str) -> list[Artefact]:
     p = ctx.run_dirs.tables_dir / f"{aid}_stationarity_{var}.csv"
     save_table_csv(tab, p)
 
-    return [Artefact(artefact_id=aid, kind="table", name=f"stationarity_tests_{var}", path=str(p), meta={})]
+    return [Artefact(artifact_id=aid, kind="table", name=f"stationarity_tests_{var}", path=str(p), meta={})]
 
 
 def decide_ts_ds(ctx: ToolContext, var: str) -> tuple[str, Artefact]:
@@ -186,4 +186,4 @@ def decide_ts_ds(ctx: ToolContext, var: str) -> tuple[str, Artefact]:
     p = ctx.run_dirs.metrics_dir / f"{aid}_ts_ds_{var}.json"
     p.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    return decision, Artefact(artefact_id=aid, kind="metric", name=f"ts_ds_decision_{var}", path=str(p), meta=payload)
+    return decision, Artefact(artifact_id=aid, kind="metric", name=f"ts_ds_decision_{var}", path=str(p), meta=payload)
