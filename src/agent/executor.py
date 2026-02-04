@@ -98,13 +98,13 @@ class AgentExecutor:
             intent=plan.intent,
             tools_called=tools_called,
             variables=sorted(set(variables)),
-            artefacts=[a.model_dump() for a in artefacts],
+            artefacts=[a.dict() for a in artefacts],
             versions={
                 "python": platform.python_version(),
                 "platform": platform.platform(),
             },
             lookup=lookup,
-        ).model_dump()
+        ).dict()
 
         mp = self.writer.save_manifest(manifest)
         artefacts.append(ArtefactRef(kind="manifest", path=str(mp), label="manifest"))
