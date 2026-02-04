@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Iterable
+from typing import Iterable, Any
 from src.agent.schemas import Artefact
 from src.narrative.rules import Sentence, render_sentence, audit_narrative
 
@@ -38,3 +38,19 @@ def build_mvp_narrative(artefacts: list[Artefact]) -> tuple[str, dict]:
     ok, problems = audit_narrative(text, ids)
     audit = {"ok": ok, "problems": problems, "n_sentences": len(sentences)}
     return text, audit
+
+def render_anthropology(*, facts: dict[str, Any]) -> dict[str, Any]:
+    """
+    Sortie 100% offline, contrainte:
+      - bloc 'faits econometriques' (uniquement ce qui est dans facts)
+      - bloc 'hypotheses anthropologiques' (interprétation cadrée)
+    """
+    y = facts.get("y", "NA")
+    text = []
+    text.append("## Faits économétriques (artefacts)")
+    for k, v in facts.items():
+        text.append(f"- {k}: {v}")
+    text.append("\n## Hypothèses anthropologiques (cadrées)")
+    text.append("- Les corrélations/ruptures observées sont discutées comme faits stylisés, sans causalité forte.")
+    text.append("- Lecture Todd: structures familiales / normes / cycles longs comme cadre interprétatif (non test économétrique).")
+    return {"markdown": "\n".join(text)}

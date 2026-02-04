@@ -1,71 +1,60 @@
 from __future__ import annotations
-import json
-from pathlib import Path
 
-import pandas as pd
 import streamlit as st
+from src.utils.session_state import get_state
+from src.utils.run_reader import read_manifest, latest_table, latest_figure, read_table_csv
 
-from src.utils.settings import settings
-from src.utils.session_state import get_session
-from src.utils.paths import ensure_dirs
-from src.agent.tools import ToolContext
-from src.econometrics.diagnostics import acf_pacf_artefacts, stationarity_tests_artefacts, decide_ts_ds
+st.title("2 — Méthodologie (diagnostics TS)")
 
-st.set_page_config(page_title="Méthodologie", layout="wide")
-st.title("Méthodologie — Diagnostics économétriques")
-
-sess = get_session(st)
-
-def load_df_ms() -> pd.DataFrame:
-    from src.data_pipeline.loader import load_local_excel
-    from src.data_pipeline.harmonize import harmonize_monthly_index
-    raw = load_local_excel()
-    df_ms, _ = harmonize_monthly_index(raw, "Date")
-    return df_ms
-
-if not sess.current_run_id:
-    st.info("Aucun run actif. Lance un run depuis Accueil/Agent.")
+state = get_state()
+run_id = state.selected_run_id
+if not run_id:
+    st.warning("Aucune run sélectionnée.")
     st.stop()
 
-df = load_df_ms()
+st.caption(f"Run: {run_id}")
+st.json(read_manifest(run_id))
 
-var = st.selectbox(
-    "Variable cible",
-    options=list(df.columns),
-    index=0,
-)
+st.divider()
+st.subheader("ACF / PACF")
 
-st.subheader("Série (niveau)")
-st.line_chart(df[var])
+p_acf = latest_figure(run_id, "acf_")
+p_pacf = latest_figure(run_id, "pacf_")
+c1, c2 = st.columns(2)
 
-run_dirs = ensure_dirs(settings.outputs_dir, sess.current_run_id)
-ctx = ToolContext(run_id=sess.current_run_id, run_dirs=run_dirs, memory={"df_ms": df})
+with c1:
+    if p_acf:
+        st.image(str(p_acf), use_container_width=True)
+        st.caption(str(p_acf))
+    else:
+        st.info("Figure ACF absente (lancer une run avec eco_diagnostics).")
 
-col1, col2, col3 = st.columns(3)
-do_acf = col1.button("ACF/PACF")
-do_tests = col2.button("Tests stationnarité (ADF/PP)")
-do_decide = col3.button("Décision TS vs DS")
+with c2:
+    if p_pacf:
+        st.image(str(p_pacf), use_container_width=True)
+        st.caption(str(p_pacf))
+    else:
+        st.info("Figure PACF absente.")
 
-if do_acf:
-    artefacts = acf_pacf_artefacts(ctx, var=var, lags=48)
-    st.success(f"Artefacts ACF/PACF générés: {len(artefacts)}")
-    for a in artefacts:
-        st.write(f"- {a.artifact_id} | {a.name} | {a.path}")
-        if a.kind == "figure":
-            st.image(a.path)
+st.divider()
+st.subheader("Table ACF/PACF")
+p_tab = latest_table(run_id, "acf_pacf_")
+if p_tab:
+    st.dataframe(read_table_csv(p_tab), use_container_width=True)
+    st.caption(str(p_tab))
+else:
+    st.info("Table ACF/PACF absente.")
 
-if do_tests:
-    artefacts = stationarity_tests_artefacts(ctx, var=var)
-    st.success(f"Artefacts tests générés: {len(artefacts)}")
-    for a in artefacts:
-        st.write(f"- {a.artifact_id} | {a.name} | {a.path}")
-        if a.kind == "table":
-            st.dataframe(pd.read_csv(a.path))
+st.divider()
+st.subheader("Tests de stationnarité (ADF + KPSS si dispo)")
+p_adf = latest_table(run_id, "adf_")
+if p_adf:
+    st.dataframe(read_table_csv(p_adf), use_container_width=True)
+    st.caption(str(p_adf))
+else:
+    st.info("ADF absent.")
 
-if do_decide:
-    decision, artefact = decide_ts_ds(ctx, var=var)
-    st.success(f"Décision: {decision}")
-    st.write(f"- {artefact.artifact_id} | {artefact.name} | {artefact.path}")
-    st.json(json.loads(Path(artefact.path).read_text(encoding="utf-8")))
-
-st.caption("Tous les résultats sont stockés en artefacts dans app/outputs/runs/<run_id>/artefacts/.")
+p_kpss = latest_table(run_id, "kpss_")
+if p_kpss:
+    st.dataframe(read_table_csv(p_kpss), use_container_width=True)
+    st.caption(str(p_kpss))

@@ -1,60 +1,50 @@
 from __future__ import annotations
-import pandas as pd
+
 import streamlit as st
+from src.utils.session_state import get_state
+from src.utils.run_reader import read_manifest, latest_table, latest_figure, read_table_csv
 
-from src.utils.settings import settings
-from src.utils.session_state import get_session
-from src.utils.paths import ensure_dirs
-from src.agent.tools import ToolContext
-from src.econometrics.cointegration import engle_granger_artefacts, johansen_artefacts
-from src.econometrics.impulse import irf_fevd_artefacts
+st.title("4 — Résultats (cointegration / IRF / FEVD)")
 
-st.set_page_config(page_title="Résultats", layout="wide")
-st.title("Résultats — Cointégration, VAR/VECM, IRF/FEVD")
-
-sess = get_session(st)
-
-def load_df_ms() -> pd.DataFrame:
-    from src.data_pipeline.loader import load_local_excel
-    from src.data_pipeline.harmonize import harmonize_monthly_index
-    raw = load_local_excel()
-    df_ms, _ = harmonize_monthly_index(raw, "Date")
-    return df_ms
-
-if not sess.current_run_id:
-    st.info("Aucun run actif. Lance un run depuis Accueil/Agent.")
+state = get_state()
+run_id = state.selected_run_id
+if not run_id:
+    st.warning("Aucune run sélectionnée.")
     st.stop()
 
-df = load_df_ms()
-run_dirs = ensure_dirs(settings.outputs_dir, sess.current_run_id)
-ctx = ToolContext(run_id=sess.current_run_id, run_dirs=run_dirs, memory={"df_ms": df})
+st.caption(f"Run: {run_id}")
+st.json(read_manifest(run_id))
 
-vars_sel = st.multiselect("Variables (système)", options=list(df.columns), default=list(df.columns)[:3])
-lags = st.slider("Lags (Johansen / IRF)", 1, 12, 4)
+st.divider()
+st.subheader("Cointegration — Engle-Granger (pairwise)")
+p_eg = latest_table(run_id, "engle_granger")
+if p_eg:
+    st.dataframe(read_table_csv(p_eg), use_container_width=True)
+    st.caption(str(p_eg))
+else:
+    st.info("Engle-Granger absent (lancer eco_resultats).")
 
-col1, col2, col3 = st.columns(3)
-if col1.button("Engle-Granger (pairwise vs 1ère variable)"):
-    artefacts = engle_granger_artefacts(ctx, vars=vars_sel)
-    st.success(f"Artefacts Engle-Granger: {len(artefacts)}")
-    for a in artefacts:
-        st.write(f"- {a.artefact_id} | {a.name} | {a.path}")
-        if a.kind == "table":
-            st.dataframe(pd.read_csv(a.path))
+st.subheader("Cointegration — Johansen (trace)")
+p_j = latest_table(run_id, "johansen_trace")
+if p_j:
+    st.dataframe(read_table_csv(p_j), use_container_width=True)
+    st.caption(str(p_j))
+else:
+    st.info("Johansen absent.")
 
-if col2.button("Johansen"):
-    artefacts = johansen_artefacts(ctx, vars=vars_sel, det_order=0, k_ar_diff=lags)
-    st.success(f"Artefacts Johansen: {len(artefacts)}")
-    for a in artefacts:
-        st.write(f"- {a.artefact_id} | {a.name} | {a.path}")
-        if a.kind == "table":
-            st.dataframe(pd.read_csv(a.path))
+st.divider()
+st.subheader("IRF")
+p_irf = latest_figure(run_id, "irf")
+if p_irf:
+    st.image(str(p_irf), use_container_width=True)
+    st.caption(str(p_irf))
+else:
+    st.info("IRF absent.")
 
-if col3.button("IRF + FEVD (VAR)"):
-    artefacts = irf_fevd_artefacts(ctx, vars=vars_sel, max_lag=min(lags, 8), horizon=24)
-    st.success(f"Artefacts IRF/FEVD: {len(artefacts)}")
-    for a in artefacts:
-        st.write(f"- {a.artefact_id} | {a.name} | {a.path}")
-        if a.kind == "figure":
-            st.image(a.path)
-        if a.kind == "table":
-            st.dataframe(pd.read_csv(a.path))
+st.subheader("FEVD (résumé)")
+p_fevd = latest_table(run_id, "fevd")
+if p_fevd:
+    st.dataframe(read_table_csv(p_fevd), use_container_width=True)
+    st.caption(str(p_fevd))
+else:
+    st.info("FEVD absent.")

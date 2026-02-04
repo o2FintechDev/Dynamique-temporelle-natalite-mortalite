@@ -1,66 +1,34 @@
 from __future__ import annotations
-import pandas as pd
+
 import streamlit as st
+from src.utils.session_state import get_state
+from src.utils.run_reader import read_manifest, latest_table, read_table_csv
 
-from src.utils.settings import settings
-from src.utils.session_state import get_session
-from src.utils.paths import ensure_dirs
-from src.agent.tools import ToolContext
-from src.econometrics.univariate import fit_univariate_grid_artefacts
-from src.econometrics.multivariate import fit_var_artefacts, granger_artefacts
+st.title("3 — Modèles (univarié / multivarié)")
 
-st.set_page_config(page_title="Modèles", layout="wide")
-st.title("Modèles — Estimation & comparaison")
-
-sess = get_session(st)
-
-def load_df_ms() -> pd.DataFrame:
-    from src.data_pipeline.loader import load_local_excel
-    from src.data_pipeline.harmonize import harmonize_monthly_index
-    raw = load_local_excel()
-    df_ms, _ = harmonize_monthly_index(raw, "Date")
-    return df_ms
-
-if not sess.current_run_id:
-    st.info("Aucun run actif. Lance un run depuis Accueil/Agent.")
+state = get_state()
+run_id = state.selected_run_id
+if not run_id:
+    st.warning("Aucune run sélectionnée.")
     st.stop()
 
-df = load_df_ms()
-run_dirs = ensure_dirs(settings.outputs_dir, sess.current_run_id)
-ctx = ToolContext(run_id=sess.current_run_id, run_dirs=run_dirs, memory={"df_ms": df})
+st.caption(f"Run: {run_id}")
+st.json(read_manifest(run_id))
 
-st.header("Univarié")
-var = st.selectbox("Variable univariée", options=list(df.columns), index=0)
-max_p = st.slider("max p (AR)", 0, 6, 3)
-max_q = st.slider("max q (MA)", 0, 6, 3)
-max_d = st.slider("max d (diff)", 0, 2, 1)
+st.divider()
+st.subheader("Grid ARIMA (AIC/BIC)")
+p_grid = latest_table(run_id, "univariate_grid_")
+if p_grid:
+    st.dataframe(read_table_csv(p_grid), use_container_width=True)
+    st.caption(str(p_grid))
+else:
+    st.info("Grid ARIMA absent (lancer une run avec eco_modelisation).")
 
-if st.button("Fit grid ARIMA (fallback ARMA/AR/MA)"):
-    artefacts = fit_univariate_grid_artefacts(ctx, var=var, max_p=max_p, max_q=max_q, max_d=max_d)
-    st.success(f"Artefacts modèles univariés: {len(artefacts)}")
-    for a in artefacts:
-        st.write(f"- {a.artefact_id} | {a.name} | {a.path}")
-        if a.kind == "table":
-            st.dataframe(pd.read_csv(a.path))
-
-st.header("Multivarié (VAR)")
-target = st.selectbox("Cible VAR", options=list(df.columns), index=0)
-exogs = st.multiselect("Variables incluses (endog VAR)", options=list(df.columns), default=[target])
-max_lag = st.slider("Lag max", 1, 12, 6)
-
-col1, col2 = st.columns(2)
-if col1.button("Fit VAR (sélection AIC/BIC)"):
-    artefacts = fit_var_artefacts(ctx, vars=list(dict.fromkeys(exogs)), max_lag=max_lag)
-    st.success(f"Artefacts VAR: {len(artefacts)}")
-    for a in artefacts:
-        st.write(f"- {a.artefact_id} | {a.name} | {a.path}")
-        if a.kind == "table":
-            st.dataframe(pd.read_csv(a.path))
-
-if col2.button("Causalité de Granger (pairwise)"):
-    artefacts = granger_artefacts(ctx, vars=list(dict.fromkeys(exogs)), max_lag=min(max_lag, 6))
-    st.success(f"Artefacts Granger: {len(artefacts)}")
-    for a in artefacts:
-        st.write(f"- {a.artefact_id} | {a.name} | {a.path}")
-        if a.kind == "table":
-            st.dataframe(pd.read_csv(a.path))
+st.divider()
+st.subheader("VAR — sélection de lag")
+p_var = latest_table(run_id, "var_selection")
+if p_var:
+    st.dataframe(read_table_csv(p_var), use_container_width=True)
+    st.caption(str(p_var))
+else:
+    st.info("VAR selection absente (si multivarié non lancé).")
