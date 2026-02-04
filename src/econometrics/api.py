@@ -1,4 +1,3 @@
-# econometrics/api.py
 from __future__ import annotations
 
 from typing import Any
@@ -83,4 +82,3 @@ def resultats_pack(df: pd.DataFrame, *, vars: list[str]) -> Pack:
     _merge_pack(out, run_cointegration_pack(df, vars=vars))
     _merge_pack(out, run_impulse_pack(df, vars=vars))
     return out
-
