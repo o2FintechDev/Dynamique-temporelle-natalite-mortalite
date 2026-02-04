@@ -1,73 +1,44 @@
-#  app/pages/3_Modeles.py
-from __future__ import annotations
-
 import streamlit as st
-
 from src.utils.session_state import get_state
-from src.utils.run_reader import RunManager, read_table_csv, read_manifest, read_metric_json
+from src.utils.run_reader import RunManager, read_table_csv, read_metric_json
 
+st.title("Modèles")
 
-st.title("3 — Modèles (univarié / multivarié)")
-
-state = get_state()
-run_id = state.selected_run_id
+run_id = get_state().selected_run_id or RunManager.get_latest_run_id()
 if not run_id:
-    st.warning("Aucune run sélectionnée.")
+    st.warning("Aucun run.")
     st.stop()
 
-manifest = read_manifest(run_id)
-st.caption(f"Run: {run_id}")
-st.json(manifest)
+def show_tbl(label: str, title: str):
+    p = RunManager.get_artefact_path(label, run_id=run_id)
+    if p:
+        st.subheader(title)
+        st.dataframe(read_table_csv(p), use_container_width=True)
+    else:
+        st.warning(f"Artefact absent: {label}")
 
-# Déduction simple de y (cible) : 1ère variable du manifest si présent
-y = None
-vars_ = manifest.get("variables") or []
-if vars_:
-    y = vars_[0]
+def show_fig(label: str, caption: str):
+    p = RunManager.get_artefact_path(label, run_id=run_id)
+    if p:
+        st.image(str(p), caption=caption, use_container_width=True)
+    else:
+        st.warning(f"Artefact absent: {label}")
 
-if not y:
-    st.info("Variable cible inconnue dans le manifest. Lance une run de modélisation avec variables explicites.")
-    st.stop()
+show_tbl("tbl.uni.selection", "Sélection ARIMA (AIC/BIC)")
+show_tbl("tbl.uni.resid_diag", "Diagnostics résidus (Ljung-Box / Normalité / ARCH)")
+show_tbl("tbl.uni.memory", "Analyse de mémoire (R/S, Hurst)")
 
-st.divider()
-st.subheader("ARIMA — Grid (AIC/BIC)")
+for lab, cap in [("fig.uni.fit","Fit ARIMA"),("fig.uni.resid_acf","ACF résidus"),("fig.uni.qq","QQ-plot")]:
+    show_fig(lab, cap)
 
-label_grid = f"univariate_grid_{y}"
-p_grid = RunManager.get_artefact_path(label_grid, run_id=run_id)
-if p_grid:
-    st.dataframe(read_table_csv(p_grid), width='stretch')
-    st.caption(str(p_grid))
-else:
-    st.info("Donnée non disponible pour ce type de run (grid ARIMA). Lance une run avec 'Modélisation'.")
+m_best = RunManager.get_artefact_path("m.uni.best", run_id=run_id)
+if m_best:
+    best = read_metric_json(m_best).get("best", {})
+    st.markdown(
+        f"**Interprétation (courte)** : Le modèle retenu minimise l’AIC (ordre={best.get('order')}). "
+        "Les diagnostics résidus valident (ou invalident) l’adéquation via Ljung-Box/ARCH/normalité."
+    )
 
-st.subheader("ARIMA — Meilleur modèle (metric)")
-
-label_best = f"univariate_best_{y}"
-p_best = RunManager.get_artefact_path(label_best, run_id=run_id)
-if p_best:
-    metric = read_metric_json(p_best)
-    st.json(metric)
-    st.caption(str(p_best))
-else:
-    st.info("Donnée non disponible pour ce type de run (meilleur ARIMA).")
-
-st.divider()
-st.subheader("VAR — sélection de lag")
-
-label_var = "var_selection"
-p_var = RunManager.get_artefact_path(label_var, run_id=run_id)
-if p_var:
-    st.dataframe(read_table_csv(p_var), width='stretch')
-    st.caption(str(p_var))
-else:
-    st.info("Donnée non disponible pour ce type de run (VAR).")
-
-st.subheader("Granger — pairwise (optionnel)")
-
-label_granger = "granger_pairwise"
-p_g = RunManager.get_artefact_path(label_granger, run_id=run_id)
-if p_g:
-    st.dataframe(read_table_csv(p_g), width='stretch')
-    st.caption(str(p_g))
-else:
-    st.info("Donnée non disponible pour ce type de run (Granger).")
+p = RunManager.get_artefact_path("m.note.stepX", run_id=run_id)
+if p:
+    st.markdown(read_metric_json(p).get("markdown",""))

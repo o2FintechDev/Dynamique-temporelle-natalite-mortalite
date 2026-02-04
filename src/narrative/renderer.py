@@ -1,51 +1,35 @@
 # src/narrative/renderer.py
 from __future__ import annotations
 
-from typing import Any
+from pathlib import Path
+from typing import Any, Dict
+import json
+from datetime import datetime, timezone
+
+from src.utils.run_writer import RunWriter
 
 
-def render_anthropology(*, facts: dict[str, Any]) -> dict[str, Any]:
+def _utc_ts() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def append_to_narrative(runs_dir: str, run_id: str, step_name: str, data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Offline, cadré, auditable.
-    Entrée: facts = faits économétriques extraits depuis metrics de la run.
-    Sortie: {"markdown": "...", "refs": [...], "meta": {...}}
-      - refs: liste de labels d'artefacts/metrics qui justifient les faits
+    Enrichit narrative.json sous blocks[step_name] (append-only logique).
     """
-    y = facts.get("y", "NA")
+    rw = RunWriter(Path(runs_dir), run_id)
+    p = rw.paths.narrative_path
+    obj = json.loads(p.read_text(encoding="utf-8"))
 
-    # Faits stylisés (strict): uniquement keys présentes dans facts
-    refs = facts.get("_refs", [])
-    meta = {
-        "y": y,
-        "contract": "facts_only_from_metrics",
-        "note": "Interprétation anthropologique séparée des faits économétriques.",
-    }
+    blocks = obj.get("blocks", {})
+    step_block = blocks.get(step_name, {})
+    # merge simple (step-level). Si tu veux list-append, fais-le côté data.
+    step_block.update(data)
+    step_block["updated_at"] = _utc_ts()
+    blocks[step_name] = step_block
 
-    md: list[str] = []
-    md.append("# Analyse anthropologique (cadrée, offline)")
-    md.append("")
-    md.append("## Faits économétriques (issus des métriques du run)")
-    md.append("Ces points reprennent uniquement des valeurs présentes dans les métriques persistées.")
-    md.append("")
+    obj["blocks"] = blocks
+    obj["updated_at"] = _utc_ts()
 
-    # Affichage stable, sans bruit interne
-    for k, v in facts.items():
-        if k.startswith("_"):
-            continue
-        md.append(f"- **{k}** : `{v}`")
-
-    md.append("")
-    md.append("## Hypothèses anthropologiques (cadre Todd, non-testé économétriquement)")
-    md.append("- Les ruptures/variations mises en évidence sont traitées comme **faits stylisés** (pas de causalité démontrée).")
-    md.append("- Cadre Todd (lecture longue) : normes familiales, structures de reproduction sociale, cycles longs comme **grille** d’interprétation.")
-    md.append("- Toute hypothèse reste **conditionnelle** aux artefacts et ne remplace pas une identification causale.")
-    md.append("")
-    md.append("## Traçabilité")
-    if refs:
-        md.append("Références (labels d’artefacts/metrics) :")
-        for r in refs:
-            md.append(f"- `{r}`")
-    else:
-        md.append("Aucune référence explicite trouvée : la run ne contient pas (encore) de métriques exploitables pour l’analyse.")
-
-    return {"markdown": "\n".join(md), "refs": refs, "meta": meta}
+    p.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+    return obj

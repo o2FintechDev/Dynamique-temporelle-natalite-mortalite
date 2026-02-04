@@ -1,218 +1,273 @@
-# app/streamlit_app.py
-from __future__ import annotations
-
-import hashlib
-from datetime import datetime, timezone
-
+import sys
+from pathlib import Path
+import os
+import json
+import re
+import requests
 import streamlit as st
 
-from src.utils.run_context import init_run_context
-from src.utils.session_state import get_state, set_current_run_id, set_last_query
-from src.utils.run_reader import list_runs, read_manifest
-from src.utils.logger import get_logger
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-from src.agent.schemas import Plan, ToolCall
+from src.utils.run_reader import list_runs, RunManager, read_metric_json
+from src.utils.session_state import get_state
 from src.agent.executor import AgentExecutor
-
-# NEW (J7)
-from src.agent.intent import classify_intent
-from src.agent.planner import make_plan
-
-log = get_logger("app.streamlit_app")
-
-
-ALL_COLS = [
-    "taux_naissances",
-    "taux_décès",
-    "Croissance_Naturelle",
-    "Nb_mariages",
-    "IPC",
-    "Masse_Monétaire",
-]
-
-
-def make_run_id(user_query: str) -> str:
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    h = hashlib.sha1(user_query.encode("utf-8")).hexdigest()[:10]
-    return f"{ts}_{h}"
-
-
-def build_plan(run_type: str, target_y: str, predictors_x: list[str]) -> Plan:
-    """
-    Construit un Plan "manuel" conforme au contrat.
-    (Le mode Auto utilise make_plan() directement)
-    """
-    y = target_y
-    x = [v for v in predictors_x if v != y]
-
-    if run_type == "Exploration complète":
-        return Plan(
-            intent="exploration",
-            page_targets=["1_Exploration"],
-            tool_calls=[
-                ToolCall(
-                    tool_name="pipeline_load_and_profile",
-                    variables=ALL_COLS,
-                    params={},
-                ),
-            ],
-            notes="Launcher: exploration complète",
-        )
-
-    if run_type == "Méthodologie seule (ACF/PACF/ADF)":
-        return Plan(
-            intent="methodologie",
-            page_targets=["2_Methodologie"],
-            tool_calls=[
-                ToolCall(
-                    tool_name="eco_diagnostics",
-                    variables=[y],
-                    params={"y": y, "lags": 24},
-                ),
-            ],
-            notes="Launcher: diagnostics méthodologie",
-        )
-
-    if run_type == "Modélisation (ARIMA + VAR + Granger)":
-        return Plan(
-            intent="modelisation",
-            page_targets=["3_Modeles"],
-            tool_calls=[
-                ToolCall(
-                    tool_name="eco_modelisation",
-                    variables=[y] + x,
-                    params={"y": y, "x": x},
-                ),
-            ],
-            notes="Launcher: modélisation complète",
-        )
-
-    if run_type == "Résultats (Cointegration + IRF/FEVD)":
-        vars_ = [y] + x if x else [y]
-        return Plan(
-            intent="resultats",
-            page_targets=["4_Resultats"],
-            tool_calls=[
-                ToolCall(
-                    tool_name="eco_resultats",
-                    variables=vars_,
-                    params={"vars": vars_},
-                ),
-            ],
-            notes="Launcher: résultats",
-        )
-
-    if run_type == "Anthropologie (Todd)":
-        return Plan(
-            intent="anthropologie",
-            page_targets=["5_Analyse_Anthropologique"],
-            tool_calls=[
-                ToolCall(
-                    tool_name="narrative_anthropology",
-                    variables=[y],
-                    params={"y": y},
-                ),
-            ],
-            notes="Launcher: anthropologie",
-        )
-
-    # fallback safe
-    return Plan(
-        intent="exploration",
-        page_targets=["1_Exploration"],
-        tool_calls=[ToolCall(tool_name="pipeline_load_and_profile", variables=ALL_COLS, params={})],
-        notes="Launcher fallback",
-    )
-
+from src.agent.schemas import Plan, ToolCall
 
 st.set_page_config(page_title="AnthroDem Lab", layout="wide")
-st.title("AnthroDem Lab — Agent IA interprétatif (offline)")
-
 state = get_state()
 
+Y = "Croissance_Naturelle"
+
+# ---------------------------
+# Orchestration
+# ---------------------------
+def run_step(step_name: str, params: dict) -> str:
+    plan = Plan(intent=step_name, tool_calls=[ToolCall(step_name, [Y], params)])
+    ex = AgentExecutor(user_query=f"{step_name} via chatbot")
+    res = ex.run(plan)
+    state.selected_run_id = res.run_id
+    return res.run_id
+
+def append_assistant(md: str) -> None:
+    st.session_state.chat_messages.append({"role": "assistant", "content": md})
+
+def show_note(run_id: str, note_label: str) -> None:
+    p = RunManager.get_artefact_path(note_label, run_id=run_id)
+    if p:
+        payload = read_metric_json(p)
+        md = payload.get("markdown")
+        if md:
+            append_assistant(md)
+
+# ---------------------------
+# LLM Router (API) + fallback
+# ---------------------------
+PLAN_STEPS = [
+    ("step1_load_and_profile", "m.note.step1", "Traitement des données"),
+    ("step2_descriptive",      "m.note.step2", "Analyse descriptive + décomposition"),
+    ("step3_stationarity",     "m.note.step3", "Diagnostics & stationnarité"),
+    ("step4_univariate",       "m.note.step4", "Analyse univariée"),
+    ("step5_var",              "m.note.step5", "Analyse multivariée VAR"),
+    ("step6_cointegration",    "m.note.step6", "Cointégration & long terme"),
+    ("step7_anthropology",     "m.note.step7", "Analyse anthropologique"),
+]
+
+def next_step_hint(step_name: str) -> str | None:
+    names = [s[0] for s in PLAN_STEPS]
+    if step_name in names:
+        i = names.index(step_name)
+        return names[i + 1] if i + 1 < len(names) else "export_latex_pdf"
+    if step_name == "RUN_ALL":
+        return "export_latex_pdf"
+    return None
+
+def fallback_route(user_text: str) -> dict:
+    t = user_text.strip().lower()
+
+    # global
+    if any(k in t for k in ["run all", "run_all", "pipeline complet", "tout", "lance tout", "analyse complète"]):
+        return {"action": "RUN_ALL"}
+    if any(k in t for k in ["export", "latex", "pdf", "rapport"]):
+        return {"action": "export_latex_pdf"}
+
+    # steps
+    if any(k in t for k in ["step1", "étape 1", "traitement", "nettoyage", "profil", "coverage"]):
+        return {"action": "step1_load_and_profile"}
+    if any(k in t for k in ["step2", "étape 2", "décomposition", "decomposition", "stl", "descriptive"]):
+        return {"action": "step2_descriptive"}
+    if any(k in t for k in ["step3", "étape 3", "stationnar", "adf", "phillips", "pp", "acf", "pacf", "diagnostic"]):
+        return {"action": "step3_stationarity"}
+    if any(k in t for k in ["step4", "étape 4", "arima", "univari", "hurst", "rs", "rescaled"]):
+        return {"action": "step4_univariate"}
+    if any(k in t for k in ["step5", "étape 5", "var", "granger", "irf", "fevd"]):
+        return {"action": "step5_var"}
+    if any(k in t for k in ["step6", "étape 6", "cointegr", "johansen", "engle", "vecm"]):
+        return {"action": "step6_cointegration"}
+    if any(k in t for k in ["step7", "étape 7", "todd", "anthrop"]):
+        return {"action": "step7_anthropology"}
+
+    if any(k in t for k in ["aide", "help", "?"]):
+        return {"action": "HELP"}
+
+    return {"action": None}
+
+def llm_route(user_text: str) -> dict:
+    """
+    Retour: {"action": <tool_name|RUN_ALL|export_latex_pdf|HELP|None>, "confidence": float, "reason": str}
+    Si pas de clé API -> fallback.
+    """
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        out = fallback_route(user_text)
+        out["confidence"] = 0.50 if out["action"] else 0.0
+        out["reason"] = "fallback(no_api_key)"
+        return out
+
+    # Prompt strict: produire uniquement un JSON
+    system = (
+        "Tu es un routeur d'intentions pour une application économétrique. "
+        "Tu dois choisir UNE action parmi la liste autorisée. "
+        "Retourne STRICTEMENT un JSON minifié."
+    )
+    allowed = [s[0] for s in PLAN_STEPS] + ["RUN_ALL", "export_latex_pdf", "HELP", None]
+    user = (
+        "Actions autorisées:\n"
+        "- step1_load_and_profile\n- step2_descriptive\n- step3_stationarity\n- step4_univariate\n"
+        "- step5_var\n- step6_cointegration\n- step7_anthropology\n- RUN_ALL\n- export_latex_pdf\n- HELP\n\n"
+        f"Texte utilisateur: {user_text}\n\n"
+        "Réponds sous forme JSON minifié: "
+        '{"action":"<...|null>","confidence":0-1,"reason":"..."}'
+    )
+
+    # Appel API minimal (chat completions)
+    try:
+        r = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+                "temperature": 0.0,
+            },
+            timeout=30,
+        )
+        r.raise_for_status()
+        content = r.json()["choices"][0]["message"]["content"].strip()
+        obj = json.loads(content)
+
+        action = obj.get("action", None)
+        if action is None:
+            return {"action": None, "confidence": float(obj.get("confidence", 0)), "reason": obj.get("reason", "llm_null")}
+
+        if action not in allowed:
+            # sécurité : si LLM hallucine, on fallback
+            out = fallback_route(user_text)
+            out["confidence"] = 0.40 if out["action"] else 0.0
+            out["reason"] = "llm_invalid_action_fallback"
+            return out
+
+        return {
+            "action": action,
+            "confidence": float(obj.get("confidence", 0.7)),
+            "reason": obj.get("reason", "llm"),
+        }
+    except Exception:
+        out = fallback_route(user_text)
+        out["confidence"] = 0.40 if out["action"] else 0.0
+        out["reason"] = "llm_error_fallback"
+        return out
+
+def help_text() -> str:
+    return (
+        "Je peux exécuter une étape à partir d'une phrase libre.\n\n"
+        "**Exemples**:\n"
+        "- `Nettoie les données et fais le profil` → step1\n"
+        "- `Fais la décomposition STL` → step2\n"
+        "- `Lance les tests ADF/PP et TS vs DS` → step3\n"
+        "- `Estime un ARIMA et diagnostics` → step4\n"
+        "- `VAR + IRF/FEVD` → step5\n"
+        "- `Cointégration Johansen + VECM` → step6\n"
+        "- `Analyse Todd` → step7\n"
+        "- `Lance tout` → RUN_ALL\n"
+        "- `Export PDF` → export\n\n"
+        "Si `OPENAI_API_KEY` est définie, le parsing est LLM; sinon fallback mots-clés."
+    )
+
+# ---------------------------
+# UI
+# ---------------------------
+st.title("AnthroDem Lab — Chatbot économétrique (Croissance naturelle, 1975–2025)")
+st.caption("Contrat: variable cible unique (Croissance_Naturelle). Les pages lisent via manifest.lookup (zéro recalcul).")
+
+runs = list_runs()
 with st.sidebar:
     st.header("Runs")
-    runs = list_runs()
-
-    default_idx = 0
-    if state.selected_run_id and state.selected_run_id in runs:
-        default_idx = runs.index(state.selected_run_id)
-
-    selected = st.selectbox("Run sélectionnée", options=runs, index=default_idx if runs else 0)
+    latest = RunManager.get_latest_run_id()
+    default = state.selected_run_id or latest
     if runs:
-        state.selected_run_id = selected
-
-    st.divider()
-    st.header("Launcher")
-
-    run_type = st.radio(
-        "Type d'analyse",
-        options=[
-            "Auto (intent + planner)",
-            "Exploration complète",
-            "Méthodologie seule (ACF/PACF/ADF)",
-            "Modélisation (ARIMA + VAR + Granger)",
-            "Résultats (Cointegration + IRF/FEVD)",
-            "Anthropologie (Todd)",
-        ],
-        index=0,
-    )
-
-    user_query = st.text_area("Requête (audit)", value=state.last_user_query or "", height=110)
-
-    # Champs manuels (désactivables si Auto)
-    manual_enabled = run_type != "Auto (intent + planner)"
-    st.caption("Paramètres manuels (ignorés en mode Auto)")
-
-    target_y = st.selectbox("Variable cible (Y)", options=ALL_COLS, index=0, disabled=not manual_enabled)
-
-    predictors_x = st.multiselect(
-        "Prédicteurs (X) — utilisés si requis",
-        options=[c for c in ALL_COLS if c != target_y],
-        default=["IPC", "Masse_Monétaire"] if target_y not in ["IPC", "Masse_Monétaire"] else ["Nb_mariages"],
-        disabled=not manual_enabled,
-    )
-
-    launch = st.button("Lancer l'analyse", type="primary")
-
-
-if launch:
-    # user_query obligatoire en Auto (sinon pas d’intent)
-    uq = user_query.strip()
-    if run_type == "Auto (intent + planner)" and not uq:
-        st.error("En mode Auto, la requête ne peut pas être vide.")
-        st.stop()
-
-    # fallback texte si manuel sans requête
-    if not uq:
-        uq = f"{run_type} | y={target_y} | x={predictors_x}"
-
-    run_id = make_run_id(uq)
-
-    init_run_context(run_id)
-    set_current_run_id(run_id)
-    set_last_query(uq)
-
-    # Plan
-    if run_type == "Auto (intent + planner)":
-        intent = classify_intent(uq)
-        plan = make_plan(intent, uq)
-        # audit: injecte la requête dans les notes
-        plan.notes = (plan.notes or "") + f" | auto_intent={intent}"
+        idx = runs.index(default) if default in runs else 0
+        chosen = st.selectbox("Run actif", runs, index=idx)
+        state.selected_run_id = chosen
+        st.caption(f"Run: {chosen}")
     else:
-        plan = build_plan(run_type, target_y, predictors_x)
-
-    exe = AgentExecutor(user_query=uq)
-    try:
-        res = exe.run(plan)
-        st.success(f"Run créée: {res.run_id} | intent={res.intent}")
-        state.selected_run_id = res.run_id
-    except Exception as e:
-        st.error(str(e))
+        st.warning("Aucun run. Exécute une étape via le chat.")
 
 st.divider()
-if state.selected_run_id:
-    st.subheader("Manifest (run sélectionnée)")
-    st.json(read_manifest(state.selected_run_id))
-else:
-    st.info("Aucune run disponible. Lance une analyse via le Launcher.")
+st.subheader("Chat")
+
+if "chat_messages" not in st.session_state:
+    st.session_state.chat_messages = [
+        {"role": "assistant", "content": "Décris ce que tu veux faire (ex: « fais la décomposition STL » ou « lance tout »)."}
+    ]
+
+for m in st.session_state.chat_messages:
+    with st.chat_message(m["role"]):
+        st.markdown(m["content"])
+
+user_msg = st.chat_input("Ta demande...")
+if user_msg:
+    st.session_state.chat_messages.append({"role": "user", "content": user_msg})
+
+    route = llm_route(user_msg)
+    action = route.get("action")
+    conf = route.get("confidence", 0.0)
+    reason = route.get("reason", "")
+
+    if action in (None, "HELP"):
+        append_assistant(help_text())
+        st.rerun()
+
+    # Exécution
+    if action == "RUN_ALL":
+        # séquence 1→7
+        rid = run_step("step1_load_and_profile", {"y": Y})
+        run_step("step2_descriptive", {"y": Y})
+        run_step("step3_stationarity", {"y": Y, "lags": 24})
+        run_step("step4_univariate", {"y": Y})
+        run_step("step5_var", {"y": Y, "vars_mode": "decomp"})
+        run_step("step6_cointegration", {"y": Y, "vars_mode": "decomp"})
+        run_step("step7_anthropology", {"y": Y})
+
+        append_assistant(f"RUN_ALL terminé. run_id={state.selected_run_id} (route={reason}, confidence={conf:.2f}).")
+        # afficher note step1 + step2 (tu peux étendre)
+        show_note(state.selected_run_id, "m.note.step1")
+        show_note(state.selected_run_id, "m.note.step2")
+        append_assistant("Tu peux maintenant aller sur les pages 2→6 pour voir tables/figures, puis taper `export pdf`.")
+        st.rerun()
+
+    if action == "export_latex_pdf":
+        rid = state.selected_run_id or RunManager.get_latest_run_id()
+        if not rid:
+            append_assistant("Export impossible: aucun run disponible. Exécute d’abord une étape (ex: « step1 »).")
+            st.rerun()
+        rid2 = run_step("export_latex_pdf", {"run_id": rid})
+        append_assistant(f"Export demandé sur run_id={rid}. (route={reason}, confidence={conf:.2f})")
+        st.rerun()
+
+    # Étapes 1..7
+    params = {"y": Y}
+    if action == "step3_stationarity":
+        params["lags"] = 24
+    if action in {"step5_var", "step6_cointegration"}:
+        params["vars_mode"] = "decomp"
+
+    rid = run_step(action, params)
+    append_assistant(f"Étape exécutée: `{action}`. run_id={rid}. (route={reason}, confidence={conf:.2f})")
+
+    # afficher note persistée de l'étape
+    note_label = None
+    for s_name, s_note, _ in PLAN_STEPS:
+        if s_name == action:
+            note_label = s_note
+            break
+    if note_label:
+        show_note(rid, note_label)
+
+    # proposer next step
+    nxt = next_step_hint(action)
+    if nxt:
+        append_assistant(f"Étape suivante suggérée: `{nxt}`.")
+
+    st.rerun()

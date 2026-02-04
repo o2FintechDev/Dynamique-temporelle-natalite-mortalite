@@ -1,73 +1,189 @@
-# uils/run_writer.py
+# src/utils/run_writer.py
 from __future__ import annotations
 
 import json
-import pickle
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, Optional
+import uuid
 
-import pandas as pd
 
-from .run_context import get_current_run
+def _utc_ts() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
-def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+def deep_merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Deep merge: b enrichit a.
+    - dict -> merge récursif
+    - list -> concat (sans dédup automatique pour rester déterministe)
+    - scalaires -> overwrite par b
+    """
+    out = dict(a)
+    for k, v in b.items():
+        if k not in out:
+            out[k] = v
+            continue
+        if isinstance(out[k], dict) and isinstance(v, dict):
+            out[k] = deep_merge(out[k], v)
+        elif isinstance(out[k], list) and isinstance(v, list):
+            out[k] = out[k] + v
+        else:
+            out[k] = v
+    return out
+
+
+@dataclass(frozen=True)
+class RunPaths:
+    run_dir: Path
+    artefacts_dir: Path
+    figures_dir: Path
+    tables_dir: Path
+    metrics_dir: Path
+    models_dir: Path
+    logs_dir: Path
+    manifest_path: Path
+    narrative_path: Path
+    latex_dir: Path
+    latex_master_path: Path
+
 
 class RunWriter:
-    def __init__(self) -> None:
-        self.ctx = get_current_run()
-        self._counters: dict[str, int] = {"fig": 0, "table": 0, "metric": 0, "model": 0}
+    """
+    Structure attendue :
+    app/outputs/runs/<run_id>/
+      manifest.json
+      narrative.json
+      artefacts/{figures,tables,metrics,models}/...
+      latex/{blocks/*.tex, master.tex}
+      logs/...
+    """
 
-    def _next(self, kind: str) -> int:
-        self._counters[kind] += 1
-        return self._counters[kind]
+    def __init__(self, base_runs_dir: Path, run_id: str) -> None:
+        self.base_runs_dir = base_runs_dir
+        self.run_id = run_id
+        self.paths = self._init_dirs()
+
+    @classmethod
+    def create_new(cls, base_runs_dir: Path) -> "RunWriter":
+        run_id = f"{_utc_ts()}_{uuid.uuid4().hex[:10]}"
+        return cls(base_runs_dir, run_id)
+
+    def _init_dirs(self) -> RunPaths:
+        run_dir = self.base_runs_dir / self.run_id
+        artefacts_dir = run_dir / "artefacts"
+        figures_dir = artefacts_dir / "figures"
+        tables_dir = artefacts_dir / "tables"
+        metrics_dir = artefacts_dir / "metrics"
+        models_dir = artefacts_dir / "models"
+        logs_dir = run_dir / "logs"
+        latex_dir = run_dir / "latex"
+        blocks_dir = latex_dir / "blocks"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        for d in [artefacts_dir, figures_dir, tables_dir, metrics_dir, models_dir, logs_dir, latex_dir, blocks_dir]:
+            d.mkdir(parents=True, exist_ok=True)
+
+        manifest_path = run_dir / "manifest.json"
+        narrative_path = run_dir / "narrative.json"
+        latex_master_path = latex_dir / "master.tex"
+
+        if not manifest_path.exists():
+            self._write_json(
+                manifest_path,
+                {
+                    "run_id": self.run_id,
+                    "created_at": _utc_ts(),
+                    "lookup": {"figures": {}, "tables": {}, "metrics": {}, "models": {}, "latex_blocks": {}},
+                    "artefacts": {"figures": [], "tables": [], "metrics": [], "models": [], "latex_blocks": []},
+                    "steps": {},
+                },
+            )
+        if not narrative_path.exists():
+            self._write_json(narrative_path, {"run_id": self.run_id, "blocks": {}, "updated_at": _utc_ts()})
+        if not latex_master_path.exists():
+            latex_master_path.write_text(self._latex_master_skeleton(), encoding="utf-8")
+
+        return RunPaths(
+            run_dir=run_dir,
+            artefacts_dir=artefacts_dir,
+            figures_dir=figures_dir,
+            tables_dir=tables_dir,
+            metrics_dir=metrics_dir,
+            models_dir=models_dir,
+            logs_dir=logs_dir,
+            manifest_path=manifest_path,
+            narrative_path=narrative_path,
+            latex_dir=latex_dir,
+            latex_master_path=latex_master_path,
+        )
+
+    def _latex_master_skeleton(self) -> str:
+        # Master minimal, les blocs seront inclus via \input{blocks/<step>.tex}
+        return r"""\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{geometry}
+\geometry{margin=2.2cm}
+
+\title{Croissance naturelle en France (1975--2025) : Analyse économétrique \& lecture anthropologique}
+\author{AnthroDem Lab}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+% --- BLOCKS (auto) ---
+% \input{blocks/<step_name>.tex}
+
+\end{document}
+"""
+
+    def read_manifest(self) -> Dict[str, Any]:
+        return self._read_json(self.paths.manifest_path)
+
+    def update_manifest(self, patch: Dict[str, Any]) -> Dict[str, Any]:
+        current = self.read_manifest()
+        merged = deep_merge(current, patch)
+        merged["updated_at"] = _utc_ts()
+        self._write_json_atomic(self.paths.manifest_path, merged)
+        return merged
+
+    def register_step_status(self, step_name: str, *, status: str, summary: Optional[str] = None) -> Dict[str, Any]:
+        patch = {"steps": {step_name: {"status": status, "summary": summary, "ts": _utc_ts()}}}
+        return self.update_manifest(patch)
+
+    def register_artefact(
+        self,
+        kind: str,  # figures|tables|metrics|models|latex_blocks
+        lookup_key: str,
+        rel_path: str,
+        meta: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        meta = meta or {}
+        artefact_obj = {"key": lookup_key, "path": rel_path, "meta": meta, "ts": _utc_ts()}
+        patch = {
+            "lookup": {kind: {lookup_key: rel_path}},
+            "artefacts": {kind: [artefact_obj]},
+        }
+        return self.update_manifest(patch)
 
     @staticmethod
-    def _slug(s: str) -> str:
-        return s.strip().lower().replace(" ", "_").replace("-", "_").replace("__", "_")
+    def _read_json(path: Path) -> Dict[str, Any]:
+        return json.loads(path.read_text(encoding="utf-8"))
 
-    def save_table(self, df: pd.DataFrame, slug: str) -> Path:
-        i = self._next("table")
-        name = f"table_{i:03d}_{self._slug(slug)}.csv"
-        path = self.ctx.tables / name
-        df.to_csv(path, index=True)
-        return path
+    @staticmethod
+    def _write_json(path: Path, obj: Dict[str, Any]) -> None:
+        path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    def save_metric(self, payload: dict[str, Any], slug: str) -> Path:
-        i = self._next("metric")
-        name = f"metric_{i:03d}_{self._slug(slug)}.json"
-        path = self.ctx.metrics / name
-        _write_json(path, payload)
-        return path
-
-    def save_model_pickle(self, obj: Any, slug: str) -> Path:
-        i = self._next("model")
-        name = f"model_{i:03d}_{self._slug(slug)}.pkl"
-        path = self.ctx.models / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "wb") as f:
-            pickle.dump(obj, f)
-        return path
-
-    def save_figure(self, fig: Any, slug: str) -> Path:
-        """
-        fig: matplotlib.figure.Figure
-        """
-        i = self._next("fig")
-        name = f"fig_{i:03d}_{self._slug(slug)}.png"
-        path = self.ctx.figures / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(path, dpi=150, bbox_inches="tight")
-        return path
-
-    def save_manifest(self, manifest: dict[str, Any]) -> Path:
-        manifest = dict(manifest)
-        manifest.setdefault("created_at_utc", utc_now_iso())
-        path = self.ctx.root / "manifest.json"
-        _write_json(path, manifest)
-        return path
+    @staticmethod
+    def _write_json_atomic(path: Path, obj: Dict[str, Any]) -> None:
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(path)

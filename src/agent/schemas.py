@@ -1,48 +1,57 @@
 # src/agent/schemas.py
 from __future__ import annotations
+from dataclasses import dataclass
+from typing import Any
 
-from typing import Any, Dict, List, Optional, Literal
-from pydantic import BaseModel, Field
+@dataclass
+class ToolCall:
+    tool_name: str
+    variables: list[str]
+    params: dict[str, Any]
 
-Intent = Literal["exploration", "methodologie", "modelisation", "resultats", "anthropologie", "export"]
+@dataclass
+class Plan:
+    intent: str
+    tool_calls: list[ToolCall]
 
-
-class ToolCall(BaseModel):
-    tool_name: str = Field(..., description="Nom logique de l'outil agent (clé tools.py)")
-    variables: List[str] = Field(default_factory=list)
-    params: Dict[str, Any] = Field(default_factory=dict)
-
-
-class Plan(BaseModel):
-    intent: Intent
-    page_targets: List[str] = Field(default_factory=list, description="Pages Streamlit à alimenter")
-    tool_calls: List[ToolCall] = Field(default_factory=list)
-    notes: Optional[str] = None
-
-
-class ArtefactRef(BaseModel):
-    kind: Literal["figure", "table", "metric", "model", "manifest"]
+@dataclass
+class ArtefactRef:
+    kind: str
     path: str
-    label: Optional[str] = None
+    label: str | None = None
 
+    def dict(self) -> dict[str, Any]:
+        return {"kind": self.kind, "path": self.path, "label": self.label}
 
-class ExecutionResult(BaseModel):
+@dataclass
+class ExecutionResult:
     run_id: str
-    intent: Intent
-    variables: List[str] = Field(default_factory=list)
-    tools_called: List[str] = Field(default_factory=list)
-    artefacts: List[ArtefactRef] = Field(default_factory=list)
+    intent: str
+    variables: list[str]
+    tools_called: list[str]
+    artefacts: list[ArtefactRef]
 
-
-class Manifest(BaseModel):
+@dataclass
+class Manifest:
     run_id: str
     created_at_utc: str
     user_query: str
-    intent: Intent
-    tools_called: List[str]
-    variables: List[str]
-    artefacts: List[Dict[str, Any]] = Field(default_factory=list)
-    versions: Dict[str, str] = Field(default_factory=dict)
+    intent: str
+    tools_called: list[str]
+    variables: list[str]
+    artefacts: list[dict[str, Any]]
+    versions: dict[str, Any]
+    lookup: dict[str, str]
 
-    # accès direct artefact par label (ex: manifest.lookup["acf_plot"] -> path)
-    lookup: Dict[str, str] = Field(default_factory=dict)
+    def dict(self) -> dict[str, Any]:
+        return {
+            "run_id": self.run_id,
+            "created_at_utc": self.created_at_utc,
+            "user_query": self.user_query,
+            "intent": self.intent,
+            "tools_called": self.tools_called,
+            "variables": self.variables,
+            "artefacts": self.artefacts,
+            "versions": self.versions,
+            "lookup": self.lookup,
+        }
