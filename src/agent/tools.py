@@ -60,9 +60,9 @@ def eco_diagnostics(*, variables: list[str], y: str, lags: int = 24, **params: A
     return diagnostics_pack(df, y=y)  # tables+metrics+figures
 
 @register("eco_modelisation")
-def eco_modelisation(*, variables: list[str], y: str, x: list[str] | None = None, **params: Any) -> dict[str, Any]:
+def eco_modelisation(*, variables: list[str], y: str, x: list[str] | None = None, with_granger: bool = True, **params: Any) -> dict[str, Any]:
     df = harmonize(load_clean_dataset())
-    return modelisation_pack(df, y=y, x=x)
+    return modelisation_pack(df, y=y, x=x, with_granger=with_granger)
 
 @register("eco_resultats")
 def eco_resultats(*, variables: list[str], vars: list[str], **params: Any) -> dict[str, Any]:
