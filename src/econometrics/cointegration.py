@@ -2,92 +2,71 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pandas as pd
 from statsmodels.tsa.stattools import coint
 from statsmodels.tsa.vector_ar.vecm import coint_johansen
 
-from src.agent.schemas import Artefact
-from src.agent.tools import ToolContext, _next_id
-from src.visualization.tables import save_table_csv
 
-
-def _get_df(ctx: ToolContext, vars: list[str]) -> pd.DataFrame:
-    df: pd.DataFrame = ctx.memory["df_ms"]
+def _prep_df(df: pd.DataFrame, vars: list[str]) -> pd.DataFrame:
     cols = [v for v in vars if v in df.columns]
-    d = df[cols].copy()
     if "Date" in df.columns:
-        tmp = df[["Date"] + cols].copy()
-        tmp["Date"] = pd.to_datetime(tmp["Date"], errors="coerce")
-        tmp = tmp.dropna(subset=["Date"]).sort_values("Date")
-        d = tmp[cols].copy()
-    return d.apply(pd.to_numeric, errors="coerce")
+        d = df[["Date"] + cols].copy()
+        d["Date"] = pd.to_datetime(d["Date"], errors="coerce")
+        d = d.dropna(subset=["Date"]).sort_values("Date")
+        X = d[cols].apply(pd.to_numeric, errors="coerce")
+    else:
+        X = df[cols].apply(pd.to_numeric, errors="coerce")
+    return X.dropna()
 
 
-def engle_granger_artefacts(ctx: ToolContext, vars: list[str]) -> list[Artefact]:
-    vars = [v for v in vars if v is not None]
-    data = _get_df(ctx, vars).dropna()
+def run_cointegration_pack(df: pd.DataFrame, *, vars: list[str]) -> dict[str, Any]:
+    X = _prep_df(df, vars)
+    nobs = int(X.shape[0])
+    k = int(X.shape[1])
 
-    if data.shape[1] < 2 or data.shape[0] < 30:
-        tab = pd.DataFrame([{"error": "Engle-Granger nécessite >=2 variables et nobs>=30"}])
-        aid = _next_id(ctx, "table")
-        p = ctx.run_dirs.tables_dir / f"{aid}_engle_granger.csv"
-        save_table_csv(tab, p)
-        return [Artefact(artefact_id=aid, kind="table", name="engle_granger", path=str(p), meta={"vars": vars})]
+    if k < 2 or nobs < 50:
+        tab = pd.DataFrame([{"error": f"Cointegration: nécessite >=2 variables et nobs>=50 (k={k}, nobs={nobs})"}])
+        return {"tables": {"engle_granger": tab, "johansen_trace": tab.copy()}, "metrics": {"cointegration_meta": {"vars": vars, "nobs": nobs}}}
 
-    # Pairwise (plus robuste que “base only”)
-    rows: list[dict] = []
-    cols = list(data.columns)
+    # Engle-Granger pairwise
+    rows = []
+    cols = list(X.columns)
     for i in range(len(cols)):
         for j in range(i + 1, len(cols)):
-            x, y = cols[i], cols[j]
+            a, b = cols[i], cols[j]
             try:
-                stat, pval, crit = coint(data[x].values, data[y].values)
+                stat, pval, crit = coint(X[a].values, X[b].values)
                 rows.append({
-                    "x": x,
-                    "y": y,
-                    "coint_stat": float(stat),
+                    "x": a,
+                    "y": b,
+                    "stat": float(stat),
                     "pvalue": float(pval),
-                    "nobs": int(data.shape[0]),
+                    "nobs": nobs,
                     "crit_1": float(crit[0]),
                     "crit_5": float(crit[1]),
                     "crit_10": float(crit[2]),
                 })
             except Exception as e:
-                rows.append({"x": x, "y": y, "error": str(e)})
+                rows.append({"x": a, "y": b, "error": str(e)})
 
-    tab = pd.DataFrame(rows).sort_values(["pvalue"], na_position="last")
+    eg = pd.DataFrame(rows).sort_values(["pvalue"], na_position="last")
 
-    aid = _next_id(ctx, "table")
-    p = ctx.run_dirs.tables_dir / f"{aid}_engle_granger.csv"
-    save_table_csv(tab, p)
-    return [Artefact(artefact_id=aid, kind="table", name="engle_granger", path=str(p), meta={"vars": cols})]
-
-
-def johansen_artefacts(ctx: ToolContext, vars: list[str], det_order: int = 0, k_ar_diff: int = 4) -> list[Artefact]:
-    data = _get_df(ctx, vars).dropna()
-    if data.shape[1] < 2 or data.shape[0] < 50:
-        tab = pd.DataFrame([{"error": "Johansen nécessite >=2 variables et nobs>=50"}])
-        aid = _next_id(ctx, "table")
-        p = ctx.run_dirs.tables_dir / f"{aid}_johansen.csv"
-        save_table_csv(tab, p)
-        return [Artefact(artefact_id=aid, kind="table", name="johansen", path=str(p), meta={"vars": vars, "det_order": det_order, "k_ar_diff": k_ar_diff})]
-
+    # Johansen (trace)
     try:
-        res = coint_johansen(data.values, det_order=det_order, k_ar_diff=k_ar_diff)
-        rows = []
-        for i, stat in enumerate(res.lr1):
-            rows.append({
-                "rank_tested": i,
-                "trace_stat": float(stat),
-                "cv_90": float(res.cvt[i, 0]),
-                "cv_95": float(res.cvt[i, 1]),
-                "cv_99": float(res.cvt[i, 2]),
-            })
-        tab = pd.DataFrame(rows)
+        joh = coint_johansen(X.values, det_order=0, k_ar_diff=1)
+        joh_tab = pd.DataFrame({
+            "rank": list(range(len(joh.lr1))),
+            "trace_stat": joh.lr1,
+            "crit_90": joh.cvt[:, 0],
+            "crit_95": joh.cvt[:, 1],
+            "crit_99": joh.cvt[:, 2],
+        })
     except Exception as e:
-        tab = pd.DataFrame([{"error": str(e)}])
+        joh_tab = pd.DataFrame([{"error": str(e)}])
 
-    aid = _next_id(ctx, "table")
-    p = ctx.run_dirs.tables_dir / f"{aid}_johansen.csv"
-    save_table_csv(tab, p)
-    return [Artefact(artefact_id=aid, kind="table", name="johansen", path=str(p), meta={"vars": list(data.columns), "det_order": det_order, "k_ar_diff": k_ar_diff})]
+    return {
+        "tables": {"engle_granger": eg, "johansen_trace": joh_tab},
+        "metrics": {"cointegration_meta": {"vars": cols, "nobs": nobs}},
+    }

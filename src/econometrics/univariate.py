@@ -1,84 +1,87 @@
 # econometrics/univariate.py
 from __future__ import annotations
 
-import json
-import numpy as np
-import pandas as pd
+from typing import Any
 
+import pandas as pd
+import numpy as np
 from statsmodels.tsa.arima.model import ARIMA
 
-from src.agent.schemas import Artefact
-from src.agent.tools import ToolContext, _next_id
-from src.visualization.tables import save_table_csv
 
-
-def _get_series(ctx: ToolContext, var: str) -> pd.Series:
-    df: pd.DataFrame = ctx.memory["df_ms"]
+def _prep_series(df: pd.DataFrame, y: str) -> pd.Series:
     if "Date" in df.columns:
-        tmp = df[["Date", var]].copy()
-        tmp["Date"] = pd.to_datetime(tmp["Date"], errors="coerce")
-        tmp = tmp.dropna(subset=["Date"]).sort_values("Date")
-        s = tmp[var].astype(float)
+        d = df[["Date", y]].copy()
+        d["Date"] = pd.to_datetime(d["Date"], errors="coerce")
+        d = d.dropna(subset=["Date"]).sort_values("Date")
+        s = pd.to_numeric(d[y], errors="coerce")
     else:
-        s = df[var].astype(float)
-    return s.dropna()
+        s = pd.to_numeric(df[y], errors="coerce")
+    return s.dropna().astype(float)
 
 
-def fit_univariate_grid_artefacts(
-    ctx: ToolContext,
-    var: str,
-    max_p: int = 3,
-    max_q: int = 3,
-    max_d: int = 1,
-) -> list[Artefact]:
-    y = _get_series(ctx, var)
+def run_univariate_pack(
+    df: pd.DataFrame,
+    *,
+    y: str,
+    grid: list[tuple[int, int, int]] | None = None,
+) -> dict[str, Any]:
+    """
+    Produit:
+      - table univariate_grid_<y> (p,d,q,aic,bic,nobs ou error)
+      - metric univariate_best_<y>
+      - model best_arima_<y> (statsmodels ARIMAResults) picklable
+    """
+    s = _prep_series(df, y)
+    n = int(len(s))
+
+    if n < 40:
+        tab = pd.DataFrame([{"error": f"ARIMA: n_obs trop faible (n={n})"}])
+        return {
+            "tables": {f"univariate_grid_{y}": tab},
+            "metrics": {f"univariate_best_{y}": {"y": y, "n_obs": n, "best_order_aic": None, "best_aic": None}},
+        }
+
+    if grid is None:
+        grid = [(p, d, q) for p in range(0, 4) for d in range(0, 2) for q in range(0, 4) if not (p == 0 and d == 0 and q == 0)]
 
     rows = []
-    best = {"aic": float("inf"), "bic": float("inf"), "order": None}
+    best_order = None
+    best_aic = float("inf")
+    best_bic = float("inf")
+    best_model = None
 
-    if len(y) < 40:
-        tab = pd.DataFrame([{"error": f"ARIMA grid: série trop courte (n={len(y)})"}])
-        aid = _next_id(ctx, "table")
-        p = ctx.run_dirs.tables_dir / f"{aid}_univariate_grid_{var}.csv"
-        save_table_csv(tab, p)
-        aid2 = _next_id(ctx, "metric")
-        pm = ctx.run_dirs.metrics_dir / f"{aid2}_univariate_best_{var}.json"
-        pm.write_text(json.dumps({"best": best, "error": "series_too_short"}, ensure_ascii=False, indent=2), encoding="utf-8")
-        return [
-            Artefact(artefact_id=aid, kind="table", name=f"univariate_grid_{var}", path=str(p), meta={"max_p": max_p, "max_q": max_q, "max_d": max_d}),
-            Artefact(artefact_id=aid2, kind="metric", name=f"univariate_best_{var}", path=str(pm), meta={"best": best}),
-        ]
+    yv = s.values
 
-    for d in range(max_d + 1):
-        for p_ in range(max_p + 1):
-            for q_ in range(max_q + 1):
-                if p_ == 0 and d == 0 and q_ == 0:
-                    continue
-                order = (p_, d, q_)
-                try:
-                    m = ARIMA(y.values, order=order, trend="c").fit()
-                    aic = float(m.aic)
-                    bic = float(m.bic)
-                    rows.append({"p": p_, "d": d, "q": q_, "aic": aic, "bic": bic, "nobs": int(m.nobs)})
+    for (p, d, q) in grid:
+        try:
+            m = ARIMA(yv, order=(p, d, q), trend="c").fit()
+            aic = float(m.aic)
+            bic = float(m.bic)
+            rows.append({"p": p, "d": d, "q": q, "aic": aic, "bic": bic, "nobs": int(m.nobs)})
+            if aic < best_aic:
+                best_aic = aic
+                best_bic = bic
+                best_order = (p, d, q)
+                best_model = m
+        except Exception as e:
+            rows.append({"p": p, "d": d, "q": q, "error": str(e)})
 
-                    if aic < best["aic"]:
-                        best = {"aic": aic, "bic": bic, "order": order}
-                except Exception as e:
-                    rows.append({"p": p_, "d": d, "q": q_, "error": str(e)})
+    grid_df = pd.DataFrame(rows)
+    if "aic" in grid_df.columns:
+        grid_df = grid_df.sort_values("aic", na_position="last").reset_index(drop=True)
 
-    tab = pd.DataFrame(rows)
-    if "aic" in tab.columns:
-        tab = tab.sort_values(["aic"], na_position="last").reset_index(drop=True)
+    metrics = {
+        f"univariate_best_{y}": {
+            "y": y,
+            "n_obs": n,
+            "best_order_aic": best_order,
+            "best_aic": None if best_order is None else float(best_aic),
+            "best_bic": None if best_order is None else float(best_bic),
+        }
+    }
 
-    aid = _next_id(ctx, "table")
-    p = ctx.run_dirs.tables_dir / f"{aid}_univariate_grid_{var}.csv"
-    save_table_csv(tab, p)
+    models: dict[str, Any] = {}
+    if best_model is not None:
+        models[f"best_arima_{y}"] = best_model
 
-    aid2 = _next_id(ctx, "metric")
-    pm = ctx.run_dirs.metrics_dir / f"{aid2}_univariate_best_{var}.json"
-    pm.write_text(json.dumps({"best": best, "var": var, "nobs": int(len(y))}, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    return [
-        Artefact(artefact_id=aid, kind="table", name=f"univariate_grid_{var}", path=str(p), meta={"max_p": max_p, "max_q": max_q, "max_d": max_d}),
-        Artefact(artefact_id=aid2, kind="metric", name=f"univariate_best_{var}", path=str(pm), meta={"best": best}),
-    ]
+    return {"tables": {f"univariate_grid_{y}": grid_df}, "metrics": metrics, "models": models}
