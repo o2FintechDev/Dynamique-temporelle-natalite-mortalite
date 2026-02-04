@@ -1,49 +1,88 @@
 from __future__ import annotations
-import json
-from pathlib import Path
+
+import platform
 from typing import Any
 
-from src.agent.schemas import Plan, Artefact
-from src.agent.tools import (
-    ToolContext,
-    tool_load_data,
-    tool_coverage_report,
-    tool_plot_timeseries,
-    tool_describe_stats,
-)
-from src.utils.logger import get_logger
-from src.utils.settings import settings
+import pandas as pd
 
-log = get_logger("agent.executor", settings.log_level)
+from src.agent.schemas import Plan, ExecutionResult, ArtefactRef, Manifest
+from src.agent.tools import get_tool
+from src.utils.run_writer import RunWriter, utc_now_iso
+from src.utils import get_logger
 
-TOOL_REGISTRY = {
-    "load_data": lambda ctx, **p: tool_load_data(ctx),
-    "coverage_report": lambda ctx, **p: tool_coverage_report(ctx),
-    "plot_timeseries": lambda ctx, **p: tool_plot_timeseries(ctx, **p),
-    "describe_stats": lambda ctx, **p: tool_describe_stats(ctx, **p),
+log = get_logger("agent.executor")
 
-    # econometrics
-    "acf_pacf": lambda ctx, **p: __import__("src.agent.tools", fromlist=["tool_acf_pacf"]).tool_acf_pacf(ctx, **p),
-    "stationarity_tests": lambda ctx, **p: __import__("src.agent.tools", fromlist=["tool_stationarity_tests"]).tool_stationarity_tests(ctx, **p),
-    "ts_ds_decision": lambda ctx, **p: __import__("src.agent.tools", fromlist=["tool_ts_ds_decision"]).tool_ts_ds_decision(ctx, **p),
-    "fit_univariate_models": lambda ctx, **p: __import__("src.agent.tools", fromlist=["tool_fit_univariate_models"]).tool_fit_univariate_models(ctx, **p),
-    "fit_var_model": lambda ctx, **p: __import__("src.agent.tools", fromlist=["tool_fit_var_model"]).tool_fit_var_model(ctx, **p),
-}
+class AgentExecutor:
+    """
+    Exécute un Plan:
+      - appelle tools.py (mapping strict)
+      - persiste systématiquement les sorties via RunWriter
+      - produit un manifest.json canonique
+    """
+    def __init__(self, user_query: str) -> None:
+        self.user_query = user_query
+        self.writer = RunWriter()
 
+    def run(self, plan: Plan) -> ExecutionResult:
+        tools_called: list[str] = []
+        variables: list[str] = []
+        artefacts: list[ArtefactRef] = []
 
-def execute_plan(plan: Plan, ctx: ToolContext) -> list[Artefact]:
-    artefacts: list[Artefact] = []
-    for call in plan.calls:
-        tool = call.tool
-        params = call.params or {}
-        try:
-            if tool not in TOOL_REGISTRY:
-                log.warning(json.dumps({"event": "tool_missing", "tool": tool}, ensure_ascii=False))
-                continue
-            out = TOOL_REGISTRY[tool](ctx, **params)
-            artefacts.extend(out)
-        except Exception as e:
-            # fallback offline: on log et on continue
-            log.error(json.dumps({"event": "tool_error", "tool": tool, "error": str(e)}, ensure_ascii=False))
-            continue
-    return artefacts
+        for call in plan.tool_calls:
+            tools_called.append(call.tool_name)
+            variables.extend(call.variables)
+
+            fn = get_tool(call.tool_name)
+            out = fn(variables=call.variables, **call.params)  # dict sérialisable
+
+            # Convention de sorties:
+            # out may contain: {"tables": {slug: df}, "metrics": {slug: dict}, "models": {slug: obj}}
+            if "tables" in out:
+                for slug, df in out["tables"].items():
+                    if not isinstance(df, pd.DataFrame):
+                        raise TypeError(f"Table '{slug}' doit être un DataFrame.")
+                    p = self.writer.save_table(df, slug)
+                    artefacts.append(ArtefactRef(kind="table", path=str(p), label=slug))
+
+            if "metrics" in out:
+                for slug, payload in out["metrics"].items():
+                    if not isinstance(payload, dict):
+                        raise TypeError(f"Metric '{slug}' doit être un dict.")
+                    p = self.writer.save_metric(payload, slug)
+                    artefacts.append(ArtefactRef(kind="metric", path=str(p), label=slug))
+
+            if "models" in out:
+                for slug, obj in out["models"].items():
+                    p = self.writer.save_model_pickle(obj, slug)
+                    artefacts.append(ArtefactRef(kind="model", path=str(p), label=slug))
+
+            # Figures: volontairement gérées plus tard (charts.py) mais même logique attendue:
+            # out["figures"] = {slug: matplotlib_figure} (optionnel, J2)
+            # -> on implémentera l’export figure J2 pour éviter les divergences.
+
+        result = ExecutionResult(
+            run_id=self.writer.ctx.run_id,
+            intent=plan.intent,
+            variables=sorted(set(variables)),
+            tools_called=tools_called,
+            artefacts=artefacts,
+        )
+
+        manifest = Manifest(
+            run_id=self.writer.ctx.run_id,
+            created_at_utc=utc_now_iso(),
+            user_query=self.user_query,
+            intent=plan.intent,
+            tools_called=tools_called,
+            variables=sorted(set(variables)),
+            artefacts=[a.model_dump() for a in artefacts],
+            versions={
+                "python": platform.python_version(),
+                "platform": platform.platform(),
+            },
+        ).model_dump()
+
+        mp = self.writer.save_manifest(manifest)
+        artefacts.append(ArtefactRef(kind="manifest", path=str(mp), label="manifest"))
+
+        return result

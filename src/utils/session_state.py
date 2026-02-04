@@ -1,18 +1,31 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
+
+from dataclasses import dataclass
 from typing import Any
 
+import streamlit as st
+
 @dataclass
-class AppSession:
+class AnthroDemState:
     current_run_id: str | None = None
-    last_plan: dict[str, Any] | None = None
-    last_narrative: str | None = None
-    last_artefacts: list[dict[str, Any]] = field(default_factory=list)
+    selected_run_id: str | None = None
+    last_user_query: str | None = None
+    last_intent: str | None = None
 
-def ensure_session_state(st) -> None:
-    if "anthrodem" not in st.session_state:
-        st.session_state["anthrodem"] = AppSession()
+_KEY = "anthrodem_state"
 
-def get_session(st) -> AppSession:
-    ensure_session_state(st)
-    return st.session_state["anthrodem"]
+def get_state() -> AnthroDemState:
+    if _KEY not in st.session_state:
+        st.session_state[_KEY] = AnthroDemState()
+    return st.session_state[_KEY]
+
+def set_current_run_id(run_id: str) -> None:
+    s = get_state()
+    s.current_run_id = run_id
+    s.selected_run_id = run_id
+
+def set_last_query(query: str, intent: str | None = None) -> None:
+    s = get_state()
+    s.last_user_query = query
+    if intent is not None:
+        s.last_intent = intent

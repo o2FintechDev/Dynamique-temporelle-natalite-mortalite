@@ -1,30 +1,37 @@
 from __future__ import annotations
-import json
+
 import logging
-from datetime import datetime
-from typing import Any
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
-def get_logger(name: str, level: str = "INFO") -> logging.Logger:
-    logger = logging.getLogger(name)
-    if logger.handlers:
-        return logger
+from .run_context import get_current_run
 
-    logger.setLevel(getattr(logging, level.upper(), logging.INFO))
-    handler = logging.StreamHandler()
+_FMT = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 
-    class JsonFormatter(logging.Formatter):
-        def format(self, record: logging.LogRecord) -> str:
-            payload: dict[str, Any] = {
-                "ts": datetime.utcnow().isoformat(timespec="seconds") + "Z",
-                "level": record.levelname,
-                "logger": record.name,
-                "msg": record.getMessage(),
-            }
-            if record.exc_info:
-                payload["exc_info"] = self.formatException(record.exc_info)
-            return json.dumps(payload, ensure_ascii=False)
+def get_logger(name: str) -> logging.Logger:
+    log = logging.getLogger(name)
+    if log.handlers:
+        return log
 
-    handler.setFormatter(JsonFormatter())
-    logger.addHandler(handler)
-    logger.propagate = False
-    return logger
+    log.setLevel(logging.INFO)
+
+    # Console handler
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    ch.setFormatter(logging.Formatter(_FMT))
+    log.addHandler(ch)
+
+    # File handler bound to current run (if available)
+    try:
+        ctx = get_current_run()
+        logfile = ctx.logs / "run.log"
+        fh = RotatingFileHandler(logfile, maxBytes=2_000_000, backupCount=3, encoding="utf-8")
+        fh.setLevel(logging.INFO)
+        fh.setFormatter(logging.Formatter(_FMT))
+        log.addHandler(fh)
+    except Exception:
+        # run_context not initialised yet: ignore file logging
+        pass
+
+    log.propagate = False
+    return log

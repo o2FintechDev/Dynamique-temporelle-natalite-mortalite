@@ -1,45 +1,48 @@
 from __future__ import annotations
-from dataclasses import dataclass
+
 from pathlib import Path
-from datetime import datetime
-import hashlib
-import json
 
-@dataclass(frozen=True)
-class RunPaths:
-    run_id: str
-    run_dir: Path
-    artefacts_dir: Path
-    figures_dir: Path
-    tables_dir: Path
-    metrics_dir: Path
-    models_dir: Path
-    logs_dir: Path
+def repo_root() -> Path:
+    # repo_root = parent of "src"
+    return Path(__file__).resolve().parents[2]
 
-def make_run_id(payload: dict) -> str:
-    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-    h = hashlib.sha1(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()[:10]
-    return f"{ts}_{h}"
+def app_dir() -> Path:
+    return repo_root() / "app"
 
-def ensure_dirs(base_outputs_dir: Path, run_id: str) -> RunPaths:
-    run_dir = base_outputs_dir / "runs" / run_id
-    artefacts_dir = run_dir / "artefacts"
-    figures_dir = artefacts_dir / "figures"
-    tables_dir = artefacts_dir / "tables"
-    metrics_dir = artefacts_dir / "metrics"
-    models_dir = artefacts_dir / "models"
-    logs_dir = run_dir / "logs"
+def data_dir() -> Path:
+    return repo_root() / "data"
 
-    for d in [figures_dir, tables_dir, metrics_dir, models_dir, logs_dir]:
-        d.mkdir(parents=True, exist_ok=True)
+def outputs_dir() -> Path:
+    return app_dir() / "outputs"
 
-    return RunPaths(
-        run_id=run_id,
-        run_dir=run_dir,
-        artefacts_dir=artefacts_dir,
-        figures_dir=figures_dir,
-        tables_dir=tables_dir,
-        metrics_dir=metrics_dir,
-        models_dir=models_dir,
-        logs_dir=logs_dir,
-    )
+def runs_dir() -> Path:
+    return outputs_dir() / "runs"
+
+def ensure_dirs(*paths: Path) -> None:
+    for p in paths:
+        p.mkdir(parents=True, exist_ok=True)
+
+def run_dir(run_id: str) -> Path:
+    return runs_dir() / run_id
+
+def run_logs_dir(run_id: str) -> Path:
+    return run_dir(run_id) / "logs"
+
+def run_artefacts_dir(run_id: str) -> Path:
+    return run_dir(run_id) / "artefacts"
+
+def run_artefacts_subdirs(run_id: str) -> dict[str, Path]:
+    base = run_artefacts_dir(run_id)
+    return {
+        "figures": base / "figures",
+        "tables": base / "tables",
+        "metrics": base / "metrics",
+        "models": base / "models",
+    }
+
+def ensure_run_tree(run_id: str) -> dict[str, Path]:
+    ensure_dirs(runs_dir())
+    rd = run_dir(run_id)
+    sub = run_artefacts_subdirs(run_id)
+    ensure_dirs(rd, run_logs_dir(run_id), run_artefacts_dir(run_id), *sub.values())
+    return {"run": rd, "logs": run_logs_dir(run_id), **sub}
