@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import pandas as pd
-from src.utils import get_logger
+from src.utils.logger import get_logger
+
 
 log = get_logger("data_pipeline.coverage_report")
 

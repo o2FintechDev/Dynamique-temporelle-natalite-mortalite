@@ -5,7 +5,7 @@ from typing import Callable, Any
 
 import pandas as pd
 
-from src.utils import get_logger
+from src.utils.logger import get_logger
 from src.data_pipeline.loader import load_clean_dataset
 from src.data_pipeline.harmonize import harmonize
 from src.data_pipeline.coverage_report import coverage_report

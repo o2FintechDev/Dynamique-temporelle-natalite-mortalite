@@ -10,7 +10,7 @@ import matplotlib.figure as mpl_fig
 from src.agent.schemas import Plan, ExecutionResult, ArtefactRef, Manifest
 from src.agent.tools import get_tool
 from src.utils.run_writer import RunWriter, utc_now_iso
-from src.utils import get_logger
+from src.utils.logger import get_logger
 
 log = get_logger("agent.executor")
 

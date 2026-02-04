@@ -1,7 +1,27 @@
 @echo off
-REM Lancer l'application Streamlit AnthroDem Lab
-del
-streamlit run app\streamlit_app.py
+setlocal EnableExtensions
 
-REM Garder la fenêtre ouverte en cas d'erreur
-pause
+cd /d "%~dp0"
+
+if not exist "src\" (
+  echo [ERREUR] "src" introuvable. Ce .bat doit etre a la racine du projet.
+  pause
+  exit /b 1
+)
+
+set "PYTHONPATH=%cd%"
+
+if exist "venv\Scripts\activate.bat" (
+  call "venv\Scripts\activate.bat"
+)
+
+python -m streamlit run "app\streamlit_app.py"
+
+if errorlevel 1 (
+  echo.
+  echo [ERREUR] Streamlit KO (code=%errorlevel%).
+  pause
+  exit /b %errorlevel%
+)
+
+endlocal

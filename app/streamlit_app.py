@@ -9,7 +9,7 @@ import streamlit as st
 from src.utils.run_context import init_run_context
 from src.utils.session_state import get_state, set_current_run_id, set_last_query
 from src.utils.run_reader import list_runs, read_manifest
-from src.utils import get_logger
+from src.utils.logger import get_logger
 
 from src.agent.schemas import Plan, ToolCall
 from src.agent.executor import AgentExecutor
