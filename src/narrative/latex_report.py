@@ -42,6 +42,7 @@ def export_report_tex_from_manifest(
     run_root = Path(run_root)
     run_root.mkdir(parents=True, exist_ok=True)
 
+    # IMPORTANT: ne jamais réutiliser ce nom pour une fonction
     tex_path = run_root / tex_name
 
     run_id = manifest.get("run_id", "") or manifest.get("meta", {}).get("run_id", "")
@@ -70,7 +71,8 @@ def export_report_tex_from_manifest(
                     p = lookup[k]
         return str(p or "")
 
-    def include_graphic(path_str: str) -> str:
+    # --- Helpers chemins : 1) raw pour IfFileExists, 2) protégé pour includegraphics/input/pgfplotstable
+    def relpath_posix(path_str: str) -> str:
         p = Path(path_str)
         abs_p = (run_root / p).resolve() if not p.is_absolute() else p
         try:
@@ -78,47 +80,35 @@ def export_report_tex_from_manifest(
             return str(rel).replace("\\", "/")
         except Exception:
             return str(abs_p).replace("\\", "/")
-    
-    def tex_path_str(path_str: str) -> str:
-        """
-        Chemin LaTeX robuste : convertit en relatif au run_root + protège caractères spéciaux.
-        Utilise \detokenize{...} pour éviter les soucis avec _, %, #, espaces, etc.
-        """
-        p = Path(path_str)
-        abs_p = (run_root / p).resolve() if not p.is_absolute() else p
-        try:
-            rel = abs_p.relative_to(run_root.resolve())
-            rel_s = str(rel).replace("\\", "/")
-        except Exception:
-            rel_s = str(abs_p).replace("\\", "/")
-        return r"\detokenize{" + rel_s + "}"
 
+    def tex_path_str(path_str: str) -> str:
+        return r"\detokenize{" + relpath_posix(path_str) + "}"
 
     # IMPORTANT: lines défini dans le scope parent
     lines: list[str] = []
     lines += [
-    r"\documentclass[11pt,a4paper]{article}",
-    r"\usepackage[utf8]{inputenc}",
-    r"\usepackage[T1]{fontenc}",
-    r"\usepackage[french]{babel}",
-    r"\usepackage{geometry}",
-    r"\geometry{margin=2.2cm}",
-    r"\usepackage{graphicx}",
-    r"\usepackage{float}",          # pour [H]
-    r"\usepackage{booktabs}",
-    r"\usepackage{longtable}",
-    r"\usepackage{xcolor}",
-    r"\usepackage{hyperref}",
-    r"\usepackage{pgfplotstable}",  # pour CSV -> table
-    r"\pgfplotsset{compat=1.18}",
-    r"\graphicspath{{./artefacts/figures/}{./}}",
-    r"\DeclareGraphicsExtensions{.pdf,.png,.jpg,.jpeg}",
-    r"\begin{document}",
-    r"\title{" + _escape_tex(title) + r"}",
-    r"\author{" + _escape_tex(author) + r"}",
-    r"\date{" + _escape_tex(created) + r"}",
-    r"\maketitle",
-]
+        r"\documentclass[11pt,a4paper]{article}",
+        r"\usepackage[utf8]{inputenc}",
+        r"\usepackage[T1]{fontenc}",
+        r"\usepackage[french]{babel}",
+        r"\usepackage{geometry}",
+        r"\geometry{margin=2.2cm}",
+        r"\usepackage{graphicx}",
+        r"\usepackage{float}",          # pour [H]
+        r"\usepackage{booktabs}",
+        r"\usepackage{longtable}",
+        r"\usepackage{xcolor}",
+        r"\usepackage{hyperref}",
+        r"\usepackage{pgfplotstable}",  # CSV -> table
+        r"\pgfplotsset{compat=1.18}",
+        r"\graphicspath{{./artefacts/figures/}{./}}",
+        r"\DeclareGraphicsExtensions{.pdf,.png,.jpg,.jpeg}",
+        r"\begin{document}",
+        r"\title{" + _escape_tex(title) + r"}",
+        r"\author{" + _escape_tex(author) + r"}",
+        r"\date{" + _escape_tex(created) + r"}",
+        r"\maketitle",
+    ]
 
     if run_id:
         lines += [r"\textbf{Run ID:} " + _escape_tex(run_id) + r"\\", ""]
@@ -148,7 +138,6 @@ def export_report_tex_from_manifest(
 
             lines_ref.append(r"\subsection{" + _escape_tex(label or path_str or "Artefact") + r"}")
 
-            # Affichage du chemin (optionnel) - ok en verbatim court
             if path_str:
                 lines_ref.append(r"\texttt{" + _escape_tex(path_str) + r"}\\")
             else:
@@ -158,16 +147,17 @@ def export_report_tex_from_manifest(
 
             ext = path_str.lower()
 
-            # --- FIGURES ---
+            # --- FIGURES (png/jpg/jpeg/pdf) ---
             if ext.endswith((".png", ".jpg", ".jpeg", ".pdf")):
-                p_tex = tex_path_str(path_str)
+                raw = relpath_posix(path_str)       # IfFileExists
+                p_tex = tex_path_str(path_str)      # includegraphics
                 lines_ref += [
                     r"\begin{figure}[H]",
                     r"\centering",
-                    rf"\IfFileExists{{{p_tex}}}{{",
-                    rf"\includegraphics[width=0.95\linewidth]{{{p_tex}}}",
+                    r"\IfFileExists{" + raw + r"}{",
+                    r"\includegraphics[width=0.95\linewidth]{" + p_tex + r"}",
                     r"}{",
-                    rf"\fbox{{\textbf{{Figure manquante :}} \texttt{{{_escape_tex(path_str)}}}}}",
+                    r"\fbox{\textbf{Figure manquante :} \texttt{" + _escape_tex(path_str) + r"}}",
                     r"}",
                     r"\caption{" + _escape_tex(label or "Figure") + r"}",
                     r"\label{fig:" + _escape_tex(safe_id) + r"}",
@@ -181,19 +171,19 @@ def export_report_tex_from_manifest(
                 ]
                 continue
 
-            # --- TABLES ---
-            # 1) si .tex -> \input
+            # --- TABLES (.tex) ---
             if ext.endswith(".tex"):
-                p_tex = tex_path_str(path_str)
+                raw = relpath_posix(path_str)       # IfFileExists
+                p_tex = tex_path_str(path_str)      # input
                 lines_ref += [
                     r"\begin{table}[H]",
                     r"\centering",
                     r"\caption{" + _escape_tex(label or "Tableau") + r"}",
                     r"\label{tab:" + _escape_tex(safe_id) + r"}",
-                    rf"\IfFileExists{{{p_tex}}}{{",
-                    rf"\input{{{p_tex}}}",
+                    r"\IfFileExists{" + raw + r"}{",
+                    r"\input{" + p_tex + r"}",
                     r"}{",
-                    rf"\fbox{{\textbf{{Table manquante :}} \texttt{{{_escape_tex(path_str)}}}}}",
+                    r"\fbox{\textbf{Table manquante :} \texttt{" + _escape_tex(path_str) + r"}}",
                     r"}",
                     r"\end{table}",
                     "",
@@ -205,15 +195,16 @@ def export_report_tex_from_manifest(
                 ]
                 continue
 
-            # 2) si .csv -> pgfplotstable
+            # --- TABLES (.csv) ---
             if ext.endswith(".csv"):
-                p_tex = tex_path_str(path_str)
+                raw = relpath_posix(path_str)       # IfFileExists
+                p_tex = tex_path_str(path_str)      # pgfplotstabletypeset
                 lines_ref += [
                     r"\begin{table}[H]",
                     r"\centering",
                     r"\caption{" + _escape_tex(label or "Tableau (CSV)") + r"}",
                     r"\label{tab:" + _escape_tex(safe_id) + r"}",
-                    rf"\IfFileExists{{{p_tex}}}{{",
+                    r"\IfFileExists{" + raw + r"}{",
                     r"\pgfplotstabletypeset[",
                     r"  col sep=comma,",
                     r"  string type,",
@@ -222,7 +213,7 @@ def export_report_tex_from_manifest(
                     r"  every last row/.style={after row=\bottomrule}",
                     r"]{" + p_tex + r"}",
                     r"}{",
-                    rf"\fbox{{\textbf{{CSV manquant :}} \texttt{{{_escape_tex(path_str)}}}}}",
+                    r"\fbox{\textbf{CSV manquant :} \texttt{" + _escape_tex(path_str) + r"}}",
                     r"}",
                     r"\end{table}",
                     "",
@@ -238,9 +229,7 @@ def export_report_tex_from_manifest(
             lines_ref.append(r"\textit{Type de fichier non géré pour rendu LaTeX.}\\")
             lines_ref.append("")
 
-
-
-    # Appels safe
+    # Appels
     section_block(lines, "Figures", figures)
     section_block(lines, "Tables", tables)
     section_block(lines, "Métriques", metrics)
