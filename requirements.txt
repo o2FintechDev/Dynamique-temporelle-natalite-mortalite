@@ -6,3 +6,4 @@ statsmodels
 streamlit>=1.22.0
 requests
 arch
+openpyxl
