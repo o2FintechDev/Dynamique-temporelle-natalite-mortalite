@@ -58,6 +58,7 @@ def var_pack(df_vars: pd.DataFrame, maxlags: int = 12) -> dict[str, Any]:
     tbl_fevd = pd.DataFrame(fevd_rows)
 
     metrics = {"vars": cols, "selected_lag_aic": p, "nobs": int(res.nobs)}
+    
     note5 = (
     f"**Étape 5 — VAR(p)** : sélection AIC → p={p}, variables={cols}, nobs={int(res.nobs)}. "
     "IRF et FEVD décrivent la dynamique interne entre composantes STL (level/trend/seasonal). "

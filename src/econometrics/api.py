@@ -161,6 +161,7 @@ def step4_univariate_pack(df: pd.DataFrame, *, y: str, **params: Any) -> dict[st
     lb_p = None
     arch_p = None
     jb_p = None
+    
     if isinstance(tbl_diag, pd.DataFrame) and "ljungbox_p" in tbl_diag.columns:
         lb_p = float(tbl_diag.loc["diag", "ljungbox_p"])
         jb_p = float(tbl_diag.loc["diag", "jarque_bera_p"])

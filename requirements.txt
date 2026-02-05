@@ -3,6 +3,6 @@ numpy
 scipy
 matplotlib
 statsmodels
-streamlit
+streamlit>=1.22.0
 requests
 arch

@@ -201,18 +201,29 @@ st.title("AnthroDem Lab — Chatbot économétrique (Croissance naturelle, 1975�
 st.caption("Contrat: variable cible unique (Croissance_Naturelle). Les pages lisent via manifest.lookup (zéro recalcul).")
 
 runs = list_runs()
+
 with st.sidebar:
     st.header("Runs")
-    latest = RunManager.get_latest_run_id()
-    default = state.selected_run_id or latest
-    if runs:
-        idx = runs.index(default) if default in runs else 0
-        chosen = st.selectbox("Run actif", runs, index=idx)
+
+    options = ["(Aucun run actif)"] + runs
+    current = state.selected_run_id
+    current_label = current if current else "(Aucun run actif)"
+
+    # position dans la liste
+    try:
+        idx = options.index(current_label)
+    except ValueError:
+        idx = 0  # aucun par défaut
+
+    chosen = st.selectbox("Run actif", options, index=idx)
+
+    if chosen == "(Aucun run actif)":
+        state.selected_run_id = None
+        st.caption("Run: Aucun")
+    else:
         state.selected_run_id = chosen
         st.caption(f"Run: {chosen}")
-    else:
-        st.warning("Aucun run. Exécute une étape via le chat.")
-
+        
 st.divider()
 st.subheader("Chat")
 
