@@ -2,11 +2,15 @@
 from __future__ import annotations
 
 import json
+import os
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 import uuid
+
+from filelock import FileLock
 
 
 def _utc_ts() -> str:
@@ -14,12 +18,6 @@ def _utc_ts() -> str:
 
 
 def deep_merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Deep merge: b enrichit a.
-    - dict -> merge récursif
-    - list -> concat (sans dédup automatique pour rester déterministe)
-    - scalaires -> overwrite par b
-    """
     out = dict(a)
     for k, v in b.items():
         if k not in out:
@@ -51,7 +49,6 @@ class RunPaths:
 
 class RunWriter:
     """
-    Structure attendue :
     app/outputs/runs/<run_id>/
       manifest.json
       narrative.json
@@ -64,6 +61,8 @@ class RunWriter:
         self.base_runs_dir = base_runs_dir
         self.run_id = run_id
         self.paths = self._init_dirs()
+        # Lock unique par run pour éviter collisions Streamlit rerun + Windows handle locks
+        self._manifest_lock = FileLock(str(self.paths.manifest_path.with_suffix(".lock")))
 
     @classmethod
     def create_new(cls, base_runs_dir: Path) -> "RunWriter":
@@ -96,7 +95,6 @@ class RunWriter:
                     "run_id": self.run_id,
                     "created_at": _utc_ts(),
                     "lookup": {"figures": {}, "tables": {}, "metrics": {}, "models": {}, "latex_blocks": {}},
-                    # NOTE: chaque item artefact embarque désormais "page"
                     "artefacts": {"figures": [], "tables": [], "metrics": [], "models": [], "latex_blocks": []},
                     "steps": {},
                 },
@@ -147,14 +145,18 @@ class RunWriter:
 """
 
     def read_manifest(self) -> Dict[str, Any]:
-        return self._read_json(self.paths.manifest_path)
+        # Windows: protéger lecture pendant un replace
+        with self._manifest_lock:
+            return self._read_json(self.paths.manifest_path)
 
     def update_manifest(self, patch: Dict[str, Any]) -> Dict[str, Any]:
-        current = self.read_manifest()
-        merged = deep_merge(current, patch)
-        merged["updated_at"] = _utc_ts()
-        self._write_json_atomic(self.paths.manifest_path, merged)
-        return merged
+        # Une seule écriture du manifest à la fois
+        with self._manifest_lock:
+            current = self._read_json(self.paths.manifest_path)
+            merged = deep_merge(current, patch)
+            merged["updated_at"] = _utc_ts()
+            self._write_json_atomic(self.paths.manifest_path, merged)
+            return merged
 
     def register_step_status(self, step_name: str, *, status: str, summary: Optional[str] = None) -> Dict[str, Any]:
         patch = {"steps": {step_name: {"status": status, "summary": summary, "ts": _utc_ts()}}}
@@ -162,16 +164,13 @@ class RunWriter:
 
     def register_artefact(
         self,
-        kind: str,  # figures|tables|metrics|models|latex_blocks
+        kind: str,
         lookup_key: str,
         rel_path: str,
         *,
         page: Optional[str] = None,
         meta: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """
-        IMPORTANT: 'page' est le routage UI. Chaque page Streamlit filtre uniquement ses artefacts.
-        """
         meta = meta or {}
         artefact_obj = {"key": lookup_key, "path": rel_path, "page": page, "meta": meta, "ts": _utc_ts()}
         patch = {
@@ -192,4 +191,14 @@ class RunWriter:
     def _write_json_atomic(path: Path, obj: Dict[str, Any]) -> None:
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
-        tmp.replace(path)
+
+        last_err: Optional[Exception] = None
+        for _ in range(20):  # ~1s max (20 * 50ms)
+            try:
+                os.replace(tmp, path)  # plus direct et fiable que Path.replace
+                return
+            except PermissionError as e:
+                last_err = e
+                time.sleep(0.05)
+
+        raise last_err if last_err else PermissionError(f"Cannot replace {tmp} -> {path}")

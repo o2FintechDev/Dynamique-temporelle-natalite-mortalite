@@ -57,6 +57,39 @@ def read_manifest(run_id: str) -> dict[str, Any]:
 def read_table_csv(path: Path) -> pd.DataFrame:
     return pd.read_csv(path, index_col=0)
 
+def _find_artefact_item(manifest: dict[str, Any], *, kind: str, label: str) -> dict[str, Any] | None:
+    items = ((manifest.get("artefacts") or {}).get(kind) or [])
+    if not isinstance(items, list):
+        return None
+    return next((it for it in items if isinstance(it, dict) and it.get("key") == label), None)
+
+
+def get_table_dataframe(label: str, *, run_id: str | None = None) -> pd.DataFrame | None:
+    rid = run_id or RunManager.get_latest_run_id()
+    if not rid:
+        return None
+
+    rf = get_run_files(rid)
+    manifest = read_manifest(rid)
+
+    it = _find_artefact_item(manifest, kind="tables", label=label)
+    if it:
+        meta = it.get("meta") or {}
+        csv_rel = meta.get("csv_path")
+        if isinstance(csv_rel, str) and csv_rel:
+            p = Path(csv_rel)
+            if not p.is_absolute():
+                p = (rf.root / p).resolve()
+            if p.exists():
+                return pd.read_csv(p)
+
+    # fallback si jamais certaines tables sont encore des CSV dans lookup
+    p_lookup = RunManager.get_artefact_path(label, run_id=rid, kind="tables", absolute=True)
+    if p_lookup and p_lookup.exists() and p_lookup.suffix.lower() == ".csv":
+        return pd.read_csv(p_lookup)
+
+    return None
+
 
 def read_metric_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))

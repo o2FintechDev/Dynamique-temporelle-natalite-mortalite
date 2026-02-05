@@ -10,6 +10,8 @@ import matplotlib.figure as mpl_fig
 
 from src.utils.run_writer import RunWriter
 from src.utils.logger import get_logger
+from src.visualization.tables import save_table_csv_and_tex
+
 
 log = get_logger("utils.persist")
 
@@ -96,24 +98,38 @@ def persist_outputs(
             log.warning("Table ignorée (type=%s) label=%s", type(df), label)
             continue
 
-        fn = _safe_filename(label) + ".csv"
-        out_path = rw.paths.tables_dir / fn
-        df.to_csv(out_path, index=True)
-        rel = _relpath(run_root, out_path)
+        base = _safe_filename(label)
 
+        # 1) CSV (debug/data)
+        csv_path = rw.paths.tables_dir / (base + ".csv")
+
+        # 2) TEX (Overleaf: \input)
+        csv_path, tex_path = save_table_csv_and_tex(
+            df,
+            csv_path,
+            caption="",   # caption géré dans latex_report.py
+            label="",
+            float_format="{:.3f}",
+        )
+
+        rel_tex = _relpath(run_root, tex_path)
+        rel_csv = _relpath(run_root, csv_path)
+
+        # IMPORTANT: manifest pointe vers TEX
         rw.register_artefact(
             "tables",
             label,
-            rel,
+            rel_tex,
             page=page,
             meta={
                 "step": step_name,
-                "format": "csv",
+                "format": "tex",
+                "csv_path": rel_csv,
                 "nrows": int(df.shape[0]),
                 "ncols": int(df.shape[1]),
             },
         )
-        saved["tables"].append({"key": label, "path": rel, "page": page})
+        saved["tables"].append({"key": label, "path": rel_tex, "page": page, "csv_path": rel_csv})
 
     # -------- METRICS (.json) --------
     metrics = outputs.get("metrics") or {}

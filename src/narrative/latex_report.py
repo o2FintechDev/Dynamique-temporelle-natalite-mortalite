@@ -31,18 +31,24 @@ def export_report_tex_from_manifest(
     run_root: str | Path,
     manifest: Dict[str, Any],
     narrative_markdown: Optional[str] = None,
-    tex_name: str = "report.tex",
+    tex_name: str = "main.tex",  # Overleaf convention
     title: str = "Rapport économétrique",
     author: str = "",
 ) -> Path:
     """
     Génère un .tex dans <run_root>/<tex_name> à partir du manifest + (optionnel) narrative_markdown.
-    Signature ALIGNÉE avec src/agent/tools.py.
+
+    CIBLE OVERLEAF (strict, sans CSV):
+    - artefacts/figures/*.png
+    - artefacts/tables/*.tex   (tables prêtes à \input)
+    - artefacts/metrics/*.json (non rendues automatiquement ici)
+    - Aucun \IfFileExists : LaTeX tente directement d’inclure.
+
+    RÈGLE CENTRAGE:
+    - Figures et tables centrées systématiquement (sans centrer tout le texte).
     """
     run_root = Path(run_root)
     run_root.mkdir(parents=True, exist_ok=True)
-
-    # IMPORTANT: ne jamais réutiliser ce nom pour une fonction
     tex_path = run_root / tex_name
 
     run_id = manifest.get("run_id", "") or manifest.get("meta", {}).get("run_id", "")
@@ -55,6 +61,11 @@ def export_report_tex_from_manifest(
     models = artefacts.get("models", []) or []
 
     lookup = manifest.get("lookup", {}) or {}
+
+    # --- Overleaf layout (fixed folders) ---
+    OVERLEAF_FIG_DIR = "artefacts/figures"
+    OVERLEAF_TAB_DIR = "artefacts/tables"
+    OVERLEAF_MET_DIR = "artefacts/metrics"
 
     def resolve_path(item: dict) -> str:
         p = item.get("path") or item.get("relpath") or ""
@@ -71,20 +82,29 @@ def export_report_tex_from_manifest(
                     p = lookup[k]
         return str(p or "")
 
-    # --- Helpers chemins : 1) raw pour IfFileExists, 2) protégé pour includegraphics/input/pgfplotstable
-    def relpath_posix(path_str: str) -> str:
-        p = Path(path_str)
-        abs_p = (run_root / p).resolve() if not p.is_absolute() else p
-        try:
-            rel = abs_p.relative_to(run_root.resolve())
-            return str(rel).replace("\\", "/")
-        except Exception:
-            return str(abs_p).replace("\\", "/")
+    def filename_only(path_str: str) -> str:
+        return Path(path_str).name
 
-    def tex_path_str(path_str: str) -> str:
-        return r"\detokenize{" + relpath_posix(path_str) + "}"
+    def safe_latex_id(label: str, path_str: str) -> str:
+        base = (label or path_str or "artefact").lower().replace(" ", "-")
+        base = "".join(ch for ch in base if ch.isalnum() or ch in "-_")[:60]
+        return base or "artefact"
 
-    # IMPORTANT: lines défini dans le scope parent
+    def is_tex(path_str: str) -> bool:
+        return path_str.lower().endswith(".tex")
+
+    def is_fig(path_str: str) -> bool:
+        return path_str.lower().endswith((".png", ".jpg", ".jpeg", ".pdf"))
+
+    def overleaf_target_path(path_str: str) -> str:
+        fname = filename_only(path_str)
+        ext = path_str.lower()
+        if ext.endswith((".png", ".jpg", ".jpeg", ".pdf")):
+            return f"{OVERLEAF_FIG_DIR}/{fname}"
+        if ext.endswith(".tex"):
+            return f"{OVERLEAF_TAB_DIR}/{fname}"
+        return f"{OVERLEAF_MET_DIR}/{fname}"
+
     lines: list[str] = []
     lines += [
         r"\documentclass[11pt,a4paper]{article}",
@@ -93,16 +113,27 @@ def export_report_tex_from_manifest(
         r"\usepackage[french]{babel}",
         r"\usepackage{geometry}",
         r"\geometry{margin=2.2cm}",
+        r"\usepackage{float}",
+
         r"\usepackage{graphicx}",
-        r"\usepackage{float}",          # pour [H]
+        r"\setkeys{Gin}{draft=false}",
+
         r"\usepackage{booktabs}",
         r"\usepackage{longtable}",
+        r"\usepackage{adjustbox}",
+
         r"\usepackage{xcolor}",
         r"\usepackage{hyperref}",
-        r"\usepackage{pgfplotstable}",  # CSV -> table
-        r"\pgfplotsset{compat=1.18}",
-        r"\graphicspath{{./artefacts/figures/}{./}}",
+
+        # Centrage automatique des floats (sans centrer tout le texte)
+        r"\usepackage{etoolbox}",
+        r"\AtBeginEnvironment{figure}{\centering}",
+        r"\AtBeginEnvironment{table}{\centering}",
+
+        # Images
+        r"\graphicspath{{./artefacts/figures/}}",
         r"\DeclareGraphicsExtensions{.pdf,.png,.jpg,.jpeg}",
+
         r"\begin{document}",
         r"\title{" + _escape_tex(title) + r"}",
         r"\author{" + _escape_tex(author) + r"}",
@@ -115,12 +146,7 @@ def export_report_tex_from_manifest(
 
     if narrative_markdown:
         lines += [r"\section{Interprétation}", ""]
-        lines += [
-            r"\begin{verbatim}",
-            narrative_markdown,
-            r"\end{verbatim}",
-            "",
-        ]
+        lines += [r"\begin{verbatim}", narrative_markdown, r"\end{verbatim}", ""]
 
     def section_block(lines_ref: list[str], name: str, items: list[dict]) -> None:
         if not items:
@@ -130,110 +156,85 @@ def export_report_tex_from_manifest(
 
         for it in items:
             label = it.get("key") or it.get("label") or it.get("name") or ""
-            path_str = resolve_path(it)
+            src_path = resolve_path(it)
 
-            # IDs LaTeX stables
-            safe_id = (label or path_str or "artefact").lower().replace(" ", "-")
-            safe_id = "".join(ch for ch in safe_id if ch.isalnum() or ch in "-_")[:60]
+            safe_id = safe_latex_id(label, src_path)
+            title_txt = label or filename_only(src_path) or "Artefact"
+            lines_ref.append(r"\subsection{" + _escape_tex(title_txt) + r"}")
 
-            lines_ref.append(r"\subsection{" + _escape_tex(label or path_str or "Artefact") + r"}")
-
-            if path_str:
-                lines_ref.append(r"\texttt{" + _escape_tex(path_str) + r"}\\")
-            else:
+            if not src_path:
                 lines_ref.append(r"\textit{Chemin indisponible dans le manifest.}\\")
                 lines_ref.append("")
                 continue
 
-            ext = path_str.lower()
+            target = overleaf_target_path(src_path)
+            lines_ref.append(r"\texttt{" + _escape_tex(target) + r"}\\")
+            lines_ref.append("")
 
-            # --- FIGURES (png/jpg/jpeg/pdf) ---
-            if ext.endswith((".png", ".jpg", ".jpeg", ".pdf")):
-                raw = relpath_posix(path_str)       # IfFileExists
-                p_tex = tex_path_str(path_str)      # includegraphics
+            # --- FIGURES ---
+            if is_fig(src_path):
+                fname = filename_only(target)
                 lines_ref += [
                     r"\begin{figure}[H]",
-                    r"\centering",
-                    r"\IfFileExists{" + raw + r"}{",
-                    r"\includegraphics[width=0.95\linewidth]{" + p_tex + r"}",
-                    r"}{",
-                    r"\fbox{\textbf{Figure manquante :} \texttt{" + _escape_tex(path_str) + r"}}",
-                    r"}",
-                    r"\caption{" + _escape_tex(label or "Figure") + r"}",
+                    r"\includegraphics[width=0.95\linewidth]{" + r"\detokenize{" + fname + r"}" + r"}",
+                    r"\caption{" + _escape_tex(title_txt) + r"}",
                     r"\label{fig:" + _escape_tex(safe_id) + r"}",
                     r"\end{figure}",
-                    "",
-                    r"\paragraph{Analyse automatique (IA).}",
-                    r"\begin{quote}",
-                    r"Référence : Figure~\ref{fig:" + _escape_tex(safe_id) + r"}.",
-                    r"\end{quote}",
                     "",
                 ]
                 continue
 
             # --- TABLES (.tex) ---
-            if ext.endswith(".tex"):
-                raw = relpath_posix(path_str)       # IfFileExists
-                p_tex = tex_path_str(path_str)      # input
+            if is_tex(src_path):
+                fname = filename_only(src_path)
                 lines_ref += [
                     r"\begin{table}[H]",
-                    r"\centering",
-                    r"\caption{" + _escape_tex(label or "Tableau") + r"}",
+                    r"\caption{" + _escape_tex(title_txt) + r"}",
                     r"\label{tab:" + _escape_tex(safe_id) + r"}",
-                    r"\IfFileExists{" + raw + r"}{",
-                    r"\input{" + p_tex + r"}",
-                    r"}{",
-                    r"\fbox{\textbf{Table manquante :} \texttt{" + _escape_tex(path_str) + r"}}",
-                    r"}",
+                    r"\begin{adjustbox}{max width=\linewidth,center}",
+                    r"\input{" + r"\detokenize{" + f"{OVERLEAF_TAB_DIR}/{fname}" + r"}" + r"}",
+                    r"\end{adjustbox}",
                     r"\end{table}",
-                    "",
-                    r"\paragraph{Analyse automatique (IA).}",
-                    r"\begin{quote}",
-                    r"Référence : Tableau~\ref{tab:" + _escape_tex(safe_id) + r"}.",
-                    r"\end{quote}",
                     "",
                 ]
                 continue
 
-            # --- TABLES (.csv) ---
-            if ext.endswith(".csv"):
-                raw = relpath_posix(path_str)       # IfFileExists
-                p_tex = tex_path_str(path_str)      # pgfplotstabletypeset
-                lines_ref += [
-                    r"\begin{table}[H]",
-                    r"\centering",
-                    r"\caption{" + _escape_tex(label or "Tableau (CSV)") + r"}",
-                    r"\label{tab:" + _escape_tex(safe_id) + r"}",
-                    r"\IfFileExists{" + raw + r"}{",
-                    r"\pgfplotstabletypeset[",
-                    r"  col sep=comma,",
-                    r"  string type,",
-                    r"  header=true,",
-                    r"  every head row/.style={before row=\toprule, after row=\midrule},",
-                    r"  every last row/.style={after row=\bottomrule}",
-                    r"]{" + p_tex + r"}",
-                    r"}{",
-                    r"\fbox{\textbf{CSV manquant :} \texttt{" + _escape_tex(path_str) + r"}}",
-                    r"}",
-                    r"\end{table}",
-                    "",
-                    r"\paragraph{Analyse automatique (IA).}",
-                    r"\begin{quote}",
-                    r"Référence : Tableau~\ref{tab:" + _escape_tex(safe_id) + r"}.",
-                    r"\end{quote}",
-                    "",
-                ]
-                continue
-
-            # fallback : artefact non géré
             lines_ref.append(r"\textit{Type de fichier non géré pour rendu LaTeX.}\\")
             lines_ref.append("")
 
-    # Appels
     section_block(lines, "Figures", figures)
     section_block(lines, "Tables", tables)
-    section_block(lines, "Métriques", metrics)
-    section_block(lines, "Modèles", models)
+
+    # Metrics: non rendues automatiquement (JSON/texte). On liste les chemins pour traçabilité.
+    if metrics:
+        lines.append(r"\section{Métriques}")
+        for it in metrics:
+            label = it.get("key") or it.get("label") or it.get("name") or ""
+            src_path = resolve_path(it)
+            title_txt = label or filename_only(src_path) or "Métrique"
+            lines.append(r"\subsection{" + _escape_tex(title_txt) + r"}")
+            if src_path:
+                target = overleaf_target_path(src_path)
+                lines.append(r"\texttt{" + _escape_tex(target) + r"}\\")
+                lines.append(r"\textit{Métrique non rendue automatiquement (JSON/texte).}\\")
+            else:
+                lines.append(r"\textit{Chemin indisponible dans le manifest.}\\")
+            lines.append("")
+
+    # Models: généralement txt/pkl/json => non rendus
+    if models:
+        lines.append(r"\section{Modèles}")
+        for it in models:
+            label = it.get("key") or it.get("label") or it.get("name") or ""
+            src_path = resolve_path(it)
+            title_txt = label or filename_only(src_path) or "Modèle"
+            lines.append(r"\subsection{" + _escape_tex(title_txt) + r"}")
+            if src_path:
+                lines.append(r"\texttt{" + _escape_tex(src_path) + r"}\\")
+                lines.append(r"\textit{Artefact modèle non rendu (binaire / non-LaTeX).}\\")
+            else:
+                lines.append(r"\textit{Chemin indisponible dans le manifest.}\\")
+            lines.append("")
 
     lines.append(r"\end{document}")
 
