@@ -1,8 +1,8 @@
+# app/streamlit_app.py
 import sys
 from pathlib import Path
 import os
 import json
-import re
 import requests
 import streamlit as st
 
@@ -20,18 +20,36 @@ state = get_state()
 
 Y = "Croissance_Naturelle"
 
-# ---------------------------
-# Orchestration
-# ---------------------------
+STEP_TO_PAGE = {
+    "step1_load_and_profile": "1_Exploration",
+    "step2_descriptive":      "2_Analyse_Descriptive",
+    "step3_stationarity":     "3_Modeles",
+    "step4_univariate":       "3_Modeles",
+    "step5_var":              "3_Modeles",
+    "step6_cointegration":    "4_Resultats",
+    "step7_anthropology":     "5_Analyse_Anthropologique",
+    "export_latex_pdf":       "6_Historique_Artefacts",
+}
+
+
 def run_step(step_name: str, params: dict) -> str:
-    plan = Plan(intent=step_name, tool_calls=[ToolCall(step_name, [Y], params)])
-    ex = AgentExecutor(user_query=f"{step_name} via chatbot")
-    res = ex.run(plan)
-    state.selected_run_id = res.run_id
-    return res.run_id
+    # inject routing page AVANT création du Plan
+    params = dict(params)  # copy
+    params["_page"] = STEP_TO_PAGE.get(step_name, None)
+
+    plan = Plan(
+        intent=step_name,
+        tool_calls=[ToolCall(tool_name=step_name, variables=[Y], params=params)],
+    )
+    ex = AgentExecutor(run_id=state.selected_run_id)
+    res = ex.run(plan, user_query=f"{step_name} via chatbot")
+    state.selected_run_id = res["run_id"]
+    return res["run_id"]
+
 
 def append_assistant(md: str) -> None:
     st.session_state.chat_messages.append({"role": "assistant", "content": md})
+
 
 def show_note(run_id: str, note_label: str) -> None:
     p = RunManager.get_artefact_path(note_label, run_id=run_id)
@@ -40,6 +58,7 @@ def show_note(run_id: str, note_label: str) -> None:
         md = payload.get("markdown")
         if md:
             append_assistant(md)
+
 
 # ---------------------------
 # LLM Router (API) + fallback

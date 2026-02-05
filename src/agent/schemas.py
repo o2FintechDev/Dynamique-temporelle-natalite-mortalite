@@ -3,16 +3,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+
 @dataclass
 class ToolCall:
     tool_name: str
     variables: list[str]
     params: dict[str, Any]
 
+
 @dataclass
 class Plan:
     intent: str
     tool_calls: list[ToolCall]
+
 
 @dataclass
 class ArtefactRef:
@@ -23,6 +26,7 @@ class ArtefactRef:
     def dict(self) -> dict[str, Any]:
         return {"kind": self.kind, "path": self.path, "label": self.label}
 
+
 @dataclass
 class ExecutionResult:
     run_id: str
@@ -30,6 +34,7 @@ class ExecutionResult:
     variables: list[str]
     tools_called: list[str]
     artefacts: list[ArtefactRef]
+
 
 @dataclass
 class Manifest:

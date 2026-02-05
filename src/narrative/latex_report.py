@@ -2,63 +2,184 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List
-import re
-
-from src.utils.run_writer import RunWriter
-
-
-CANONICAL_ORDER = [
-    "01_methodologie",
-    "02_donnees_preparation",
-    "03_tests_stationnarite",
-    "04_modelisation",
-    "05_validation_residus",
-    "06_regimes_ruptures",
-    "07_interpretation_anthropologique",
-    "08_conclusion",
-]
+from typing import Any, Dict, Optional, Tuple
+import shutil
+import subprocess
+import datetime
 
 
-def render_step_block(rw: RunWriter, step_name: str, latex_body: str, *, title: str) -> str:
-    """
-    Écrit un bloc LaTeX autonome (hors préambule) dans latex/blocks/<step_name>.tex
-    """
-    blocks_dir = rw.paths.latex_dir / "blocks"
-    blocks_dir.mkdir(parents=True, exist_ok=True)
-    block_path = blocks_dir / f"{step_name}.tex"
-
-    content = rf"""
-\section{{{title}}}
-{latex_body}
-"""
-    block_path.write_text(content.strip() + "\n", encoding="utf-8")
-
-    rel_path = str(block_path.relative_to(rw.paths.run_dir)).replace("\\", "/")
-    rw.register_artefact("latex_blocks", lookup_key=step_name, rel_path=rel_path, meta={"title": title})
-    return rel_path
-
-
-def rebuild_master(rw: RunWriter) -> None:
-    """
-    Rebuild master.tex en injectant \input{blocks/<step>.tex} pour les blocs présents,
-    en respectant CANONICAL_ORDER.
-    """
-    manifest = rw.read_manifest()
-    present = set((manifest.get("lookup", {}).get("latex_blocks", {}) or {}).keys())
-
-    inputs: List[str] = []
-    for s in CANONICAL_ORDER:
-        if s in present:
-            inputs.append(rf"\input{{blocks/{s}.tex}}")
-
-    master = rw.paths.latex_master_path.read_text(encoding="utf-8")
-
-    # Remplace la zone BLOCKS (auto)
-    master_new = re.sub(
-        r"% --- BLOCKS \(auto\) ---.*?\\end\{document\}",
-        "% --- BLOCKS (auto) ---\n" + "\n".join(inputs) + "\n\n\\end{document}",
-        master,
-        flags=re.S,
+def _escape_tex(s: str) -> str:
+    if s is None:
+        return ""
+    return (
+        str(s)
+        .replace("\\", r"\textbackslash{}")
+        .replace("&", r"\&")
+        .replace("%", r"\%")
+        .replace("$", r"\$")
+        .replace("#", r"\#")
+        .replace("_", r"\_")
+        .replace("{", r"\{")
+        .replace("}", r"\}")
+        .replace("~", r"\textasciitilde{}")
+        .replace("^", r"\textasciicircum{}")
     )
-    rw.paths.latex_master_path.write_text(master_new, encoding="utf-8")
+
+
+def export_report_tex_from_manifest(
+    *,
+    run_root: str | Path,
+    manifest: Dict[str, Any],
+    narrative_markdown: Optional[str] = None,
+    tex_name: str = "report.tex",
+    title: str = "Rapport économétrique",
+    author: str = "",
+) -> Path:
+    """
+    Génère un .tex dans <run_root>/<tex_name> à partir du manifest + (optionnel) narrative_markdown.
+    Signature ALIGNÉE avec l'appel dans src/agent/tools.py.
+    """
+    run_root = Path(run_root)
+    run_root.mkdir(parents=True, exist_ok=True)
+
+    tex_path = run_root / tex_name
+
+    run_id = manifest.get("run_id", "") or manifest.get("meta", {}).get("run_id", "")
+    created = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    artefacts = manifest.get("artefacts", {}) or {}
+    figures = artefacts.get("figures", []) or []
+    tables = artefacts.get("tables", []) or []
+    metrics = artefacts.get("metrics", []) or []
+    models = artefacts.get("models", []) or []
+
+    # Tolérance: certaines versions stockent un lookup global
+    lookup = manifest.get("lookup", {}) or {}
+
+    def resolve_path(item: dict) -> str:
+        p = item.get("path") or item.get("relpath") or ""
+        if not p and item.get("label") and item["label"] in lookup:
+            p = lookup[item["label"]].get("path") or lookup[item["label"]].get("relpath") or ""
+        return str(p)
+
+    def include_graphic(path_str: str) -> str:
+        # On préfère des chemins relatifs au .tex pour pdflatex
+        p = Path(path_str)
+        if not p.is_absolute():
+            abs_p = (run_root / p).resolve()
+        else:
+            abs_p = p
+
+        try:
+            rel = abs_p.relative_to(run_root.resolve())
+            return str(rel).replace("\\", "/")
+        except Exception:
+            return str(abs_p).replace("\\", "/")
+
+    lines: list[str] = []
+    lines += [
+        r"\documentclass[11pt,a4paper]{article}",
+        r"\usepackage[utf8]{inputenc}",
+        r"\usepackage[T1]{fontenc}",
+        r"\usepackage[french]{babel}",
+        r"\usepackage{geometry}",
+        r"\geometry{margin=2.2cm}",
+        r"\usepackage{graphicx}",
+        r"\usepackage{booktabs}",
+        r"\usepackage{hyperref}",
+        r"\begin{document}",
+        r"\title{" + _escape_tex(title) + r"}",
+        r"\author{" + _escape_tex(author) + r"}",
+        r"\date{" + _escape_tex(created) + r"}",
+        r"\maketitle",
+    ]
+
+    if run_id:
+        lines += [r"\textbf{Run ID:} " + _escape_tex(run_id) + r"\\", ""]
+
+    # Narratif
+    if narrative_markdown:
+        lines += [r"\section{Interprétation}", ""]
+        # markdown -> tex minimal (on garde brut en monospaced pour éviter un parser)
+        lines += [
+            r"\begin{verbatim}",
+            narrative_markdown,
+            r"\end{verbatim}",
+            "",
+        ]
+
+    def section_block(name: str, items: list[dict]) -> None:
+        if not items:
+            return
+        lines.append(r"\section{" + _escape_tex(name) + r"}")
+        for it in items:
+            label = it.get("label") or it.get("name") or ""
+            path_str = resolve_path(it)
+            lines.append(r"\subsection{" + _escape_tex(label or path_str) + r"}")
+            if path_str:
+                lines.append(r"\texttt{" + _escape_tex(path_str) + r"}\\")
+            else:
+                lines.append(r"\textit{Chemin indisponible dans le manifest.}\\")
+            # Inclusion auto si image
+            if path_str.lower().endswith((".png", ".jpg", ".jpeg")):
+                inc = include_graphic(path_str)
+                lines += [
+                    r"\begin{center}",
+                    r"\includegraphics[width=0.95\linewidth]{" + _escape_tex(inc) + r"}",
+                    r"\end{center}",
+                ]
+            lines.append("")
+
+    section_block("Figures", figures)
+    section_block("Tables", tables)
+    section_block("Métriques", metrics)
+    section_block("Modèles", models)
+
+    lines.append(r"\end{document}")
+
+    tex_path.write_text("\n".join(lines), encoding="utf-8")
+    return tex_path
+
+
+def try_compile_pdf(
+    *,
+    run_root: str | Path,
+    tex_path: str | Path,
+    runs: int = 1,
+) -> Tuple[Optional[Path], Optional[str]]:
+    """
+    Compile avec pdflatex si dispo.
+    Signature ALIGNÉE avec l'appel dans src/agent/tools.py.
+    Retourne (pdf_path|None, log_text|None).
+    """
+    run_root = Path(run_root)
+    tex_path = Path(tex_path)
+    if not tex_path.is_absolute():
+        tex_path = (run_root / tex_path).resolve()
+
+    if shutil.which("pdflatex") is None:
+        return None, None
+
+    work_dir = tex_path.parent
+    log_path = work_dir / (tex_path.stem + ".pdflatex.log")
+    cmd = ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", tex_path.name]
+
+    with log_path.open("w", encoding="utf-8") as logf:
+        rc = 0
+        for _ in range(max(1, runs)):
+            p = subprocess.run(cmd, cwd=str(work_dir), stdout=logf, stderr=logf, check=False)
+            rc = p.returncode
+            if rc != 0:
+                break
+
+    pdf_path = work_dir / (tex_path.stem + ".pdf")
+    log_text = None
+    try:
+        log_text = log_path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        log_text = None
+
+    if rc != 0 or not pdf_path.exists():
+        return None, log_text
+
+    return pdf_path, log_text

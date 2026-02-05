@@ -1,4 +1,3 @@
-# agent/tools.py
 # src/agent/tools.py
 from __future__ import annotations
 from typing import Callable, Any
@@ -22,7 +21,7 @@ from src.econometrics.api import (
 from src.narrative.renderer import render_anthropology
 from src.utils.session_state import get_state
 from src.utils.run_reader import get_run_files, read_manifest, RunManager, read_metric_json
-from src.narrative.latex_report import export_report_tex_from_manifest, try_compile_pdf
+
 
 log = get_logger("agent.tools")
 
@@ -138,6 +137,7 @@ def step7_anthropology(*, variables: list[str], y: str, **params: Any) -> dict[s
 
 @register("export_latex_pdf")
 def export_latex_pdf(*, variables: list[str], run_id: str, **params: Any) -> dict[str, Any]:
+    from src.narrative.latex_report import export_report_tex_from_manifest, try_compile_pdf
     rf = get_run_files(run_id)
     manifest = read_manifest(run_id)
     if not manifest:

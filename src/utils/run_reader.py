@@ -1,15 +1,15 @@
-# utils/run_reader.py
-
+# src/utils/run_reader.py
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Iterable
 
 import pandas as pd
 
 from src.utils.paths import runs_dir, run_dir
+
 
 @dataclass(frozen=True)
 class RunFiles:
@@ -23,11 +23,13 @@ class RunFiles:
     models: Path
     logs: Path
 
+
 def list_runs() -> list[str]:
     rd = runs_dir()
     if not rd.exists():
         return []
     return sorted([p.name for p in rd.iterdir() if p.is_dir()], reverse=True)
+
 
 def get_run_files(run_id: str) -> RunFiles:
     root = run_dir(run_id)
@@ -44,17 +46,74 @@ def get_run_files(run_id: str) -> RunFiles:
         logs=root / "logs",
     )
 
+
 def read_manifest(run_id: str) -> dict[str, Any]:
     p = get_run_files(run_id).manifest
     if not p.exists():
         return {}
     return json.loads(p.read_text(encoding="utf-8"))
 
+
 def read_table_csv(path: Path) -> pd.DataFrame:
     return pd.read_csv(path, index_col=0)
 
+
 def read_metric_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _lookup_get_path(lookup: Any, label: str, *, kind: Optional[str] = None) -> Optional[str]:
+    """
+    Supporte:
+    - lookup "plat" (ancien): { "<label>": "<path>", ... }
+    - lookup "typé" (nouveau): { "metrics": { "<label>": "<path>" }, ... }
+    """
+    if not isinstance(lookup, dict):
+        return None
+
+    # 1) ancien format (plat)
+    if label in lookup and isinstance(lookup[label], str):
+        return lookup[label]
+
+    # 2) nouveau format (par kind)
+    if kind:
+        bucket = lookup.get(kind)
+        if isinstance(bucket, dict):
+            p = bucket.get(label)
+            if isinstance(p, str):
+                return p
+
+    # 3) fallback: scan de tous les buckets
+    for _, bucket in lookup.items():
+        if isinstance(bucket, dict) and label in bucket and isinstance(bucket[label], str):
+            return bucket[label]
+
+    return None
+
+
+def get_artefacts_for_page(manifest: dict[str, Any], *, page: str, kind: Optional[str] = None) -> list[dict[str, Any]]:
+    """
+    Retourne les artefacts du manifest filtrés par page (et éventuellement par kind).
+    """
+    arte = (manifest.get("artefacts") or {})
+    if not isinstance(arte, dict):
+        return []
+
+    kinds: Iterable[str]
+    if kind:
+        kinds = [kind]
+    else:
+        kinds = ["figures", "tables", "metrics", "models", "latex_blocks"]
+
+    out: list[dict[str, Any]] = []
+    for k in kinds:
+        items = arte.get(k) or []
+        if not isinstance(items, list):
+            continue
+        out.extend([it for it in items if isinstance(it, dict) and it.get("page") == page])
+
+    return out
+
 
 class RunManager:
     @staticmethod
@@ -63,15 +122,28 @@ class RunManager:
         return runs[0] if runs else None
 
     @staticmethod
-    def get_artefact_path(label: str, *, run_id: str | None = None, absolute: bool = True) -> Path | None:
+    def get_artefact_path(
+        label: str,
+        *,
+        run_id: str | None = None,
+        kind: str | None = None,     # "metrics" | "tables" | "figures" | "models" | "latex_blocks"
+        absolute: bool = True,
+    ) -> Path | None:
+        """
+        Résout un label -> path via manifest.lookup.
+        Compatible lookup plat (ancien) ou lookup typé (nouveau).
+        """
         rid = run_id or RunManager.get_latest_run_id()
         if not rid:
             return None
+
         manifest = read_manifest(rid)
         lookup = manifest.get("lookup") or {}
-        p = lookup.get(label)
+
+        p = _lookup_get_path(lookup, label, kind=kind)
         if not p:
             return None
+
         path = Path(p)
         if absolute and not path.is_absolute():
             path = (get_run_files(rid).root / path).resolve()

@@ -80,6 +80,7 @@ class RunWriter:
         logs_dir = run_dir / "logs"
         latex_dir = run_dir / "latex"
         blocks_dir = latex_dir / "blocks"
+
         run_dir.mkdir(parents=True, exist_ok=True)
         for d in [artefacts_dir, figures_dir, tables_dir, metrics_dir, models_dir, logs_dir, latex_dir, blocks_dir]:
             d.mkdir(parents=True, exist_ok=True)
@@ -95,6 +96,7 @@ class RunWriter:
                     "run_id": self.run_id,
                     "created_at": _utc_ts(),
                     "lookup": {"figures": {}, "tables": {}, "metrics": {}, "models": {}, "latex_blocks": {}},
+                    # NOTE: chaque item artefact embarque désormais "page"
                     "artefacts": {"figures": [], "tables": [], "metrics": [], "models": [], "latex_blocks": []},
                     "steps": {},
                 },
@@ -119,7 +121,6 @@ class RunWriter:
         )
 
     def _latex_master_skeleton(self) -> str:
-        # Master minimal, les blocs seront inclus via \input{blocks/<step>.tex}
         return r"""\documentclass[11pt]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -164,10 +165,15 @@ class RunWriter:
         kind: str,  # figures|tables|metrics|models|latex_blocks
         lookup_key: str,
         rel_path: str,
+        *,
+        page: Optional[str] = None,
         meta: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        """
+        IMPORTANT: 'page' est le routage UI. Chaque page Streamlit filtre uniquement ses artefacts.
+        """
         meta = meta or {}
-        artefact_obj = {"key": lookup_key, "path": rel_path, "meta": meta, "ts": _utc_ts()}
+        artefact_obj = {"key": lookup_key, "path": rel_path, "page": page, "meta": meta, "ts": _utc_ts()}
         patch = {
             "lookup": {kind: {lookup_key: rel_path}},
             "artefacts": {kind: [artefact_obj]},

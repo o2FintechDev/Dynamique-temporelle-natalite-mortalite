@@ -1,22 +1,116 @@
+# pages/5_Analyse_Anthropologique.py
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Dict, List
+
+import pandas as pd
 import streamlit as st
+
 from src.utils.session_state import get_state
-from src.utils.run_reader import RunManager, read_metric_json
+from src.utils.run_reader import get_run_files, read_manifest, read_metric_json, RunManager
 
-st.title("Analyse anthropologique augmentée")
 
-run_id = get_state().selected_run_id or RunManager.get_latest_run_id()
-if not run_id:
-    st.warning("Aucun run.")
-    st.stop()
+PAGE_ID = "5_Analyse_Anthropologique"
+PAGE_TITLE = "5 — Analyse anthropologique"
 
-p = RunManager.get_artefact_path("m.anthro.todd_analysis", run_id=run_id)
-if not p:
-    st.warning("Artefact absent: m.anthro.todd_analysis")
-    st.stop()
 
-payload = read_metric_json(p)
-st.markdown(payload.get("markdown", ""))
+def _get_run_id() -> str | None:
+    state = get_state()
+    rid = getattr(state, "selected_run_id", None)
+    if rid:
+        return rid
+    return st.session_state.get("run_id")
 
-p = RunManager.get_artefact_path("m.note.stepX", run_id=run_id)
-if p:
-    st.markdown(read_metric_json(p).get("markdown",""))
+
+def _run_root(run_id: str) -> Path:
+    rf = get_run_files(run_id)
+    return Path(rf.root)
+
+
+def _abs_path(run_id: str, rel: str) -> Path:
+    return _run_root(run_id) / rel
+
+
+def _filter_items(m: Dict[str, Any], kind: str) -> List[Dict[str, Any]]:
+    items = (m.get("artefacts", {}) or {}).get(kind, []) or []
+    return [it for it in items if it.get("page") == PAGE_ID]
+
+
+def _render_analysis_block(run_id: str) -> None:
+    st.markdown("### Bloc d’analyse (Todd)")
+    p = RunManager.get_artefact_path("m.anthro.todd_analysis", run_id=run_id)
+    if not p:
+        st.info("Aucune analyse anthropologique persistée pour ce run.")
+        return
+    payload = read_metric_json(p)
+    if isinstance(payload, dict) and "markdown" in payload:
+        st.markdown(payload["markdown"])
+    else:
+        st.json(payload)
+
+
+def _render_tables(run_id: str, items: List[Dict[str, Any]]) -> None:
+    if not items:
+        return
+    st.markdown("### Tables annexes")
+    for it in items:
+        st.subheader(it.get("key", "table"))
+        p = _abs_path(run_id, it.get("path", ""))
+        try:
+            df = pd.read_csv(p, index_col=0)
+            st.dataframe(df, use_container_width=True)
+        except Exception as e:
+            st.error(f"Lecture table impossible: {it.get('path')} ({e})")
+
+
+def _render_figures(run_id: str, items: List[Dict[str, Any]]) -> None:
+    if not items:
+        return
+    st.markdown("### Figures annexes")
+    for it in items:
+        st.subheader(it.get("key", "figure"))
+        p = _abs_path(run_id, it.get("path", ""))
+        if p.exists():
+            st.image(str(p), use_container_width=True)
+        else:
+            st.error(f"Figure introuvable: {it.get('path')}")
+
+
+def main() -> None:
+    st.set_page_config(page_title=PAGE_TITLE, layout="wide")
+    st.title(PAGE_TITLE)
+
+    run_id = _get_run_id()
+    if not run_id:
+        st.warning("Aucun run sélectionné.")
+        return
+
+    m = read_manifest(run_id) or {}
+    st.caption(f"Run: {run_id}")
+
+    _render_analysis_block(run_id)
+
+    # Si tu veux aussi router des artefacts anthropo via page=5_Analyse_Anthropologique
+    _render_figures(run_id, _filter_items(m, "figures"))
+    _render_tables(run_id, _filter_items(m, "tables"))
+
+    mets = _filter_items(m, "metrics")
+    if mets:
+        st.markdown("### Métriques annexes")
+        for it in mets:
+            st.subheader(it.get("key", "metric"))
+            p = _abs_path(run_id, it.get("path", ""))
+            try:
+                payload = read_metric_json(p)
+            except Exception as e:
+                st.error(f"Lecture métrique impossible: {it.get('path')} ({e})")
+                continue
+            if isinstance(payload, dict) and "markdown" in payload:
+                st.markdown(payload["markdown"])
+            else:
+                st.json(payload)
+
+
+if __name__ == "__main__":
+    main()

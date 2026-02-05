@@ -1,46 +1,108 @@
+# pages/4_Resultats.py
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Dict, List
+
+import pandas as pd
 import streamlit as st
+
 from src.utils.session_state import get_state
-from src.utils.run_reader import RunManager, read_table_csv, read_metric_json
+from src.utils.run_reader import get_run_files, read_manifest, read_metric_json
 
-st.title("Résultats")
 
-run_id = get_state().selected_run_id or RunManager.get_latest_run_id()
-if not run_id:
-    st.warning("Aucun run.")
-    st.stop()
+PAGE_ID = "4_Resultats"
+PAGE_TITLE = "4 — Résultats"
 
-def show_tbl(label: str, title: str):
-    p = RunManager.get_artefact_path(label, run_id=run_id)
-    if p:
-        st.subheader(title)
-        st.dataframe(read_table_csv(p), width='content')
-    else:
-        st.warning(f"Artefact absent: {label}")
 
-def show_fig(label: str, caption: str):
-    p = RunManager.get_artefact_path(label, run_id=run_id)
-    if p:
-        st.image(str(p), caption=caption, width='content')
-    else:
-        st.warning(f"Artefact absent: {label}")
+def _get_run_id() -> str | None:
+    state = get_state()
+    rid = getattr(state, "selected_run_id", None)
+    if rid:
+        return rid
+    return st.session_state.get("run_id")
 
-show_tbl("tbl.var.lag_selection", "Sélection VAR(p)")
-show_tbl("tbl.var.granger", "Tests de Granger (composantes)")
-show_tbl("tbl.var.fevd", "FEVD")
-show_fig("fig.var.irf", "IRF (VAR)")
 
-show_tbl("tbl.coint.eg", "Engle–Granger (indicatif)")
-show_tbl("tbl.coint.johansen", "Johansen (rang)")
-show_tbl("tbl.coint.var_vs_vecm_choice", "Choix VAR diff vs VECM")
-show_tbl("tbl.vecm.params", "Paramètres VECM (si estimé)")
+def _run_root(run_id: str) -> Path:
+    rf = get_run_files(run_id)
+    return Path(rf.root)
 
-m_tsds = RunManager.get_artefact_path("m.diag.ts_vs_ds", run_id=run_id)
-if m_tsds:
-    verdict = read_metric_json(m_tsds).get("verdict")
-    st.markdown(
-        f"**Interprétation (courte)** : La décision stationnarité conclut **{verdict}** (TS vs DS) "
-        "sur la base ADF/PP/lecture bande. Les résultats VAR/VECM décrivent la dynamique interne des composantes."
-    )
-p = RunManager.get_artefact_path("m.note.stepX", run_id=run_id)
-if p:
-    st.markdown(read_metric_json(p).get("markdown",""))
+
+def _abs_path(run_id: str, rel: str) -> Path:
+    return _run_root(run_id) / rel
+
+
+def _filter_items(m: Dict[str, Any], kind: str) -> List[Dict[str, Any]]:
+    items = (m.get("artefacts", {}) or {}).get(kind, []) or []
+    return [it for it in items if it.get("page") == PAGE_ID]
+
+
+def _render_figures(run_id: str, items: List[Dict[str, Any]]) -> None:
+    if not items:
+        st.info("Aucune figure pour cette page.")
+        return
+    for it in items:
+        st.subheader(it.get("key", "figure"))
+        p = _abs_path(run_id, it.get("path", ""))
+        if p.exists():
+            st.image(str(p), use_container_width=True)
+        else:
+            st.error(f"Figure introuvable: {it.get('path')}")
+
+
+def _render_tables(run_id: str, items: List[Dict[str, Any]]) -> None:
+    if not items:
+        st.info("Aucune table pour cette page.")
+        return
+    for it in items:
+        st.subheader(it.get("key", "table"))
+        p = _abs_path(run_id, it.get("path", ""))
+        try:
+            df = pd.read_csv(p, index_col=0)
+            st.dataframe(df, use_container_width=True)
+        except Exception as e:
+            st.error(f"Lecture table impossible: {it.get('path')} ({e})")
+
+
+def _render_metrics(run_id: str, items: List[Dict[str, Any]]) -> None:
+    if not items:
+        st.info("Aucune métrique pour cette page.")
+        return
+    for it in items:
+        st.subheader(it.get("key", "metric"))
+        p = _abs_path(run_id, it.get("path", ""))
+        try:
+            payload = read_metric_json(p)
+        except Exception as e:
+            st.error(f"Lecture métrique impossible: {it.get('path')} ({e})")
+            continue
+        if isinstance(payload, dict) and "markdown" in payload:
+            st.markdown(payload["markdown"])
+        else:
+            st.json(payload)
+
+
+def main() -> None:
+    st.set_page_config(page_title=PAGE_TITLE, layout="wide")
+    st.title(PAGE_TITLE)
+
+    run_id = _get_run_id()
+    if not run_id:
+        st.warning("Aucun run sélectionné.")
+        return
+
+    m = read_manifest(run_id) or {}
+    st.caption(f"Run: {run_id}")
+
+    st.markdown("### Figures")
+    _render_figures(run_id, _filter_items(m, "figures"))
+
+    st.markdown("### Tables")
+    _render_tables(run_id, _filter_items(m, "tables"))
+
+    st.markdown("### Métriques")
+    _render_metrics(run_id, _filter_items(m, "metrics"))
+
+
+if __name__ == "__main__":
+    main()

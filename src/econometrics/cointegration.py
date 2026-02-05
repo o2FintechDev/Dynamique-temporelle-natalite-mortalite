@@ -49,7 +49,8 @@ def cointegration_pack(df_vars: pd.DataFrame, det_order: int = 0, k_ar_diff: int
             "tbl.coint.johansen": tbl_joh,
             "tbl.coint.var_vs_vecm_choice": tbl_choice,
         },
-        "metrics": {"m.coint.meta": {"vars": cols, "rank": int(rank), "nobs": int(X.shape[0])}},
+        "metrics": {"m.coint.meta": {"vars": cols, "rank": int(rank), "nobs": int(X.shape[0]), "choice": choice}},
+
     }
 
     if use_vecm:

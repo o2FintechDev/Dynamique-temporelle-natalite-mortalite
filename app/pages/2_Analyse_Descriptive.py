@@ -1,51 +1,108 @@
-import sys
+# pages/2_Analyse_Descriptive.py
+from __future__ import annotations
+
 from pathlib import Path
+from typing import Any, Dict, List
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
+import pandas as pd
 import streamlit as st
+
 from src.utils.session_state import get_state
-from src.utils.run_reader import RunManager, read_table_csv, read_metric_json
+from src.utils.run_reader import get_run_files, read_manifest, read_metric_json
 
-st.title("Analyse descriptive + décomposition (Étape 2)")
 
-run_id = get_state().selected_run_id or RunManager.get_latest_run_id()
-if not run_id:
-    st.warning("Aucun run sélectionné.")
-    st.stop()
+PAGE_ID = "2_Analyse_Descriptive"
+PAGE_TITLE = "2 — Analyse descriptive"
 
-def show_fig(label: str, caption: str):
-    p = RunManager.get_artefact_path(label, run_id=run_id)
-    if p:
-        st.image(str(p), caption=caption, width='content')
-    else:
-        st.warning(f"Artefact absent: {label}")
 
-def show_tbl(label: str, title: str):
-    p = RunManager.get_artefact_path(label, run_id=run_id)
-    if p:
-        st.subheader(title)
-        st.dataframe(read_table_csv(p), width='content')
-    else:
-        st.warning(f"Artefact absent: {label}")
+def _get_run_id() -> str | None:
+    state = get_state()
+    rid = getattr(state, "selected_run_id", None)
+    if rid:
+        return rid
+    return st.session_state.get("run_id")
 
-# Figures
-show_fig("fig.desc.level", "Série en niveau")
-show_fig("fig.desc.decomp", "Décomposition STL (trend/seasonal/resid)")
 
-# Tables
-show_tbl("tbl.desc.summary", "Statistiques descriptives")
-show_tbl("tbl.desc.seasonality", "Qualification saisonnalité")
+def _run_root(run_id: str) -> Path:
+    rf = get_run_files(run_id)
+    return Path(rf.root)
 
-# Analyse persistée step2
-p_note = RunManager.get_artefact_path("m.note.step2", run_id=run_id)
-if p_note:
-    st.markdown(read_metric_json(p_note).get("markdown", ""))
-else:
-    st.info("Note step2 non disponible (m.note.step2).")
 
-p = RunManager.get_artefact_path("m.note.stepX", run_id=run_id)
-if p:
-    st.markdown(read_metric_json(p).get("markdown",""))
+def _abs_path(run_id: str, rel: str) -> Path:
+    return _run_root(run_id) / rel
+
+
+def _filter_items(m: Dict[str, Any], kind: str) -> List[Dict[str, Any]]:
+    items = (m.get("artefacts", {}) or {}).get(kind, []) or []
+    return [it for it in items if it.get("page") == PAGE_ID]
+
+
+def _render_figures(run_id: str, items: List[Dict[str, Any]]) -> None:
+    if not items:
+        st.info("Aucune figure pour cette page.")
+        return
+    for it in items:
+        st.subheader(it.get("key", "figure"))
+        p = _abs_path(run_id, it.get("path", ""))
+        if p.exists():
+            st.image(str(p), use_container_width=True)
+        else:
+            st.error(f"Figure introuvable: {it.get('path')}")
+
+
+def _render_tables(run_id: str, items: List[Dict[str, Any]]) -> None:
+    if not items:
+        st.info("Aucune table pour cette page.")
+        return
+    for it in items:
+        st.subheader(it.get("key", "table"))
+        p = _abs_path(run_id, it.get("path", ""))
+        try:
+            df = pd.read_csv(p, index_col=0)
+            st.dataframe(df, use_container_width=True)
+        except Exception as e:
+            st.error(f"Lecture table impossible: {it.get('path')} ({e})")
+
+
+def _render_metrics(run_id: str, items: List[Dict[str, Any]]) -> None:
+    if not items:
+        st.info("Aucune métrique pour cette page.")
+        return
+    for it in items:
+        st.subheader(it.get("key", "metric"))
+        p = _abs_path(run_id, it.get("path", ""))
+        try:
+            payload = read_metric_json(p)
+        except Exception as e:
+            st.error(f"Lecture métrique impossible: {it.get('path')} ({e})")
+            continue
+        if isinstance(payload, dict) and "markdown" in payload:
+            st.markdown(payload["markdown"])
+        else:
+            st.json(payload)
+
+
+def main() -> None:
+    st.set_page_config(page_title=PAGE_TITLE, layout="wide")
+    st.title(PAGE_TITLE)
+
+    run_id = _get_run_id()
+    if not run_id:
+        st.warning("Aucun run sélectionné.")
+        return
+
+    m = read_manifest(run_id) or {}
+    st.caption(f"Run: {run_id}")
+
+    st.markdown("### Figures")
+    _render_figures(run_id, _filter_items(m, "figures"))
+
+    st.markdown("### Tables")
+    _render_tables(run_id, _filter_items(m, "tables"))
+
+    st.markdown("### Métriques")
+    _render_metrics(run_id, _filter_items(m, "metrics"))
+
+
+if __name__ == "__main__":
+    main()
