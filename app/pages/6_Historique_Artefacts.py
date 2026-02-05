@@ -52,7 +52,7 @@ def _render_kind(run_id: str, kind: str, items: List[Dict[str, Any]]) -> None:
             st.markdown(f"**{it.get('key','figure')}**  \n`{it.get('path','')}`")
             p = _abs_path(run_id, it.get("path", ""))
             if p.exists():
-                st.image(str(p), use_container_width=True)
+                st.image(str(p), width='stretch')
             else:
                 st.error("Figure introuvable")
     elif kind == "tables":
@@ -61,7 +61,7 @@ def _render_kind(run_id: str, kind: str, items: List[Dict[str, Any]]) -> None:
             p = _abs_path(run_id, it.get("path", ""))
             try:
                 df = pd.read_csv(p, index_col=0)
-                st.dataframe(df, use_container_width=True)
+                st.dataframe(df, width='stretch')
             except Exception as e:
                 st.error(f"Lecture table impossible ({e})")
     elif kind == "metrics":

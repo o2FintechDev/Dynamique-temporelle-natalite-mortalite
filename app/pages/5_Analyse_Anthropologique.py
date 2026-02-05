@@ -59,7 +59,7 @@ def _render_tables(run_id: str, items: List[Dict[str, Any]]) -> None:
         p = _abs_path(run_id, it.get("path", ""))
         try:
             df = pd.read_csv(p, index_col=0)
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, width='stretch')
         except Exception as e:
             st.error(f"Lecture table impossible: {it.get('path')} ({e})")
 
@@ -72,7 +72,7 @@ def _render_figures(run_id: str, items: List[Dict[str, Any]]) -> None:
         st.subheader(it.get("key", "figure"))
         p = _abs_path(run_id, it.get("path", ""))
         if p.exists():
-            st.image(str(p), use_container_width=True)
+            st.image(str(p), width='stretch')
         else:
             st.error(f"Figure introuvable: {it.get('path')}")
 
