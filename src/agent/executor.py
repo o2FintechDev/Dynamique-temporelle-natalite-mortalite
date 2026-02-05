@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional, Callable
 import streamlit as st
 
 from src.utils.run_writer import RunWriter
-from src.utils import get_logger
+from src.utils.logger import get_logger
 
 log = get_logger("agent.executor")
 
