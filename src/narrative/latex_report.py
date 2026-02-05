@@ -37,7 +37,7 @@ def export_report_tex_from_manifest(
 ) -> Path:
     """
     Génère un .tex dans <run_root>/<tex_name> à partir du manifest + (optionnel) narrative_markdown.
-    Signature ALIGNÉE avec l'appel dans src/agent/tools.py.
+    Signature ALIGNÉE avec src/agent/tools.py.
     """
     run_root = Path(run_root)
     run_root.mkdir(parents=True, exist_ok=True)
@@ -53,29 +53,33 @@ def export_report_tex_from_manifest(
     metrics = artefacts.get("metrics", []) or []
     models = artefacts.get("models", []) or []
 
-    # Tolérance: certaines versions stockent un lookup global
     lookup = manifest.get("lookup", {}) or {}
 
     def resolve_path(item: dict) -> str:
         p = item.get("path") or item.get("relpath") or ""
-        if not p and item.get("label") and item["label"] in lookup:
-            p = lookup[item["label"]].get("path") or lookup[item["label"]].get("relpath") or ""
-        return str(p)
+        if not p:
+            k = item.get("key") or item.get("label")
+            if k and isinstance(lookup, dict):
+                # lookup typé
+                for bucket in lookup.values() if any(isinstance(v, dict) for v in lookup.values()) else []:
+                    if isinstance(bucket, dict) and k in bucket:
+                        p = bucket[k]
+                        break
+                # lookup plat
+                if not p and k in lookup and isinstance(lookup[k], str):
+                    p = lookup[k]
+        return str(p or "")
 
     def include_graphic(path_str: str) -> str:
-        # On préfère des chemins relatifs au .tex pour pdflatex
         p = Path(path_str)
-        if not p.is_absolute():
-            abs_p = (run_root / p).resolve()
-        else:
-            abs_p = p
-
+        abs_p = (run_root / p).resolve() if not p.is_absolute() else p
         try:
             rel = abs_p.relative_to(run_root.resolve())
             return str(rel).replace("\\", "/")
         except Exception:
             return str(abs_p).replace("\\", "/")
 
+    # IMPORTANT: lines défini dans le scope parent
     lines: list[str] = []
     lines += [
         r"\documentclass[11pt,a4paper]{article}",
@@ -97,10 +101,8 @@ def export_report_tex_from_manifest(
     if run_id:
         lines += [r"\textbf{Run ID:} " + _escape_tex(run_id) + r"\\", ""]
 
-    # Narratif
     if narrative_markdown:
         lines += [r"\section{Interprétation}", ""]
-        # markdown -> tex minimal (on garde brut en monospaced pour éviter un parser)
         lines += [
             r"\begin{verbatim}",
             narrative_markdown,
@@ -108,32 +110,33 @@ def export_report_tex_from_manifest(
             "",
         ]
 
-    def section_block(name: str, items: list[dict]) -> None:
+    def section_block(lines_ref: list[str], name: str, items: list[dict]) -> None:
         if not items:
             return
-        lines.append(r"\section{" + _escape_tex(name) + r"}")
+        lines_ref.append(r"\section{" + _escape_tex(name) + r"}")
         for it in items:
-            label = it.get("label") or it.get("name") or ""
+            label = it.get("key") or it.get("label") or it.get("name") or ""
             path_str = resolve_path(it)
-            lines.append(r"\subsection{" + _escape_tex(label or path_str) + r"}")
+
+            lines_ref.append(r"\subsection{" + _escape_tex(label or path_str) + r"}")
             if path_str:
-                lines.append(r"\texttt{" + _escape_tex(path_str) + r"}\\")
+                lines_ref.append(r"\texttt{" + _escape_tex(path_str) + r"}\\")
             else:
-                lines.append(r"\textit{Chemin indisponible dans le manifest.}\\")
-            # Inclusion auto si image
+                lines_ref.append(r"\textit{Chemin indisponible dans le manifest.}\\")
             if path_str.lower().endswith((".png", ".jpg", ".jpeg")):
                 inc = include_graphic(path_str)
-                lines += [
+                lines_ref += [
                     r"\begin{center}",
                     r"\includegraphics[width=0.95\linewidth]{" + _escape_tex(inc) + r"}",
                     r"\end{center}",
                 ]
-            lines.append("")
+            lines_ref.append("")
 
-    section_block("Figures", figures)
-    section_block("Tables", tables)
-    section_block("Métriques", metrics)
-    section_block("Modèles", models)
+    # Appels safe
+    section_block(lines, "Figures", figures)
+    section_block(lines, "Tables", tables)
+    section_block(lines, "Métriques", metrics)
+    section_block(lines, "Modèles", models)
 
     lines.append(r"\end{document}")
 
@@ -149,7 +152,6 @@ def try_compile_pdf(
 ) -> Tuple[Optional[Path], Optional[str]]:
     """
     Compile avec pdflatex si dispo.
-    Signature ALIGNÉE avec l'appel dans src/agent/tools.py.
     Retourne (pdf_path|None, log_text|None).
     """
     run_root = Path(run_root)
