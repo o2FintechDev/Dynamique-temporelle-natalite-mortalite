@@ -78,25 +78,47 @@ def export_report_tex_from_manifest(
             return str(rel).replace("\\", "/")
         except Exception:
             return str(abs_p).replace("\\", "/")
+    
+    def tex_path_str(path_str: str) -> str:
+        """
+        Chemin LaTeX robuste : convertit en relatif au run_root + protège caractères spéciaux.
+        Utilise \detokenize{...} pour éviter les soucis avec _, %, #, espaces, etc.
+        """
+        p = Path(path_str)
+        abs_p = (run_root / p).resolve() if not p.is_absolute() else p
+        try:
+            rel = abs_p.relative_to(run_root.resolve())
+            rel_s = str(rel).replace("\\", "/")
+        except Exception:
+            rel_s = str(abs_p).replace("\\", "/")
+        return r"\detokenize{" + rel_s + "}"
+
 
     # IMPORTANT: lines défini dans le scope parent
     lines: list[str] = []
     lines += [
-        r"\documentclass[11pt,a4paper]{article}",
-        r"\usepackage[utf8]{inputenc}",
-        r"\usepackage[T1]{fontenc}",
-        r"\usepackage[french]{babel}",
-        r"\usepackage{geometry}",
-        r"\geometry{margin=2.2cm}",
-        r"\usepackage{graphicx}",
-        r"\usepackage{booktabs}",
-        r"\usepackage{hyperref}",
-        r"\begin{document}",
-        r"\title{" + _escape_tex(title) + r"}",
-        r"\author{" + _escape_tex(author) + r"}",
-        r"\date{" + _escape_tex(created) + r"}",
-        r"\maketitle",
-    ]
+    r"\documentclass[11pt,a4paper]{article}",
+    r"\usepackage[utf8]{inputenc}",
+    r"\usepackage[T1]{fontenc}",
+    r"\usepackage[french]{babel}",
+    r"\usepackage{geometry}",
+    r"\geometry{margin=2.2cm}",
+    r"\usepackage{graphicx}",
+    r"\usepackage{float}",          # pour [H]
+    r"\usepackage{booktabs}",
+    r"\usepackage{longtable}",
+    r"\usepackage{xcolor}",
+    r"\usepackage{hyperref}",
+    r"\usepackage{pgfplotstable}",  # pour CSV -> table
+    r"\pgfplotsset{compat=1.18}",
+    r"\graphicspath{{./artefacts/figures/}{./}}",
+    r"\DeclareGraphicsExtensions{.pdf,.png,.jpg,.jpeg}",
+    r"\begin{document}",
+    r"\title{" + _escape_tex(title) + r"}",
+    r"\author{" + _escape_tex(author) + r"}",
+    r"\date{" + _escape_tex(created) + r"}",
+    r"\maketitle",
+]
 
     if run_id:
         lines += [r"\textbf{Run ID:} " + _escape_tex(run_id) + r"\\", ""]
@@ -113,24 +135,110 @@ def export_report_tex_from_manifest(
     def section_block(lines_ref: list[str], name: str, items: list[dict]) -> None:
         if not items:
             return
+
         lines_ref.append(r"\section{" + _escape_tex(name) + r"}")
+
         for it in items:
             label = it.get("key") or it.get("label") or it.get("name") or ""
             path_str = resolve_path(it)
 
-            lines_ref.append(r"\subsection{" + _escape_tex(label or path_str) + r"}")
+            # IDs LaTeX stables
+            safe_id = (label or path_str or "artefact").lower().replace(" ", "-")
+            safe_id = "".join(ch for ch in safe_id if ch.isalnum() or ch in "-_")[:60]
+
+            lines_ref.append(r"\subsection{" + _escape_tex(label or path_str or "Artefact") + r"}")
+
+            # Affichage du chemin (optionnel) - ok en verbatim court
             if path_str:
                 lines_ref.append(r"\texttt{" + _escape_tex(path_str) + r"}\\")
             else:
                 lines_ref.append(r"\textit{Chemin indisponible dans le manifest.}\\")
-            if path_str.lower().endswith((".png", ".jpg", ".jpeg")):
-                inc = include_graphic(path_str)
+                lines_ref.append("")
+                continue
+
+            ext = path_str.lower()
+
+            # --- FIGURES ---
+            if ext.endswith((".png", ".jpg", ".jpeg", ".pdf")):
+                p_tex = tex_path_str(path_str)
                 lines_ref += [
-                    r"\begin{center}",
-                    r"\includegraphics[width=0.95\linewidth]{" + _escape_tex(inc) + r"}",
-                    r"\end{center}",
+                    r"\begin{figure}[H]",
+                    r"\centering",
+                    rf"\IfFileExists{{{p_tex}}}{{",
+                    rf"\includegraphics[width=0.95\linewidth]{{{p_tex}}}",
+                    r"}{",
+                    rf"\fbox{{\textbf{{Figure manquante :}} \texttt{{{_escape_tex(path_str)}}}}}",
+                    r"}",
+                    r"\caption{" + _escape_tex(label or "Figure") + r"}",
+                    r"\label{fig:" + _escape_tex(safe_id) + r"}",
+                    r"\end{figure}",
+                    "",
+                    r"\paragraph{Analyse automatique (IA).}",
+                    r"\begin{quote}",
+                    r"Référence : Figure~\ref{fig:" + _escape_tex(safe_id) + r"}.",
+                    r"\end{quote}",
+                    "",
                 ]
+                continue
+
+            # --- TABLES ---
+            # 1) si .tex -> \input
+            if ext.endswith(".tex"):
+                p_tex = tex_path_str(path_str)
+                lines_ref += [
+                    r"\begin{table}[H]",
+                    r"\centering",
+                    r"\caption{" + _escape_tex(label or "Tableau") + r"}",
+                    r"\label{tab:" + _escape_tex(safe_id) + r"}",
+                    rf"\IfFileExists{{{p_tex}}}{{",
+                    rf"\input{{{p_tex}}}",
+                    r"}{",
+                    rf"\fbox{{\textbf{{Table manquante :}} \texttt{{{_escape_tex(path_str)}}}}}",
+                    r"}",
+                    r"\end{table}",
+                    "",
+                    r"\paragraph{Analyse automatique (IA).}",
+                    r"\begin{quote}",
+                    r"Référence : Tableau~\ref{tab:" + _escape_tex(safe_id) + r"}.",
+                    r"\end{quote}",
+                    "",
+                ]
+                continue
+
+            # 2) si .csv -> pgfplotstable
+            if ext.endswith(".csv"):
+                p_tex = tex_path_str(path_str)
+                lines_ref += [
+                    r"\begin{table}[H]",
+                    r"\centering",
+                    r"\caption{" + _escape_tex(label or "Tableau (CSV)") + r"}",
+                    r"\label{tab:" + _escape_tex(safe_id) + r"}",
+                    rf"\IfFileExists{{{p_tex}}}{{",
+                    r"\pgfplotstabletypeset[",
+                    r"  col sep=comma,",
+                    r"  string type,",
+                    r"  header=true,",
+                    r"  every head row/.style={before row=\toprule, after row=\midrule},",
+                    r"  every last row/.style={after row=\bottomrule}",
+                    r"]{" + p_tex + r"}",
+                    r"}{",
+                    rf"\fbox{{\textbf{{CSV manquant :}} \texttt{{{_escape_tex(path_str)}}}}}",
+                    r"}",
+                    r"\end{table}",
+                    "",
+                    r"\paragraph{Analyse automatique (IA).}",
+                    r"\begin{quote}",
+                    r"Référence : Tableau~\ref{tab:" + _escape_tex(safe_id) + r"}.",
+                    r"\end{quote}",
+                    "",
+                ]
+                continue
+
+            # fallback : artefact non géré
+            lines_ref.append(r"\textit{Type de fichier non géré pour rendu LaTeX.}\\")
             lines_ref.append("")
+
+
 
     # Appels safe
     section_block(lines, "Figures", figures)
