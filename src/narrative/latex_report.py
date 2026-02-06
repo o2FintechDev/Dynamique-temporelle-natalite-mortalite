@@ -85,7 +85,12 @@ def export_report_tex_from_manifest(
     def filename_only(path_str: str) -> str:
         return Path(path_str).name
 
+    def latex_filename(fname: str) -> str:
+        # \input/\includegraphics : garder "_" brut (pas \_) et éviter espaces
+        return fname.replace(" ", "_")
+
     def safe_latex_id(label: str, path_str: str) -> str:
+        # IMPORTANT: destiné à \label{} => doit contenir UNIQUEMENT des caractères "sûrs"
         base = (label or path_str or "artefact").lower().replace(" ", "-")
         base = "".join(ch for ch in base if ch.isalnum() or ch in "-_")[:60]
         return base or "artefact"
@@ -173,12 +178,13 @@ def export_report_tex_from_manifest(
 
             # --- FIGURES ---
             if is_fig(src_path):
-                fname = filename_only(target)
+                fname = latex_filename(filename_only(target))
                 lines_ref += [
                     r"\begin{figure}[H]",
-                    r"\includegraphics[width=0.95\linewidth]{" + r"\detokenize{" + fname + r"}" + r"}",
+                    r"\includegraphics[width=0.95\linewidth]{" + fname + r"}",
                     r"\caption{" + _escape_tex(title_txt) + r"}",
-                    r"\label{fig:" + _escape_tex(safe_id) + r"}",
+                    # IMPORTANT: pas de _escape_tex ici (sinon \_ dans \label -> crash)
+                    r"\label{fig:" + safe_id + r"}",
                     r"\end{figure}",
                     "",
                 ]
@@ -186,13 +192,14 @@ def export_report_tex_from_manifest(
 
             # --- TABLES (.tex) ---
             if is_tex(src_path):
-                fname = filename_only(src_path)
+                fname = latex_filename(filename_only(src_path))
                 lines_ref += [
                     r"\begin{table}[H]",
                     r"\caption{" + _escape_tex(title_txt) + r"}",
-                    r"\label{tab:" + _escape_tex(safe_id) + r"}",
+                    r"\label{tab:" + safe_id + r"}",
                     r"\begin{adjustbox}{max width=\linewidth,center}",
-                    r"\input{" + r"\detokenize{" + f"{OVERLEAF_TAB_DIR}/{fname}" + r"}" + r"}",
+                    # IMPORTANT: pas de \detokenize dans \input
+                    r"\input{" + f"{OVERLEAF_TAB_DIR}/{fname}" + r"}",
                     r"\end{adjustbox}",
                     r"\end{table}",
                     "",

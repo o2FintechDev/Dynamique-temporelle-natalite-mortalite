@@ -30,23 +30,43 @@ def save_table_tex(
     wrap_table_env: bool = False,
 ) -> Path:
     """
-    Exporte un tableau LaTeX 'booktabs' prêt à être \input{}.
-
-    - wrap_table_env=False (recommandé) :
-        génère uniquement le tabular, car ton latex_report.py enveloppe déjà avec table/caption/label.
-    - wrap_table_env=True :
-        génère un environnement table complet (utile si tu veux le rendre standalone).
+    Exporte un tableau LaTeX prêt à être \input{}.
+    Compatible pandas anciens: booktabs peut être absent.
     """
     path = Path(path)
     _ensure_parent(path)
 
-    latex = df.to_latex(
-        index=index,
-        escape=True,
-        booktabs=True,
-        longtable=False,
-        float_format=(lambda x: float_format.format(x)) if float_format else None,
-    )
+    fmt = (lambda x: float_format.format(x)) if float_format else None
+
+    # Essai pandas "récent"
+    try:
+        latex = df.to_latex(
+            index=index,
+            escape=True,
+            longtable=False,
+            float_format=fmt,
+            booktabs=True,
+        )
+    except TypeError:
+        # Fallback pandas "ancien"
+        latex = df.to_latex(
+            index=index,
+            escape=True,
+            longtable=False,
+            float_format=fmt,
+        )
+
+        # Remplacement des \hline par booktabs si présents
+        # (évite un rendu "grille" et fonctionne avec \usepackage{booktabs} côté LaTeX)
+        if r"\hline" in latex:
+            # remplace 1er et 2e \hline
+            latex = latex.replace(r"\hline", r"\toprule", 1)
+            latex = latex.replace(r"\hline", r"\midrule", 1)
+
+            # remplace le DERNIER \hline restant (s'il existe) par \bottomrule
+            pos = latex.rfind(r"\hline")
+            if pos != -1:
+                latex = latex[:pos] + r"\bottomrule" + latex[pos + len(r"\hline"):]
 
     if wrap_table_env:
         cap = f"\\caption{{{caption}}}\n" if caption else ""
@@ -63,8 +83,7 @@ def save_table_csv_and_tex(
     *,
     caption: str = "",
     label: str = "",
-    float_format: str = "{:.3f}",
-) -> tuple[Path, Path]:
+    float_format: str = "{:.3f}",) -> tuple[Path, Path]:
     """
     Sauve CSV + TEX en parallèle.
     Convention: même nom, extension changée .csv -> .tex
