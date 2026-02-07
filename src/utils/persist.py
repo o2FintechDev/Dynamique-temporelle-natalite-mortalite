@@ -123,8 +123,15 @@ def _write_latex_block(
 ) -> Optional[Path]:
     """
     Génère un bloc LaTeX auto: latex/blocks/<step_name>.tex
-    - compile depuis latex/master.tex donc chemins relatifs: ../artefacts/...
-    - labels LaTeX sûrs (corrige ton erreur \protect entre \csname..\endcsname)
+
+    Hypothèse Overleaf (recommandée):
+    - le fichier compilé est main.tex à la racine
+    - main.tex fait: \input{latex/master.tex}
+    - master.tex fait: \input{blocks/<step>.tex}
+
+    Donc, depuis latex/blocks/*.tex, les artefacts sont à:
+    - ../../artefacts/figures/<file>.png
+    - ../../artefacts/tables/<file>.tex
     """
     blocks_dir = rw.paths.latex_dir / "blocks"
     blocks_dir.mkdir(parents=True, exist_ok=True)
@@ -134,36 +141,40 @@ def _write_latex_block(
     note_md = _extract_step_note_markdown(step_name, outputs)
 
     lines: list[str] = []
-    # Titre du bloc: éviter \label ici, on reste simple
+
+    # Titre du bloc (pas de \label ici)
     lines.append(r"\section*{" + _escape_tex(step_name) + r"}")
     if page:
         lines.append(r"\textit{Page: " + _escape_tex(page) + r"}\\")
     lines.append("")
 
     if note_md:
-        # Verbatim = robuste (pas besoin de conversion markdown->latex)
         lines += [r"\begin{verbatim}", note_md, r"\end{verbatim}", ""]
 
-    # FIGURES
+    # -------- FIGURES --------
     figs = saved.get("figures") or []
     if figs:
         lines.append(r"\subsection*{Figures}")
         for f in figs:
-            # f["path"] est relatif au run_root: artefacts/figures/<file>.png
+            # f["path"] relatif run_root: artefacts/figures/<file>.png
             fname = Path(f.get("path", "")).name
             caption = f.get("key") or fname
             lab_id = _latex_safe_label_id(f"fig:{caption}")
 
+            rel_fig = f"../../artefacts/figures/{fname}"
+
             lines += [
                 r"\begin{figure}[H]",
-                r"\includegraphics[width=0.95\linewidth]{" + r"\detokenize{" + fname + r"}" + r"}",
+                r"\includegraphics[width=0.95\linewidth]{"
+                + r"\detokenize{" + rel_fig + r"}"
+                + r"}",
                 r"\caption{" + _escape_tex(caption) + r"}",
                 r"\label{" + lab_id + r"}",
                 r"\end{figure}",
                 "",
             ]
 
-    # TABLES
+    # -------- TABLES --------
     tbls = saved.get("tables") or []
     if tbls:
         lines.append(r"\subsection*{Tableaux}")
@@ -173,9 +184,7 @@ def _write_latex_block(
             caption = t.get("key") or tname
             lab_id = _latex_safe_label_id(f"tab:{caption}")
 
-            # IMPORTANT: compilation depuis latex/master.tex => remonter d'un niveau
-            # latex/blocks/*.tex -> ../artefacts/tables/*.tex
-            rel_input = f"../artefacts/tables/{tname}"
+            rel_input = f"../../artefacts/tables/{tname}"
 
             lines += [
                 r"\begin{table}[H]",
@@ -188,12 +197,13 @@ def _write_latex_block(
                 "",
             ]
 
-    # METRICS: on liste uniquement (JSON)
+    # -------- METRICS (liste seulement) --------
     mets = saved.get("metrics") or []
     if mets:
         lines.append(r"\subsection*{Métriques (JSON, non rendues)}")
         for m in mets:
             p = m.get("path", "")
+            # afficher un chemin relatif au run_root (lisible)
             lines.append(r"\texttt{" + _escape_tex(p) + r"}\\")
         lines.append("")
 
