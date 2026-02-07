@@ -6,7 +6,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import warnings
 
-from statsmodels.tsa.statespace.sarimax import SARIMAX
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 from scipy import stats
 from statsmodels.tsa.statespace.sarimax import SARIMAX
@@ -30,6 +29,92 @@ def rescaled_range(x: np.ndarray) -> float:
     r = np.max(z) - np.min(z)
     s = np.std(x)
     return float(r / s) if s > 0 else float("nan")
+
+def ar_grid(series: pd.Series, p_max: int = 8) -> pd.DataFrame:
+    y = series.dropna().astype(float)
+    rows = []
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=ConvergenceWarning)
+        warnings.filterwarnings("ignore", message=".*failed to converge.*")
+
+        for p in range(1, p_max + 1):
+            try:
+                m = SARIMAX(
+                    y,
+                    order=(p, 0, 0),
+                    trend="c",
+                    enforce_stationarity=False,
+                    enforce_invertibility=False,
+                )
+                res = m.fit(disp=False)
+
+                if not bool(res.mle_retvals.get("converged", False)):
+                    continue
+
+                rows.append({"p": int(p), "aic": float(res.aic), "bic": float(res.bic)})
+            except Exception:
+                continue
+
+    return pd.DataFrame(rows).sort_values(["aic", "bic"]).reset_index(drop=True)
+
+def ma_grid(series: pd.Series, q_max: int = 8) -> pd.DataFrame:
+    y = series.dropna().astype(float)
+    rows = []
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=ConvergenceWarning)
+        warnings.filterwarnings("ignore", message=".*failed to converge.*")
+
+        for q in range(1, q_max + 1):
+            try:
+                m = SARIMAX(
+                    y,
+                    order=(0, 0, q),
+                    trend="c",
+                    enforce_stationarity=False,
+                    enforce_invertibility=False,
+                )
+                res = m.fit(disp=False)
+
+                if not bool(res.mle_retvals.get("converged", False)):
+                    continue
+
+                rows.append({"q": int(q), "aic": float(res.aic), "bic": float(res.bic)})
+            except Exception:
+                continue
+
+    return pd.DataFrame(rows).sort_values(["aic", "bic"]).reset_index(drop=True)
+
+
+def arma_grid(series: pd.Series, p_max: int = 6, q_max: int = 6) -> pd.DataFrame:
+    y = series.dropna().astype(float)
+    rows = []
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=ConvergenceWarning)
+        warnings.filterwarnings("ignore", message=".*failed to converge.*")
+
+        for p in range(1, p_max + 1):
+            for q in range(1, q_max + 1):
+                try:
+                    m = SARIMAX(
+                        y,
+                        order=(p, 0, q),
+                        trend="c",
+                        enforce_stationarity=False,
+                        enforce_invertibility=False,
+                    )
+                    res = m.fit(disp=False)
+
+                    if not bool(res.mle_retvals.get("converged", False)):
+                        continue
+
+                    rows.append({"p": int(p), "q": int(q), "aic": float(res.aic), "bic": float(res.bic)})
+                except Exception:
+                    continue
+
+    return pd.DataFrame(rows).sort_values(["aic", "bic"]).reset_index(drop=True)
 
 def arima_grid(series: pd.Series, p_max: int = 4, d_max: int = 2, q_max: int = 4) -> tuple[pd.DataFrame, dict, Any]:
     y = series.dropna().astype(float)

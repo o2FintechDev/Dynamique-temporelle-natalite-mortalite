@@ -10,7 +10,11 @@ from src.econometrics.diagnostics import (
     acf_pacf_figs, adf_table, phillips_perron_table,
     dickey_fuller_band_metrics, ts_vs_ds_decision, ljungbox_diff,
 )
-from src.econometrics.univariate import arima_grid, residual_diagnostics, hurst_exponent, rescaled_range, figs_fit
+from src.econometrics.univariate import (
+    ar_grid, ma_grid, arma_grid,
+    arima_grid, residual_diagnostics,
+    hurst_exponent, rescaled_range, figs_fit)
+
 from src.econometrics.multivariate import var_pack
 from src.econometrics.cointegration import cointegration_pack
 
@@ -141,9 +145,49 @@ def step3_stationarity_pack(df: pd.DataFrame, *, y: str, lags: int = 24, **param
 def step4_univariate_pack(df: pd.DataFrame, *, y: str, **params: Any) -> dict[str, Any]:
     s = _series(df, y)
 
+    tbl_ar = ar_grid(s, p_max=8)
+    tbl_ma = ma_grid(s, q_max=8)
+    tbl_arma = arma_grid(s, p_max=6, q_max=6)
+
     grid, best, best_res = arima_grid(s)
     resid = best_res.resid if best_res is not None else None
 
+    # --- utilitaire LOCAL ---
+    def _best_from_table(df: pd.DataFrame) -> dict | None:
+        if df is None or df.empty:
+            return None
+        return df.iloc[0].to_dict()
+
+    best_ar = _best_from_table(tbl_ar)
+    best_ma = _best_from_table(tbl_ma)
+    best_arma = _best_from_table(tbl_arma)
+
+    tbl_summary = pd.DataFrame([
+            {
+            "model": "AR",
+            "best_aic": best_ar["aic"] if best_ar else None,
+            "best_bic": best_ar["bic"] if best_ar else None,
+            "params": f"p={best_ar['p']}" if best_ar else None,
+            },
+            {
+            "model": "MA",
+            "best_aic": best_ma["aic"] if best_ma else None,
+            "best_bic": best_ma["bic"] if best_ma else None,
+            "params": f"q={best_ma['q']}" if best_ma else None,
+            },
+            {
+            "model": "ARMA",
+            "best_aic": best_arma["aic"] if best_arma else None,
+            "best_bic": best_arma["bic"] if best_arma else None,
+            "params": f"p={best_arma['p']}, q={best_arma['q']}" if best_arma else None,
+            },
+            {
+            "model": "ARIMA",
+            "best_aic": best.get("aic"),
+            "best_bic": best.get("bic"),
+            "params": f"(p,d,q)={best['order']}",
+            },
+        ])
     mem = {
         "rescaled_range": rescaled_range(s.values),
         "hurst": hurst_exponent(s.values),
@@ -176,10 +220,11 @@ def step4_univariate_pack(df: pd.DataFrame, *, y: str, **params: Any) -> dict[st
         + (f"Mémoire: Hurst≈{hurst:.3f}, R/S≈{rs:.3f}." if hurst is not None and rs is not None else "")
     )
     return {
-        "tables": {"tbl.uni.selection": grid, "tbl.uni.resid_diag": tbl_diag, "tbl.uni.memory": tbl_mem},
+        "tables": {"tbl.uni.ar": tbl_ar,"tbl.uni.ma": tbl_ma,"tbl.uni.arma": tbl_arma,
+        "tbl.uni.arima": grid, "tbl.uni.summary": tbl_summary, "tbl.uni.resid_diag": tbl_diag, "tbl.uni.memory": tbl_mem},
         "metrics": {"m.uni.best": {"best": best},
                     "m.note.step4": {"markdown": note4,
-                                     "key_points": {
+                                     "key_points": {"best_ar": best_ar,"best_ma": best_ma,"best_arma": best_arma,
                                          "order": order, "aic": aic, "bic": bic,
                                          "lb_p": lb_p, "jb_p": jb_p, "arch_p": arch_p,
                                          "hurst": hurst, "rescaled_range": rs
