@@ -174,7 +174,7 @@ class RunWriter:
 \graphicspath{{./../artefacts/figures/}{./}}
 
 \title{Dynamique temporelle de la natalité et de la mortalité en France (1975--2025)}
-\author{AnthroDem Lab}
+\author{AnthroDem Lab - Aude Bernier, Clara Pierreuse, Justine Reiter -- Guerville}
 \date{\today}
 
 \begin{document}

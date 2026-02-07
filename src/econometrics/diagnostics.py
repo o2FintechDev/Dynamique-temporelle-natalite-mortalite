@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any
+from typing import Any, Tuple
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -67,26 +67,50 @@ def dickey_fuller_band_metrics(acf_df: pd.DataFrame) -> pd.DataFrame:
         "acf_abs_area_1_24": float(np.abs(x["acf"]).sum()),
     }]).set_index(pd.Index(["band"]))
 
-def ts_vs_ds_decision(adf: pd.DataFrame,  band: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
-    # règle simple, traçable:
-    # - si ADF (c ou ct) rejette (p<0.05) => TS
-    # - sinon DS
-    p_c = float(adf.loc["c", "pvalue"])
-    p_ct = float(adf.loc["ct", "pvalue"])
+def ts_vs_ds_decision(tbl_adf: pd.DataFrame, tbl_band: pd.DataFrame, alpha: float = 0.05) -> Tuple[pd.DataFrame, dict[str, Any]]:
+    """
+    Décision TS vs DS fondée EXCLUSIVEMENT sur ADF.
+    Règle:
+      - si ADF(ct) rejette H0 (p<alpha) => TS (stationnaire autour d'une tendance)
+      - sinon si ADF(c) rejette H0 => TS (stationnaire autour d'une constante)
+      - sinon => DS
+    tbl_band est conservé pour traçabilité (lecture persistance), mais n'entre pas dans la décision.
+    """
+    def _p(spec: str) -> float | None:
+        try:
+            return float(tbl_adf.loc[spec, "pvalue"])
+        except Exception:
+            return None
 
-    vote_ts = (p_c < 0.05) or (p_ct < 0.05) 
-    verdict = "TS" if vote_ts else "DS"
+    p_c = _p("c")
+    p_ct = _p("ct")
 
-    tbl = pd.DataFrame([{
+    if p_ct is not None and p_ct < alpha:
+        verdict = "TS"
+        rule = "ADF(ct) rejette H0 => TS (tendance déterministe)."
+    elif p_c is not None and p_c < alpha:
+        verdict = "TS"
+        rule = "ADF(c) rejette H0 => TS (constante)."
+    else:
+        verdict = "DS"
+        rule = "ADF(c) et ADF(ct) ne rejettent pas => DS (différenciation requise)."
+
+    tbl_dec = pd.DataFrame([{
+        "verdict": verdict,
         "adf_p_c": p_c,
         "adf_p_ct": p_ct,
-        "band_outside_ratio": float(band.loc["band", "acf_outside_ratio"]),
-        "verdict": verdict,
-        "rule": "TS si (ADF c/ct p<0.05), sinon DS",
-    }]).set_index(pd.Index(["decision"]))
+        "alpha": alpha,
+        "rule": rule,
+    }]).set_index(pd.Index(["ts_vs_ds"]))
 
-    metric = {"verdict": verdict, "adf_p_c": p_c, "adf_p_ct": p_ct}
-    return tbl, metric
+    metrics = {
+        "verdict": verdict,
+        "adf_p_c": p_c,
+        "adf_p_ct": p_ct,
+        "alpha": alpha,
+        "rule": rule,
+    }
+    return tbl_dec, metrics
 
 def ljungbox_diff(series: pd.Series, lags: int = 24) -> pd.DataFrame:
     x = series.dropna().astype(float)

@@ -28,11 +28,6 @@ def _relpath(root: Path, p: Path) -> str:
 
 
 def _json_safe(x: Any) -> Any:
-    """
-    Rend un objet sérialisable JSON sans exploser.
-    - dict/list/str/int/float/bool/None: OK
-    - autres: str(x)
-    """
     if x is None:
         return None
     if isinstance(x, (str, int, float, bool)):
@@ -45,10 +40,6 @@ def _json_safe(x: Any) -> Any:
 
 
 def _escape_tex(s: Any) -> str:
-    """
-    Echappement minimal sûr pour captions/labels LaTeX.
-    IMPORTANT: ne pas l'utiliser pour des blocs de texte longs (utiliser verbatim).
-    """
     if s is None:
         return ""
     return (
@@ -67,37 +58,35 @@ def _escape_tex(s: Any) -> str:
 
 
 def _latex_safe_label_id(x: str, *, maxlen: int = 60) -> str:
-    """
-    ID sûr pour \label{...}:
-    - pas d'espaces, pas de backslash, pas de \protect, pas de caractères actifs
-    - uniquement [a-zA-Z0-9:_-]
-    """
     x = (x or "artefact").strip().lower()
     x = x.replace(" ", "-")
-    # remplace tout ce qui n'est pas alnum / : _ - par _
-    x = re.sub(r"[^a-z0-9:_-]+", "_", x)
-    x = x.strip("_")
+    x = re.sub(r"[^a-z0-9:_-]+", "_", x).strip("_")
     return (x[:maxlen] or "artefact")
 
 
+def _normalize_tex_text(s: str) -> str:
+    """
+    Normalise les caractères unicode qui font planter pdfLaTeX (ex: U+2212).
+    """
+    if not s:
+        return s
+    return (
+        s.replace("\u2212", "-")   # minus
+         .replace("\u2013", "-")   # en dash
+         .replace("\u2014", "-")   # em dash
+         .replace("\u00a0", " ")   # nbsp
+    )
+
+
 def _extract_step_note_markdown(step_name: str, outputs: Dict[str, Any]) -> Optional[str]:
-    """
-    Récupère une note markdown si présente.
-    Convention déjà dans ton code: m.note.step2, m.note.step3, m.note.step4...
-    """
     metrics = outputs.get("metrics") or {}
     if not isinstance(metrics, dict):
         return None
 
-    # Tentatives directes: m.note.<step_name> ou m.note.stepX (si step_name contient stepX)
     candidates: list[str] = []
-
-    # ex: step_name="step3_stationarity" -> "m.note.step3"
     m = re.match(r"^(step\d+)", step_name)
     if m:
         candidates.append(f"m.note.{m.group(1)}")
-
-    # ex: "m.note.step3_stationarity" (au cas où)
     candidates.append(f"m.note.{step_name}")
 
     for k in candidates:
@@ -105,7 +94,6 @@ def _extract_step_note_markdown(step_name: str, outputs: Dict[str, Any]) -> Opti
         if isinstance(v, dict) and isinstance(v.get("markdown"), str):
             return v["markdown"]
 
-    # fallback: premier m.note.* rencontré
     for k, v in metrics.items():
         if isinstance(k, str) and k.startswith("m.note.") and isinstance(v, dict) and isinstance(v.get("markdown"), str):
             return v["markdown"]
@@ -121,47 +109,43 @@ def _write_latex_block(
     outputs: Dict[str, Any],
     saved: Dict[str, Any],
 ) -> Optional[Path]:
-    """
+    r"""
     Génère un bloc LaTeX auto: latex/blocks/<step_name>.tex
 
-    Hypothèse Overleaf (recommandée):
-    - le fichier compilé est main.tex à la racine
-    - main.tex fait: \input{latex/master.tex}
-    - master.tex fait: \input{blocks/<step>.tex}
-
-    Donc, depuis latex/blocks/*.tex, les artefacts sont à:
-    - ../../artefacts/figures/<file>.png
-    - ../../artefacts/tables/<file>.tex
+    IMPORTANT (Overleaf stable):
+    - On écrit des chemins RELATIFS À LA RACINE DU PROJET (run folder).
+      Donc dans les blocs:
+        artefacts/figures/<file>.png
+        artefacts/tables/<file>.tex
     """
     blocks_dir = rw.paths.latex_dir / "blocks"
     blocks_dir.mkdir(parents=True, exist_ok=True)
-
     block_path = blocks_dir / f"{_safe_filename(step_name)}.tex"
 
     note_md = _extract_step_note_markdown(step_name, outputs)
+    if isinstance(note_md, str):
+        note_md = _normalize_tex_text(note_md)
 
     lines: list[str] = []
-
-    # Titre du bloc (pas de \label ici)
     lines.append(r"\section*{" + _escape_tex(step_name) + r"}")
     if page:
         lines.append(r"\textit{Page: " + _escape_tex(page) + r"}\\")
     lines.append("")
 
     if note_md:
+        # verbatim mais en texte normalisé (évite U+2212)
         lines += [r"\begin{verbatim}", note_md, r"\end{verbatim}", ""]
 
-    # -------- FIGURES --------
+    # FIGURES
     figs = saved.get("figures") or []
     if figs:
         lines.append(r"\subsection*{Figures}")
         for f in figs:
-            # f["path"] relatif run_root: artefacts/figures/<file>.png
             fname = Path(f.get("path", "")).name
             caption = f.get("key") or fname
             lab_id = _latex_safe_label_id(f"fig:{caption}")
 
-            rel_fig = f"../../artefacts/figures/{fname}"
+            rel_fig = f"artefacts/figures/{fname}"  # ROOT-RELATIVE
 
             lines += [
                 r"\begin{figure}[H]",
@@ -174,17 +158,16 @@ def _write_latex_block(
                 "",
             ]
 
-    # -------- TABLES --------
+    # TABLES
     tbls = saved.get("tables") or []
     if tbls:
         lines.append(r"\subsection*{Tableaux}")
         for t in tbls:
-            # manifest pointe vers .tex: artefacts/tables/<file>.tex
             tname = Path(t.get("path", "")).name
             caption = t.get("key") or tname
             lab_id = _latex_safe_label_id(f"tab:{caption}")
 
-            rel_input = f"../../artefacts/tables/{tname}"
+            rel_input = f"artefacts/tables/{tname}"  # ROOT-RELATIVE
 
             lines += [
                 r"\begin{table}[H]",
@@ -197,13 +180,12 @@ def _write_latex_block(
                 "",
             ]
 
-    # -------- METRICS (liste seulement) --------
+    # METRICS
     mets = saved.get("metrics") or []
     if mets:
         lines.append(r"\subsection*{Métriques (JSON, non rendues)}")
         for m in mets:
-            p = m.get("path", "")
-            # afficher un chemin relatif au run_root (lisible)
+            p = _normalize_tex_text(str(m.get("path", "")))
             lines.append(r"\texttt{" + _escape_tex(p) + r"}\\")
         lines.append("")
 
@@ -224,7 +206,6 @@ def persist_outputs(
     """
     outputs = outputs or {}
 
-    # ROUTING: si rien n’est fourni, on ne casse pas le filtrage UI
     page = page or "UNROUTED"
 
     run_root = rw.paths.run_dir
@@ -268,14 +249,12 @@ def persist_outputs(
 
         base = _safe_filename(label)
 
-        # 1) CSV (debug/data)
         csv_path = rw.paths.tables_dir / (base + ".csv")
 
-        # 2) TEX (Overleaf: \input)
         csv_path, tex_path = save_table_csv_and_tex(
             df,
             csv_path,
-            caption="",   # caption géré dans latex_report.py / blocs
+            caption="",
             label="",
             float_format="{:.3f}",
         )
@@ -283,7 +262,6 @@ def persist_outputs(
         rel_tex = _relpath(run_root, tex_path)
         rel_csv = _relpath(run_root, csv_path)
 
-        # IMPORTANT: manifest pointe vers TEX
         rw.register_artefact(
             "tables",
             label,

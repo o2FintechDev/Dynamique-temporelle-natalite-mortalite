@@ -21,7 +21,9 @@ from src.econometrics.api import (
 from src.narrative.renderer import render_anthropology
 from src.utils.session_state import get_state
 from src.utils.run_reader import get_run_files, read_manifest, RunManager, read_metric_json
-
+from pathlib import Path
+from src.narrative import build_narrative_from_run, save_narrative_packet
+from src.narrative.schema import NarrativePacket
 
 log = get_logger("agent.tools")
 
@@ -91,8 +93,28 @@ def step3_stationarity(*, variables: list[str], y: str, lags: int = 24, **params
 
 @register("step4_univariate")
 def step4_univariate(*, variables: list[str], y: str, **params: Any) -> dict[str, Any]:
+    """
+    Étape 4 — Univarié (ARIMA)
+    Articulation: récupère automatiquement le verdict TS/DS (ADF-only) depuis le run courant
+    via la métrique persistée "m.diag.ts_vs_ds" et le passe à step4_univariate_pack.
+    """
     _enforce_y(y)
     df = harmonize(load_clean_dataset())
+
+    # --- Auto-wire Step3 -> Step4 (verdict ADF-only) ---
+    state = get_state()
+    run_id = state.selected_run_id
+
+    if run_id:
+        p = RunManager.get_artefact_path("m.diag.ts_vs_ds", run_id=run_id)
+        if p:
+            tsds = read_metric_json(p)
+            if isinstance(tsds, dict):
+                verdict = tsds.get("verdict")
+                if verdict in ("TS", "DS"):
+                    params = dict(params)
+                    params["ts_ds_verdict"] = verdict
+
     return step4_univariate_pack(df, y=y, **params)
 
 @register("step5_var")
@@ -137,20 +159,30 @@ def step7_anthropology(*, variables: list[str], y: str, **params: Any) -> dict[s
 
 @register("export_latex_pdf")
 def export_latex_pdf(*, variables: list[str], run_id: str, **params: Any) -> dict[str, Any]:
-    from src.narrative.latex_report import export_report_tex_from_manifest, try_compile_pdf
+    from src.narrative.latex_report import try_compile_pdf
+    from src.narrative import build_narrative_from_run, save_narrative_packet, render_report_tex
+    import json
+
     rf = get_run_files(run_id)
     manifest = read_manifest(run_id)
     if not manifest:
         return {"metrics": {"m.report.export": {"ok": False, "error": "manifest introuvable", "run_id": run_id}}}
 
-    narrative_md = None
-    p_todd = RunManager.get_artefact_path("m.anthro.todd_analysis", run_id=run_id)
-    if p_todd:
-        payload = read_metric_json(p_todd)
-        narrative_md = payload.get("markdown")
+    run_root = Path(rf.root)
 
-    tex_path = export_report_tex_from_manifest(run_root=rf.root, manifest=manifest, narrative_markdown=narrative_md)
-    pdf_path, log_text = try_compile_pdf(run_root=rf.root, tex_path=tex_path)
+    # 1) narrative.json (load or build)
+    nar_path = run_root / "artefacts" / "narrative" / "narrative.json"
+    if nar_path.exists():
+        packet = NarrativePacket.parse_obj(json.loads(nar_path.read_text(encoding="utf-8")))
+    else:
+        packet = build_narrative_from_run(run_root, manifest)
+        save_narrative_packet(run_root, packet)
+
+    # 2) render report
+    tex_path = render_report_tex(run_root, packet, tex_name="report.tex")
+
+    # 3) compile
+    pdf_path, log_text = try_compile_pdf(run_root=run_root, tex_path=tex_path, runs=1)
 
     out = {
         "ok": True,
@@ -162,3 +194,16 @@ def export_latex_pdf(*, variables: list[str], run_id: str, **params: Any) -> dic
     if log_text:
         out["pdflatex_log_head"] = log_text[:2000]
     return {"metrics": {"m.report.export": out}}
+
+
+@register("build_narrative")
+def build_narrative(*, variables: list[str], run_id: str, **params: Any) -> dict[str, Any]:
+    rf = get_run_files(run_id)
+    manifest = read_manifest(run_id)
+    if not manifest:
+        return {"metrics": {"m.narrative.build": {"ok": False, "error": "manifest introuvable", "run_id": run_id}}}
+
+    packet = build_narrative_from_run(Path(rf.root), manifest)
+    out_path = save_narrative_packet(Path(rf.root), packet)
+
+    return {"metrics": {"m.narrative.build": {"ok": True, "run_id": run_id, "narrative_path": str(out_path)}}}
