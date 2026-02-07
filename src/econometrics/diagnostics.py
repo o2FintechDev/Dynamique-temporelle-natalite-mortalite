@@ -51,21 +51,6 @@ def adf_table(series: pd.Series) -> pd.DataFrame:
         })
     return pd.DataFrame(rows).set_index("spec")
 
-def phillips_perron_table(series: pd.Series) -> pd.DataFrame:
-    x = series.dropna().astype(float)
-    try:
-        from arch.unitroot import PhillipsPerron
-        pp = PhillipsPerron(x)
-        return pd.DataFrame([{
-            "pp_stat": float(pp.stat),
-            "pvalue": float(pp.pvalue),
-            "lags": int(pp.lags),
-        }]).set_index(pd.Index(["pp"]))
-    except Exception as e:
-        return pd.DataFrame([{
-            "status": "unavailable",
-            "error": str(e)[:250],
-        }]).set_index(pd.Index(["pp"]))
 
 def dickey_fuller_band_metrics(acf_df: pd.DataFrame) -> pd.DataFrame:
     # lecture “bande”: proportion de lags hors CI 95% et run length
@@ -82,28 +67,25 @@ def dickey_fuller_band_metrics(acf_df: pd.DataFrame) -> pd.DataFrame:
         "acf_abs_area_1_24": float(np.abs(x["acf"]).sum()),
     }]).set_index(pd.Index(["band"]))
 
-def ts_vs_ds_decision(adf: pd.DataFrame, pp: pd.DataFrame, band: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
+def ts_vs_ds_decision(adf: pd.DataFrame,  band: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
     # règle simple, traçable:
     # - si ADF (c ou ct) rejette (p<0.05) => TS
     # - sinon DS
     p_c = float(adf.loc["c", "pvalue"])
     p_ct = float(adf.loc["ct", "pvalue"])
-    pp_ok = "pp_stat" in pp.columns
-    p_pp = float(pp.loc["pp", "pvalue"]) if pp_ok else None
 
-    vote_ts = (p_c < 0.05) or (p_ct < 0.05) or (pp_ok and p_pp is not None and p_pp < 0.05)
+    vote_ts = (p_c < 0.05) or (p_ct < 0.05) 
     verdict = "TS" if vote_ts else "DS"
 
     tbl = pd.DataFrame([{
         "adf_p_c": p_c,
         "adf_p_ct": p_ct,
-        "pp_p": p_pp,
         "band_outside_ratio": float(band.loc["band", "acf_outside_ratio"]),
         "verdict": verdict,
-        "rule": "TS si (ADF c/ct p<0.05) ou (PP p<0.05), sinon DS",
+        "rule": "TS si (ADF c/ct p<0.05), sinon DS",
     }]).set_index(pd.Index(["decision"]))
 
-    metric = {"verdict": verdict, "adf_p_c": p_c, "adf_p_ct": p_ct, "pp_p": p_pp}
+    metric = {"verdict": verdict, "adf_p_c": p_c, "adf_p_ct": p_ct}
     return tbl, metric
 
 def ljungbox_diff(series: pd.Series, lags: int = 24) -> pd.DataFrame:

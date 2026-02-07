@@ -3,11 +3,13 @@ from __future__ import annotations
 from typing import Any
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
+
 
 from statsmodels.tsa.seasonal import STL
 
 from src.econometrics.diagnostics import (
-    acf_pacf_figs, adf_table, phillips_perron_table,
+    acf_pacf_figs, adf_table,
     dickey_fuller_band_metrics, ts_vs_ds_decision, ljungbox_diff,
 )
 from src.econometrics.univariate import (
@@ -103,26 +105,22 @@ def step3_stationarity_pack(df: pd.DataFrame, *, y: str, lags: int = 24, **param
     fig_acf, fig_pacf, tbl_acf = acf_pacf_figs(s, lags=lags)
 
     tbl_adf = adf_table(s)
-    tbl_pp = phillips_perron_table(s)
     tbl_band = dickey_fuller_band_metrics(tbl_acf)
-    tbl_dec, m_tsds = ts_vs_ds_decision(tbl_adf, tbl_pp, tbl_band)
+    tbl_dec, m_tsds = ts_vs_ds_decision(tbl_adf, tbl_band)
     tbl_lb = ljungbox_diff(s, lags=lags)
     verdict = m_tsds.get("verdict")
     p_c = m_tsds.get("adf_p_c")
     p_ct = m_tsds.get("adf_p_ct")
-    p_pp = m_tsds.get("pp_p")
 
     note3 = (
         f"**Étape 3 — Stationnarité (TS vs DS)** : verdict **{verdict}**. "
         f"ADF(c) p={p_c:.3g}, ADF(ct) p={p_ct:.3g}"
-        + (f", PP p={p_pp:.3g}." if p_pp is not None else ", PP indisponible.")
-        + " La décision est fondée sur ADF/PP et la lecture de persistance (bande DF via ACF)."
+        + " La décision est fondée sur ADF et la lecture de persistance (bande DF via ACF)."
     )
     return {
         "tables": {
             "tbl.diag.acf_pacf": tbl_acf,
             "tbl.diag.adf": tbl_adf,
-            "tbl.diag.pp": tbl_pp,
             "tbl.diag.band_df": tbl_band,
             "tbl.diag.ts_vs_ds_decision": tbl_dec,
             "tbl.diag.ljungbox_diff": tbl_lb,
@@ -135,7 +133,6 @@ def step3_stationarity_pack(df: pd.DataFrame, *, y: str, lags: int = 24, **param
                 "verdict": verdict,
                 "adf_p_c": p_c,
                 "adf_p_ct": p_ct,
-                "pp_p": p_pp,
                 },
             },
         },
@@ -144,10 +141,22 @@ def step3_stationarity_pack(df: pd.DataFrame, *, y: str, lags: int = 24, **param
 
 def step4_univariate_pack(df: pd.DataFrame, *, y: str, **params: Any) -> dict[str, Any]:
     s = _series(df, y)
+    verdict = params.get("ts_ds_verdict", "DS")  # fallback sécurisé
+    
+    if verdict == "DS":
+        s_for_arma = s.diff().dropna()
+    elif verdict == "TS":
+        t = np.arange(len(s))
+        coef = np.polyfit(t, s.values, 1)
+        trend = coef[0] * t + coef[1]
+        s_for_arma = (s - trend)
+    else:
+        s_for_arma = s.copy()
 
-    tbl_ar = ar_grid(s, p_max=8)
-    tbl_ma = ma_grid(s, q_max=8)
-    tbl_arma = arma_grid(s, p_max=6, q_max=6)
+
+    tbl_ar = ar_grid(s_for_arma, p_max=8)
+    tbl_ma = ma_grid(s_for_arma, q_max=8)
+    tbl_arma = arma_grid(s_for_arma, p_max=6, q_max=6)
 
     grid, best, best_res = arima_grid(s)
     resid = best_res.resid if best_res is not None else None
@@ -191,7 +200,8 @@ def step4_univariate_pack(df: pd.DataFrame, *, y: str, **params: Any) -> dict[st
     mem = {
         "rescaled_range": rescaled_range(s.values),
         "hurst": hurst_exponent(s.values),
-        "arfima_status": "unavailable (not implemented in MVP)",
+        "arfima_status": "non implémenté (hors périmètre de l'analyse)"
+,
     }
     tbl_mem = pd.DataFrame([mem]).set_index(pd.Index(["memory"]))
 
