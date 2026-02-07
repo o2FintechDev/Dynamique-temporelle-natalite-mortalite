@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from src.utils.session_state import get_state
-from src.utils.run_reader import get_run_files, read_manifest, read_metric_json
+from src.utils.run_reader import get_run_files, read_manifest, read_metric_json, read_table_from_artefact
 
 
 PAGE_ID = "6_Historique_Artefacts"
@@ -58,10 +58,9 @@ def _render_kind(run_id: str, kind: str, items: List[Dict[str, Any]]) -> None:
     elif kind == "tables":
         for it in items:
             st.markdown(f"**{it.get('key','table')}**  \n`{it.get('path','')}`")
-            p = _abs_path(run_id, it.get("path", ""))
             try:
-                df = pd.read_csv(p, index_col=0)
-                st.dataframe(df, width='stretch')
+                df = read_table_from_artefact(run_id, it)
+                st.dataframe(df, width="stretch")
             except Exception as e:
                 st.error(f"Lecture table impossible ({e})")
     elif kind == "metrics":

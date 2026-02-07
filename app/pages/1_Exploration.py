@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from src.utils.session_state import get_state
-from src.utils.run_reader import get_run_files, read_manifest, RunManager, read_metric_json
+from src.utils.run_reader import get_run_files, read_manifest, RunManager, read_metric_json, read_table_from_artefact
 
 
 PAGE_ID = "1_Exploration"
@@ -71,14 +71,13 @@ def _render_tables(run_id: str, items: List[Dict[str, Any]]) -> None:
 
     for it in items:
         key = it.get("key", "")
-        rel = it.get("path", "")
         st.subheader(key or "table")
-        p = _abs_path(run_id, rel)
+
         try:
-            df = pd.read_csv(p, index_col=0)
-            st.dataframe(df, width='stretch')
+            df = read_table_from_artefact(run_id, it)
+            st.dataframe(df, width="stretch")
         except Exception as e:
-            st.error(f"Lecture table impossible: {rel} ({e})")
+            st.error(f"Lecture table impossible: {it.get('path','')} ({e})")
 
 
 def _render_figures(run_id: str, items: List[Dict[str, Any]]) -> None:

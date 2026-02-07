@@ -181,3 +181,56 @@ class RunManager:
         if absolute and not path.is_absolute():
             path = (get_run_files(rid).root / path).resolve()
         return path
+
+def read_table_from_artefact(run_id: str, artefact: dict[str, Any]) -> pd.DataFrame:
+    """
+    Lit une table pour l'UI Streamlit.
+    - Si manifest path pointe vers .csv : lit directement.
+    - Si manifest path pointe vers .tex : lit le CSV associé (meta.csv_path ou même nom .csv).
+    """
+    rf = get_run_files(run_id)
+    rel = str(artefact.get("path") or "")
+    meta = artefact.get("meta") or {}
+    if not isinstance(meta, dict):
+        meta = {}
+
+    def _read_csv(p: Path) -> pd.DataFrame:
+        # robuste: utf-8-sig + détection séparateur basique
+        try:
+            return pd.read_csv(p, encoding="utf-8")
+        except Exception:
+            try:
+                return pd.read_csv(p, encoding="utf-8-sig")
+            except Exception:
+                # fallback séparateur ';'
+                return pd.read_csv(p, sep=";", encoding="utf-8-sig")
+
+    def _abs(p: Path) -> Path:
+        return p if p.is_absolute() else (rf.root / p).resolve()
+
+    # 1) chemin CSV explicite dans le meta
+    csv_rel = meta.get("csv_path")
+    if isinstance(csv_rel, str) and csv_rel:
+        p = _abs(Path(csv_rel))
+        if not p.exists():
+            raise FileNotFoundError(f"CSV meta.csv_path introuvable: {p}")
+        return _read_csv(p)
+
+    # 2) si path déjà csv
+    if rel.lower().endswith(".csv"):
+        p = _abs(Path(rel))
+        if not p.exists():
+            raise FileNotFoundError(f"CSV introuvable: {p}")
+        return _read_csv(p)
+
+    # 3) si path .tex -> tente même nom .csv
+    if rel.lower().endswith(".tex"):
+        csv_guess = Path(rel).with_suffix(".csv")
+        p = _abs(csv_guess)
+        if not p.exists():
+            raise FileNotFoundError(
+                f"CSV associé introuvable (meta.csv_path absent). Attendu: {p} (à partir de {rel})"
+            )
+        return _read_csv(p)
+
+    raise FileNotFoundError(f"Table non lisible pour UI: path={rel} meta={meta}")

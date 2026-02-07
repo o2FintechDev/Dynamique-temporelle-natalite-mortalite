@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from src.utils.session_state import get_state
-from src.utils.run_reader import get_run_files, read_manifest, read_metric_json, RunManager
+from src.utils.run_reader import get_run_files, read_manifest, read_metric_json, RunManager, read_table_from_artefact
 
 
 PAGE_ID = "5_Analyse_Anthropologique"
@@ -52,16 +52,18 @@ def _render_analysis_block(run_id: str) -> None:
 
 def _render_tables(run_id: str, items: List[Dict[str, Any]]) -> None:
     if not items:
+        st.info("Aucune table pour cette page.")
         return
-    st.markdown("### Tables annexes")
+
     for it in items:
-        st.subheader(it.get("key", "table"))
-        p = _abs_path(run_id, it.get("path", ""))
+        key = it.get("key", "")
+        st.subheader(key or "table")
+
         try:
-            df = pd.read_csv(p, index_col=0)
-            st.dataframe(df, width='stretch')
+            df = read_table_from_artefact(run_id, it)
+            st.dataframe(df, width="stretch")
         except Exception as e:
-            st.error(f"Lecture table impossible: {it.get('path')} ({e})")
+            st.error(f"Lecture table impossible: {it.get('path','')} ({e})")
 
 
 def _render_figures(run_id: str, items: List[Dict[str, Any]]) -> None:

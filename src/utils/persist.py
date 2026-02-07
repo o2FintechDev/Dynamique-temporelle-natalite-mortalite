@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, Optional
 import json
+import re
 
 import pandas as pd
 import matplotlib.figure as mpl_fig
@@ -11,7 +12,6 @@ import matplotlib.figure as mpl_fig
 from src.utils.run_writer import RunWriter
 from src.utils.logger import get_logger
 from src.visualization.tables import save_table_csv_and_tex
-
 
 log = get_logger("utils.persist")
 
@@ -44,6 +44,163 @@ def _json_safe(x: Any) -> Any:
     return str(x)
 
 
+def _escape_tex(s: Any) -> str:
+    """
+    Echappement minimal sûr pour captions/labels LaTeX.
+    IMPORTANT: ne pas l'utiliser pour des blocs de texte longs (utiliser verbatim).
+    """
+    if s is None:
+        return ""
+    return (
+        str(s)
+        .replace("\\", r"\textbackslash{}")
+        .replace("&", r"\&")
+        .replace("%", r"\%")
+        .replace("$", r"\$")
+        .replace("#", r"\#")
+        .replace("_", r"\_")
+        .replace("{", r"\{")
+        .replace("}", r"\}")
+        .replace("~", r"\textasciitilde{}")
+        .replace("^", r"\textasciicircum{}")
+    )
+
+
+def _latex_safe_label_id(x: str, *, maxlen: int = 60) -> str:
+    """
+    ID sûr pour \label{...}:
+    - pas d'espaces, pas de backslash, pas de \protect, pas de caractères actifs
+    - uniquement [a-zA-Z0-9:_-]
+    """
+    x = (x or "artefact").strip().lower()
+    x = x.replace(" ", "-")
+    # remplace tout ce qui n'est pas alnum / : _ - par _
+    x = re.sub(r"[^a-z0-9:_-]+", "_", x)
+    x = x.strip("_")
+    return (x[:maxlen] or "artefact")
+
+
+def _extract_step_note_markdown(step_name: str, outputs: Dict[str, Any]) -> Optional[str]:
+    """
+    Récupère une note markdown si présente.
+    Convention déjà dans ton code: m.note.step2, m.note.step3, m.note.step4...
+    """
+    metrics = outputs.get("metrics") or {}
+    if not isinstance(metrics, dict):
+        return None
+
+    # Tentatives directes: m.note.<step_name> ou m.note.stepX (si step_name contient stepX)
+    candidates: list[str] = []
+
+    # ex: step_name="step3_stationarity" -> "m.note.step3"
+    m = re.match(r"^(step\d+)", step_name)
+    if m:
+        candidates.append(f"m.note.{m.group(1)}")
+
+    # ex: "m.note.step3_stationarity" (au cas où)
+    candidates.append(f"m.note.{step_name}")
+
+    for k in candidates:
+        v = metrics.get(k)
+        if isinstance(v, dict) and isinstance(v.get("markdown"), str):
+            return v["markdown"]
+
+    # fallback: premier m.note.* rencontré
+    for k, v in metrics.items():
+        if isinstance(k, str) and k.startswith("m.note.") and isinstance(v, dict) and isinstance(v.get("markdown"), str):
+            return v["markdown"]
+
+    return None
+
+
+def _write_latex_block(
+    rw: RunWriter,
+    *,
+    step_name: str,
+    page: str,
+    outputs: Dict[str, Any],
+    saved: Dict[str, Any],
+) -> Optional[Path]:
+    """
+    Génère un bloc LaTeX auto: latex/blocks/<step_name>.tex
+    - compile depuis latex/master.tex donc chemins relatifs: ../artefacts/...
+    - labels LaTeX sûrs (corrige ton erreur \protect entre \csname..\endcsname)
+    """
+    blocks_dir = rw.paths.latex_dir / "blocks"
+    blocks_dir.mkdir(parents=True, exist_ok=True)
+
+    block_path = blocks_dir / f"{_safe_filename(step_name)}.tex"
+
+    note_md = _extract_step_note_markdown(step_name, outputs)
+
+    lines: list[str] = []
+    # Titre du bloc: éviter \label ici, on reste simple
+    lines.append(r"\section*{" + _escape_tex(step_name) + r"}")
+    if page:
+        lines.append(r"\textit{Page: " + _escape_tex(page) + r"}\\")
+    lines.append("")
+
+    if note_md:
+        # Verbatim = robuste (pas besoin de conversion markdown->latex)
+        lines += [r"\begin{verbatim}", note_md, r"\end{verbatim}", ""]
+
+    # FIGURES
+    figs = saved.get("figures") or []
+    if figs:
+        lines.append(r"\subsection*{Figures}")
+        for f in figs:
+            # f["path"] est relatif au run_root: artefacts/figures/<file>.png
+            fname = Path(f.get("path", "")).name
+            caption = f.get("key") or fname
+            lab_id = _latex_safe_label_id(f"fig:{caption}")
+
+            lines += [
+                r"\begin{figure}[H]",
+                r"\includegraphics[width=0.95\linewidth]{" + r"\detokenize{" + fname + r"}" + r"}",
+                r"\caption{" + _escape_tex(caption) + r"}",
+                r"\label{" + lab_id + r"}",
+                r"\end{figure}",
+                "",
+            ]
+
+    # TABLES
+    tbls = saved.get("tables") or []
+    if tbls:
+        lines.append(r"\subsection*{Tableaux}")
+        for t in tbls:
+            # manifest pointe vers .tex: artefacts/tables/<file>.tex
+            tname = Path(t.get("path", "")).name
+            caption = t.get("key") or tname
+            lab_id = _latex_safe_label_id(f"tab:{caption}")
+
+            # IMPORTANT: compilation depuis latex/master.tex => remonter d'un niveau
+            # latex/blocks/*.tex -> ../artefacts/tables/*.tex
+            rel_input = f"../artefacts/tables/{tname}"
+
+            lines += [
+                r"\begin{table}[H]",
+                r"\caption{" + _escape_tex(caption) + r"}",
+                r"\label{" + lab_id + r"}",
+                r"\begin{adjustbox}{max width=\linewidth,center}",
+                r"\input{" + r"\detokenize{" + rel_input + r"}" + r"}",
+                r"\end{adjustbox}",
+                r"\end{table}",
+                "",
+            ]
+
+    # METRICS: on liste uniquement (JSON)
+    mets = saved.get("metrics") or []
+    if mets:
+        lines.append(r"\subsection*{Métriques (JSON, non rendues)}")
+        for m in mets:
+            p = m.get("path", "")
+            lines.append(r"\texttt{" + _escape_tex(p) + r"}\\")
+        lines.append("")
+
+    block_path.write_text("\n".join(lines), encoding="utf-8")
+    return block_path
+
+
 def persist_outputs(
     rw: RunWriter,
     step_name: str,
@@ -53,6 +210,7 @@ def persist_outputs(
 ) -> Dict[str, Any]:
     """
     Persiste figures/tables/metrics/models et enregistre dans manifest avec la clé 'page'.
+    + Génère un bloc LaTeX par step dans latex/blocks/<step_name>.tex (auto).
     """
     outputs = outputs or {}
 
@@ -87,7 +245,7 @@ def persist_outputs(
         )
         saved["figures"].append({"key": label, "path": rel, "page": page})
 
-    # -------- TABLES (.csv) --------
+    # -------- TABLES (.csv + .tex) --------
     tables = outputs.get("tables") or {}
     if not isinstance(tables, dict):
         log.warning("outputs['tables'] ignoré (type=%s)", type(tables))
@@ -107,7 +265,7 @@ def persist_outputs(
         csv_path, tex_path = save_table_csv_and_tex(
             df,
             csv_path,
-            caption="",   # caption géré dans latex_report.py
+            caption="",   # caption géré dans latex_report.py / blocs
             label="",
             float_format="{:.3f}",
         )
@@ -174,6 +332,27 @@ def persist_outputs(
             meta={"step": step_name, "format": "txt"},
         )
         saved["models"].append({"key": label, "path": rel, "page": page})
+
+    # -------- LATEX BLOCK (auto) --------
+    try:
+        block_path = _write_latex_block(
+            rw,
+            step_name=step_name,
+            page=page,
+            outputs=outputs,
+            saved=saved,
+        )
+        if block_path is not None:
+            rel_block = _relpath(run_root, block_path)
+            rw.register_artefact(
+                "latex_blocks",
+                f"block.{step_name}",
+                rel_block,
+                page=page,
+                meta={"step": step_name, "format": "tex"},
+            )
+    except Exception as e:
+        log.exception("LATEX block generation failed: %s", e)
 
     log.info(
         "persist_outputs step=%s page=%s | figs=%d tbl=%d met=%d mdl=%d",
