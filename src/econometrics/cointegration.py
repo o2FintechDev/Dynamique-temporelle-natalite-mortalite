@@ -37,6 +37,7 @@ def cointegration_pack(df_vars: pd.DataFrame, det_order: int = 0, k_ar_diff: int
 
     # Choix VAR diff vs VECM
     use_vecm = rank > 0
+    choice = "VECM" if use_vecm else "VAR_diff"
     tbl_choice = pd.DataFrame([{
         "rank": int(rank),
         "choice": "VECM" if use_vecm else "VAR_diff",
