@@ -173,7 +173,19 @@ def var_pack(df_vars: pd.DataFrame, maxlags: int = 12) -> dict[str, Any]:
                     }
                 )
     tbl_granger = pd.DataFrame(granger_rows)
+    # 1) normalise infinities -> NaN
+    tbl_granger = tbl_granger.replace([np.inf, -np.inf], np.nan)
 
+    # 2) si df_* est entièrement vide, on supprime (sinon bruit visuel + export LaTeX sale)
+    for c in ["df_num", "df_denom"]:
+        if c in tbl_granger.columns and tbl_granger[c].isna().all():
+            tbl_granger = tbl_granger.drop(columns=[c])
+
+    # 3) optionnel : si tu gardes les colonnes, cast numérique propre
+    for c in ["df_num", "df_denom"]:
+        if c in tbl_granger.columns:
+            tbl_granger[c] = pd.to_numeric(tbl_granger[c], errors="coerce")
+            
     # -----------------------------
     # Sims (leads) : q=1..p
     # + audit erreurs / couverture

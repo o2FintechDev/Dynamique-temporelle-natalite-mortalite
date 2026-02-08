@@ -23,10 +23,7 @@ def normalize_unicode(s: str) -> str:
 
 # ---------- core helpers ----------
 def escape_tex(s: Any) -> str:
-    """
-    Escape texte LaTeX pour contenu "normal".
-    IMPORTANT: on n'échappe PAS "\" ici pour ne pas casser les macros que TU injectes.
-    """
+
     if s is None:
         return ""
 
@@ -125,15 +122,7 @@ def include_table_tex(
     arraystretch: float = 0.95,
     max_height_ratio: float = 0.85,
 ) -> str:
-    """
-    Tables exportées via save_table_tex(wrap_table_env=False) => fragment tabular.
-    On wrap ici (caption/label/adjustbox) de façon stable.
 
-    Modes:
-      - "fit"       : float + adjustbox (largeur + hauteur) + compactage (recommandé)
-      - "landscape" : idem mais en paysage (nécessite \usepackage{pdflscape})
-      - "raw"       : juste \input (utile si le fragment est déjà un longtable)
-    """
     fname = Path(tbl_rel).name.replace(" ", "_")
 
     cap = escape_tex(caption)

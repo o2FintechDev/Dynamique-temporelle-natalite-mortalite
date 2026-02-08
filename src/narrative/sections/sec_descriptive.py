@@ -149,7 +149,7 @@ def render_sec_descriptive(
     # SECTION 2 : Résultats STL / artefacts (figures + tables + analyses)
     # ============================================================
     lines += [
-        r"\section{Résultats de la décomposition et diagnostics (Step2)}",
+        r"\section{Résultats de la décomposition et diagnostics}",
         "",
         md_basic_to_tex(
             f"Synthèse quantitative : **force saisonnière (STL) = {_fmt2(m_strength)}** ; "
@@ -176,7 +176,7 @@ def render_sec_descriptive(
 
     if tbl_summary:
         lines += [
-            r"\paragraph{Tableau 1 — Synthèse descriptive (Step2)}",
+            r"\paragraph{Tableau 1 — Synthèse descriptive}",
             md_basic_to_tex(
                 "Lecture : valider l’ordre de grandeur, dispersion, et asymétrie. Ce tableau sert de contrôle de cohérence "
                 "avec la figure de niveau et les diagnostics de tendance."
@@ -189,7 +189,7 @@ def render_sec_descriptive(
 
     if tbl_season:
         lines += [
-            r"\paragraph{Tableau 2 — Indicateurs de saisonnalité (Step2)}",
+            r"\paragraph{Tableau 2 — Indicateurs de saisonnalité}",
             md_basic_to_tex(
                 "Lecture : vérifier si l’amplitude et la stabilité saisonnière justifient un traitement explicite. "
                 "Si la saisonnalité est qualifiée de faible/absente, la priorité se déplace vers la tendance et les ruptures ; "
@@ -201,24 +201,11 @@ def render_sec_descriptive(
             "",
         ]
 
-    if tbl_decomp:
-        lines += [
-            r"\paragraph{Tableau 3 — Composantes STL (Step2)}",
-            md_basic_to_tex(
-                "Lecture : contrôler la part relative de tendance/saisonnalité/résidu et la cohérence des composantes. "
-                "Une composante résiduelle encore structurée annonce des difficultés en stationnarité et en diagnostics de résidus."
-            ),
-            "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_decomp, caption="tbl.desc.decomp_components", label="tab:tbl-desc-decomp-components"),
-            narr_call("tbl.desc.decomp_components"),
-            "",
-        ]
-
     if note_md.strip():
         lines += [
             md_basic_to_tex("**Note d’interprétation automatisée (Step2)**"),
             md_basic_to_tex(
-                "Cette note doit rester strictement alignée avec les figures/tables de Step2. "
+                "La table détaillée des composantes est disponible dans les artefacts (tables) ; le rapport présente une synthèse et les graphiques. "
                 "Toute affirmation sur tendance/saisonnalité doit être justifiée par les artefacts ci-dessus."
             ),
             "",
