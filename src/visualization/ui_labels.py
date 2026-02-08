@@ -9,6 +9,9 @@ UI_LABELS: dict[str, str] = {
     "tbl.data.missing_report": "Analyse des valeurs manquantes",
     "tbl.data.coverage_report": "Couverture temporelle des données",
 
+    "m.data.dataset_meta": "Métadonnées du jeu de données",
+    "m.note.step1": "Note d'interprétation (Étape 1)",
+
     # --- Page 2 : Analyse descriptive ---
     "tbl.desc.summary": "Statistiques descriptives (série cible)",
     "tbl.desc.seasonality": "Diagnostic de saisonnalité (STL)",
