@@ -6,6 +6,8 @@ from typing import Any, Dict, List
 
 import pandas as pd
 import streamlit as st
+from src.visualization.ui_labels import pretty_label
+
 
 from src.utils.session_state import get_state
 from src.utils.run_reader import get_run_files, read_manifest, RunManager, read_metric_json, read_table_from_artefact
@@ -71,7 +73,10 @@ def _render_tables(run_id: str, items: List[Dict[str, Any]]) -> None:
 
     for it in items:
         key = it.get("key", "")
-        st.subheader(key or "table")
+        st.subheader(pretty_label(key) if key else "Table")
+        if key:
+            st.caption(f"`{key}`")  # optionnel (recommandé pour debug)
+
 
         try:
             df = read_table_from_artefact(run_id, it)
