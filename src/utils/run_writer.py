@@ -141,6 +141,11 @@ class RunWriter:
 \usepackage{xcolor}
 \usepackage{hyperref}
 \usepackage{pdflscape}
+\usepackage{chngcntr}
+\counterwithout{section}{chapter}
+\renewcommand{\thesection}{\Roman{section}} % I, II, III...
+\setcounter{secnumdepth}{1}
+\setcounter{tocdepth}{1}
 
 \usepackage{etoolbox}
 \AtBeginEnvironment{figure}{\centering}
@@ -159,21 +164,6 @@ class RunWriter:
 % =================================================
 \begin{titlepage}
 \thispagestyle{empty}
-
-% -------------------------------------------------
-% Logos
-% -------------------------------------------------
-\begin{minipage}{0.48\textwidth}
-    \raggedright
-    \includegraphics[width=0.70\textwidth]{image1.png}
-\end{minipage}
-\hfill
-\begin{minipage}{0.48\textwidth}
-    \raggedleft
-    \includegraphics[width=0.45\textwidth]{image2.png}
-\end{minipage}
-
-\vspace*{3cm}
 
 % -------------------------------------------------
 % Titre

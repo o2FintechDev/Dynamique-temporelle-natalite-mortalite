@@ -11,6 +11,66 @@ from src.narrative.sections.base import (
     narr_call,
 )
 
+
+import re
+from typing import Tuple, Union
+
+def _parse_order(order: Any) -> tuple[int, int, int] | None:
+    """
+    Normalise l'order vers (p,d,q).
+    Accepte:
+      - tuple/list (p,d,q)
+      - dict {"p":..,"d":..,"q":..} ou {"order":[p,d,q]}
+      - string "ARIMA(4,1,1)" ou "(4,1,1)" ou "4,1,1"
+    Retourne None si non parsable.
+    """
+    if order is None:
+        return None
+
+    # tuple / list
+    if isinstance(order, (tuple, list)) and len(order) == 3:
+        try:
+            p, d, q = order
+            return int(p), int(d), int(q)
+        except Exception:
+            return None
+
+    # dict
+    if isinstance(order, dict):
+        if "order" in order:
+            return _parse_order(order.get("order"))
+        if all(k in order for k in ("p", "d", "q")):
+            try:
+                return int(order["p"]), int(order["d"]), int(order["q"])
+            except Exception:
+                return None
+        return None
+
+    # string
+    s = str(order).strip()
+    # extrait 3 entiers dans la chaîne
+    nums = re.findall(r"-?\d+", s)
+    if len(nums) >= 3:
+        try:
+            p, d, q = map(int, nums[:3])
+            return p, d, q
+        except Exception:
+            return None
+    return None
+
+
+def model_label(p: int, d: int, q: int) -> str:
+    """
+    Libellé professionnel selon la structure.
+    """
+    if d == 0 and q == 0:
+        return f"AR({p})"
+    if d == 0 and p == 0:
+        return f"MA({q})"
+    if d == 0:
+        return f"ARMA({p},{q})"
+    return f"ARIMA({p},{d},{q})"
+
 def _fmt2(x: Any) -> str:
     try:
         return f"{float(x):.2f}"
@@ -37,7 +97,17 @@ def render_sec_univariate(
     uni = metrics_cache.get("m.uni.best") or {}
     kp = uni.get("key_points") or {}
 
-    order = kp.get("order") or (uni.get("best") or {}).get("order") or "NA"
+    order_raw = kp.get("order") or (uni.get("best") or {}).get("order")
+    order_parsed = _parse_order(order_raw)
+
+    if order_parsed:
+        p_best, d_best, q_best = order_parsed
+        best_label = model_label(p_best, d_best, q_best)
+        order_str = f"({p_best},{d_best},{q_best})"  # utile si tu veux l'afficher brut
+    else:
+        best_label = "Modèle univarié (order indisponible)"
+        order_str = "NA"
+
     aic = kp.get("aic") or (uni.get("best") or {}).get("aic")
     bic = kp.get("bic") or (uni.get("best") or {}).get("bic")
 
@@ -180,9 +250,11 @@ def render_sec_univariate(
         r"\section{Résultats de la modélisation univariée (Step4)}",
         "",
         md_basic_to_tex(
-            f"Synthèse quantitative : **ARIMA{order}** sous contrainte $d={d_force}$ (verdict {verdict}). "
+            f"Synthèse quantitative : **{best_label}**. "
+            f"Stationnarité imposée : $d={d_force}$ (verdict {verdict}). "
             f"AIC={_fmt2(aic)}, BIC={_fmt2(bic)}. "
             f"Diagnostics résiduels (si disponibles) : Ljung–Box p={_fmt_p(lb_p)}, JB p={_fmt_p(jb_p)}, ARCH p={_fmt_p(arch_p)}."
+
         ),
         narr_call("m.uni.best"),
         "",
@@ -297,7 +369,7 @@ def render_sec_univariate(
     lines += [
         md_basic_to_tex("**Conclusion**"),
         md_basic_to_tex(
-            f"Le modèle retenu est **ARIMA{order}** avec $d={d_force}$ (verdict {verdict}). "
+            f"Le modèle retenu est **{best_label}** avec $d={d_force}$ (verdict {verdict}). "
             "La décision finale repose sur l’acceptabilité des résidus (blancheur en priorité), "
             "puis sur la parcimonie (BIC) et la stabilité des paramètres."
         ),
