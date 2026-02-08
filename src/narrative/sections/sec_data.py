@@ -128,7 +128,7 @@ def render_sec_data(
     # SECTION 2 : Préparation des données (Step1) + tables sans subsection
     # ============================================================
     lines += [
-        r"\section{Préparation des données (Step1)}",
+        r"\section{Préparation des données}",
         "",
         md_basic_to_tex(
             f"Les diagnostics de préparation résument l’échantillon effectivement exploitable : "

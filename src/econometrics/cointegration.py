@@ -1,47 +1,289 @@
-# economics/cointegration.py
-
+# src/econometrics/cointegration.py
 from __future__ import annotations
-from typing import Any, Dict
+
+from typing import Any, Dict, Optional, Tuple
+
 import numpy as np
 import pandas as pd
-
-from statsmodels.tsa.vector_ar.vecm import coint_johansen, VECM
+from statsmodels.tsa.api import VAR
 from statsmodels.tsa.stattools import coint
+from statsmodels.tsa.vector_ar.vecm import VECM, coint_johansen
 
 
-def cointegration_pack(df_vars: pd.DataFrame, det_order: int = 0, k_ar_diff: int = 1) -> dict[str, Any]:
+def _safe_float(x: Any) -> Optional[float]:
+    try:
+        v = float(x)
+        if np.isnan(v) or np.isinf(v):
+            return None
+        return v
+    except Exception:
+        return None
+
+
+def _select_var_lag_aic(X: pd.DataFrame, maxlags: int) -> int:
+    sel = VAR(X).select_order(maxlags=maxlags)
+    try:
+        p = int(sel.aic)
+    except Exception:
+        p = 1
+    return max(1, min(int(maxlags), p))
+
+
+def _engle_granger_pairwise(X: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+    cols = list(X.columns)
+    eg_rows = []
+    eg_fail = 0
+
+    for i in range(len(cols)):
+        for j in range(i + 1, len(cols)):
+            a, b = cols[i], cols[j]
+            try:
+                stat, pval, crit = coint(X[a], X[b])
+                eg_rows.append(
+                    {
+                        "x": a,
+                        "y": b,
+                        "stat": _safe_float(stat),
+                        "pvalue": _safe_float(pval),
+                        "crit_1": _safe_float(crit[0]) if len(crit) > 0 else None,
+                        "crit_5": _safe_float(crit[1]) if len(crit) > 1 else None,
+                        "crit_10": _safe_float(crit[2]) if len(crit) > 2 else None,
+                    }
+                )
+            except Exception:
+                eg_fail += 1
+
+    tbl_eg = pd.DataFrame(eg_rows)
+
+    if not tbl_eg.empty and "pvalue" in tbl_eg.columns:
+        pvals = pd.to_numeric(tbl_eg["pvalue"], errors="coerce")
+        eg_p_min = _safe_float(pvals.min())
+        eg_p_q10 = _safe_float(pvals.quantile(0.10))
+        eg_n = int(tbl_eg.shape[0])
+    else:
+        eg_p_min = None
+        eg_p_q10 = None
+        eg_n = 0
+
+    meta = {
+        "mode": "pairwise_audit_only",
+        "n_pairs": int(eg_n),
+        "n_fail": int(eg_fail),
+        "eg_p_min": eg_p_min,
+        "eg_p_q10": eg_p_q10,
+        "warning": "Engle–Granger est bivarié. Ici: tests pairwise, usage audit/indication, pas décision système.",
+    }
+    return tbl_eg, meta
+
+
+def _johansen(X: pd.DataFrame, *, det_order: int, k_ar_diff: int) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+    cols = list(X.columns)
+    k = int(len(cols))
+
+    try:
+        joh = coint_johansen(X, det_order=det_order, k_ar_diff=k_ar_diff)
+    except Exception as e:
+        tbl = pd.DataFrame([{"note": "Johansen indisponible", "error": type(e).__name__}])
+        meta = {"available": False, "error": type(e).__name__}
+        return tbl, meta
+
+    trace_stat = np.asarray(joh.lr1, dtype=float)
+    trace_crit5 = np.asarray(joh.cvt[:, 1], dtype=float)  # col 1 = 95%
+    reject5 = (trace_stat > trace_crit5)
+
+    # rang via rejets successifs (trace)
+    rank = int(np.sum(reject5))
+    rank = max(0, min(rank, k - 1))
+
+    tbl_joh = pd.DataFrame(
+        {
+            "r": list(range(k)),
+            "trace_stat": trace_stat,
+            "trace_cv_95": trace_crit5,
+            "reject_95": [bool(x) for x in reject5],
+            "maxeig_stat": np.asarray(joh.lr2, dtype=float),
+            "maxeig_cv_95": np.asarray(joh.cvm[:, 1], dtype=float),
+        }
+    )
+
+    meta = {
+        "available": True,
+        "det_order": int(det_order),
+        "k_ar_diff": int(k_ar_diff),
+        "rank_selected_trace_95": int(rank),
+        "eigenvalues": [float(x) for x in np.asarray(joh.eig, dtype=float).ravel().tolist()] if getattr(joh, "eig", None) is not None else None,
+    }
+    return tbl_joh, meta
+
+
+def _vecm_params_table(res_vecm: Any, cols: list[str]) -> pd.DataFrame:
+    rows = []
+
+    beta = getattr(res_vecm, "beta", None)
+    alpha = getattr(res_vecm, "alpha", None)
+    gamma = getattr(res_vecm, "gamma", None)
+
+    if beta is not None:
+        B = np.asarray(beta, dtype=float)  # (k, r)
+        for j in range(B.shape[1]):
+            for i, var in enumerate(cols):
+                rows.append({"block": "beta", "eq": int(j + 1), "var": var, "value": float(B[i, j])})
+
+    if alpha is not None:
+        A = np.asarray(alpha, dtype=float)  # (k, r)
+        for j in range(A.shape[1]):
+            for i, var in enumerate(cols):
+                rows.append({"block": "alpha", "eq": int(j + 1), "var": var, "value": float(A[i, j])})
+
+    if gamma is not None:
+        G = np.asarray(gamma, dtype=float)
+        # mapping exact dépend de la structure interne; on garde un format stable pour audit
+        for i, var in enumerate(cols):
+            for j in range(G.shape[1]):
+                rows.append({"block": "gamma", "eq": None, "var": var, "param": f"g{j+1}", "value": float(G[i, j])})
+
+    if not rows:
+        return pd.DataFrame([{"note": "Paramètres VECM indisponibles"}])
+
+    tbl = pd.DataFrame(rows)
+    if "param" not in tbl.columns:
+        tbl["param"] = None
+    return tbl
+
+
+def cointegration_pack(
+    df_vars: pd.DataFrame,
+    det_order: int = 0,
+    k_ar_diff: int = 1,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """
+    Pack cointégration auditable + décision VAR_diff vs VECM.
+
+    Paramètres (compatibles avec anciens appels):
+      - det_order: composante déterministe Johansen (statsmodels)
+      - k_ar_diff: nombre de retards en différences (Johansen/VECM)
+      - kwargs: accepte alias historiques (k_ar, lags, nlags, lag_order)
+
+    Sorties:
+      tables:
+        - tbl.coint.eg
+        - tbl.coint.johansen
+        - tbl.coint.var_vs_vecm_choice
+        - (optionnel) tbl.vecm.params
+      metrics:
+        - m.coint.meta
+        - m.coint.audit
+        - (optionnel) m.vecm.meta
+        - m.note.step6
+      models (optionnel):
+        - model.vecm
+    """
+
+    # -----------------------------
+    # Compat kwargs (anti-crash)
+    # -----------------------------
+    if "k_ar" in kwargs and (k_ar_diff is None or int(k_ar_diff) == 1):
+        k_ar_diff = int(kwargs["k_ar"])
+    if "lags" in kwargs and (k_ar_diff is None or int(k_ar_diff) == 1):
+        k_ar_diff = int(kwargs["lags"])
+    if "nlags" in kwargs and (k_ar_diff is None or int(k_ar_diff) == 1):
+        k_ar_diff = int(kwargs["nlags"])
+    if "lag_order" in kwargs and (k_ar_diff is None or int(k_ar_diff) == 1):
+        k_ar_diff = int(kwargs["lag_order"])
+
+    det_order = int(det_order)
+    k_ar_diff = int(k_ar_diff)
+
+    # -----------------------------
+    # Données
+    # -----------------------------
     X = df_vars.dropna().astype(float)
     cols = list(X.columns)
     nobs = int(X.shape[0])
     k = int(X.shape[1])
 
+    # garde-fous
+    if k < 2 or nobs < (k_ar_diff + 10):
+        tbl_empty = pd.DataFrame()
+        meta = {
+            "vars": cols,
+            "nobs": nobs,
+            "k": k,
+            "det_order": det_order,
+            "k_ar_diff": k_ar_diff,
+            "rank": 0,
+            "choice": "VAR_diff",
+            "rule": "VECM si rank>0 (trace@5%), sinon VAR_diff",
+            "eg_n_pairs": 0,
+            "eg_n_fail": 0,
+            "eg_p_min": None,
+            "eg_p_q10": None,
+            "trace_stat_0": None,
+            "trace_crit5_0": None,
+            "trace_reject5_0": None,
+        }
+        audit = {
+            "engle_granger": {"n_pairs": 0, "n_fail": 0, "p_min": None, "p_q10": None},
+            "johansen": {
+                "det_order": det_order,
+                "k_ar_diff": k_ar_diff,
+                "nobs": nobs,
+                "k": k,
+                "cols": cols,
+                "error": "insufficient_data",
+            },
+            "decision": {"rank": 0, "choice": "VAR_diff", "rule": meta["rule"]},
+        }
+        note6 = (
+            f"**Étape 6 — Cointégration** : données insuffisantes (k={k}, nobs={nobs}). "
+            "Décision conservatrice: VAR en différences."
+        )
+        return {
+            "tables": {
+                "tbl.coint.eg": tbl_empty,
+                "tbl.coint.johansen": tbl_empty,
+                "tbl.coint.var_vs_vecm_choice": pd.DataFrame(
+                    [{"rank": 0, "choice": "VAR_diff", "det_order": det_order, "k_ar_diff": k_ar_diff, "rule": meta["rule"]}],
+                    index=["choice"],
+                ),
+            },
+            "metrics": {
+                "m.coint.meta": meta,
+                "m.coint.audit": audit,
+                "m.note.step6": {"markdown": note6, "key_points": meta},
+            },
+        }
+
     # -----------------------------
     # 1) Engle–Granger (pairwise, indicatif)
     # -----------------------------
-    eg_rows = []
+    eg_rows: list[dict[str, Any]] = []
     eg_fail = 0
     for i in range(len(cols)):
         for j in range(i + 1, len(cols)):
             a, b = cols[i], cols[j]
             try:
                 stat, pval, crit = coint(X[a], X[b])
-                eg_rows.append({
-                    "x": a,
-                    "y": b,
-                    "stat": float(stat),
-                    "pvalue": float(pval),
-                    "crit_1": float(crit[0]),
-                    "crit_5": float(crit[1]),
-                    "crit_10": float(crit[2]),
-                })
+                eg_rows.append(
+                    {
+                        "x": a,
+                        "y": b,
+                        "stat": float(stat),
+                        "pvalue": float(pval),
+                        "crit_1": float(crit[0]),
+                        "crit_5": float(crit[1]),
+                        "crit_10": float(crit[2]),
+                    }
+                )
             except Exception:
                 eg_fail += 1
-                continue
 
     tbl_eg = pd.DataFrame(eg_rows)
-    if not tbl_eg.empty:
-        eg_p_min = float(tbl_eg["pvalue"].min())
-        eg_p_q10 = float(tbl_eg["pvalue"].quantile(0.10))
+
+    if not tbl_eg.empty and "pvalue" in tbl_eg.columns:
+        eg_p_min = float(pd.to_numeric(tbl_eg["pvalue"], errors="coerce").min())
+        eg_p_q10 = float(pd.to_numeric(tbl_eg["pvalue"], errors="coerce").quantile(0.10))
         eg_n = int(len(tbl_eg))
     else:
         eg_p_min = None
@@ -51,86 +293,119 @@ def cointegration_pack(df_vars: pd.DataFrame, det_order: int = 0, k_ar_diff: int
     # -----------------------------
     # 2) Johansen (multivarié)
     # -----------------------------
-    joh = coint_johansen(X, det_order=det_order, k_ar_diff=k_ar_diff)
+    joh_error: str | None = None
+    try:
+        joh = coint_johansen(X, det_order=det_order, k_ar_diff=k_ar_diff)
 
-    # rank via trace test @ 5%
-    # joh.lr1 : trace statistics
-    # joh.cvt : critical values for trace; column 1 = 5%
-    trace_stat = np.asarray(joh.lr1, dtype=float)
-    trace_crit5 = np.asarray(joh.cvt[:, 1], dtype=float)
-    reject5 = (trace_stat > trace_crit5)
+        trace_stat = np.asarray(joh.lr1, dtype=float)          # trace stats
+        trace_crit5 = np.asarray(joh.cvt[:, 1], dtype=float)   # 5%
+        reject5 = trace_stat > trace_crit5
 
-    rank = int(np.sum(reject5))  # nombre de rejets successifs
-    # garde-fou : rank ∈ [0, k-1]
-    rank = max(0, min(rank, k - 1))
+        # rank via trace @5% = nb de rejets successifs
+        rank = int(np.sum(reject5))
+        rank = max(0, min(rank, k - 1))
 
-    tbl_joh = pd.DataFrame({
-        "r": list(range(len(cols))),
-        "trace_stat": trace_stat,
-        "crit_5": trace_crit5,
-        "reject_5": [bool(x) for x in reject5],
-    })
+        tbl_joh = pd.DataFrame(
+            {
+                "r": list(range(len(trace_stat))),
+                "trace_stat": trace_stat,
+                "crit_5": trace_crit5,
+                "reject_5": [bool(x) for x in reject5],
+                "maxeig_stat": np.asarray(joh.lr2, dtype=float),
+                "maxeig_crit_5": np.asarray(joh.cvm[:, 1], dtype=float),
+            }
+        )
 
-    # Audit Johansen : valeurs utiles + paramètres
-    joh_audit = {
-        "det_order": int(det_order),
-        "k_ar_diff": int(k_ar_diff),
-        "nobs": nobs,
-        "k": k,
-        "cols": cols,
-        "trace_stat": trace_stat.tolist(),
-        "trace_crit_90": np.asarray(joh.cvt[:, 0], dtype=float).tolist(),
-        "trace_crit_95": trace_crit5.tolist(),
-        "trace_crit_99": np.asarray(joh.cvt[:, 2], dtype=float).tolist(),
-        "reject_95": [bool(x) for x in reject5],
-        # max eigen test (si tu veux l’audit complet)
-        "maxeig_stat": np.asarray(joh.lr2, dtype=float).tolist(),
-        "maxeig_crit_90": np.asarray(joh.cvm[:, 0], dtype=float).tolist(),
-        "maxeig_crit_95": np.asarray(joh.cvm[:, 1], dtype=float).tolist(),
-        "maxeig_crit_99": np.asarray(joh.cvm[:, 2], dtype=float).tolist(),
-    }
+        joh_audit = {
+            "det_order": det_order,
+            "k_ar_diff": k_ar_diff,
+            "nobs": nobs,
+            "k": k,
+            "cols": cols,
+            "trace_stat": trace_stat.tolist(),
+            "trace_crit_90": np.asarray(joh.cvt[:, 0], dtype=float).tolist(),
+            "trace_crit_95": trace_crit5.tolist(),
+            "trace_crit_99": np.asarray(joh.cvt[:, 2], dtype=float).tolist(),
+            "reject_95": [bool(x) for x in reject5],
+            "maxeig_stat": np.asarray(joh.lr2, dtype=float).tolist(),
+            "maxeig_crit_90": np.asarray(joh.cvm[:, 0], dtype=float).tolist(),
+            "maxeig_crit_95": np.asarray(joh.cvm[:, 1], dtype=float).tolist(),
+            "maxeig_crit_99": np.asarray(joh.cvm[:, 2], dtype=float).tolist(),
+        }
+
+        trace_stat_0 = float(trace_stat[0]) if len(trace_stat) else None
+        trace_crit5_0 = float(trace_crit5[0]) if len(trace_crit5) else None
+        trace_reject5_0 = bool(reject5[0]) if len(reject5) else None
+
+    except Exception as e:
+        joh_error = type(e).__name__
+        rank = 0
+        tbl_joh = pd.DataFrame(
+            [
+                {
+                    "r": 0,
+                    "trace_stat": np.nan,
+                    "crit_5": np.nan,
+                    "reject_5": False,
+                    "maxeig_stat": np.nan,
+                    "maxeig_crit_5": np.nan,
+                    "error": joh_error,
+                }
+            ]
+        )
+        joh_audit = {
+            "det_order": det_order,
+            "k_ar_diff": k_ar_diff,
+            "nobs": nobs,
+            "k": k,
+            "cols": cols,
+            "error": joh_error,
+        }
+        trace_stat_0 = None
+        trace_crit5_0 = None
+        trace_reject5_0 = None
 
     # -----------------------------
-    # 3) Décision VAR diff vs VECM (règle explicite)
+    # 3) Décision VAR diff vs VECM
     # -----------------------------
-    use_vecm = rank > 0
+    use_vecm = (rank > 0) and (joh_error is None)
     choice = "VECM" if use_vecm else "VAR_diff"
 
-    tbl_choice = pd.DataFrame([{
-        "rank": int(rank),
-        "choice": choice,
-        "det_order": int(det_order),
-        "k_ar_diff": int(k_ar_diff),
-        "rule": "VECM si rang Johansen (trace @5%) > 0, sinon VAR en différences",
-    }]).set_index(pd.Index(["choice"]))
+    tbl_choice = pd.DataFrame(
+        [
+            {
+                "rank": int(rank),
+                "choice": choice,
+                "det_order": det_order,
+                "k_ar_diff": k_ar_diff,
+                "rule": "VECM si rang Johansen (trace @5%) > 0, sinon VAR en différences",
+            }
+        ],
+        index=pd.Index(["choice"]),
+    )
 
     # -----------------------------
-    # 4) Métriques d’auditabilité (meta + audit)
+    # 4) Metrics (meta + audit)
     # -----------------------------
     coint_meta = {
-        # identité
         "vars": cols,
         "nobs": nobs,
         "k": k,
-        # paramétrage test
-        "det_order": int(det_order),
-        "k_ar_diff": int(k_ar_diff),
-        # résultat Johansen
+        "det_order": det_order,
+        "k_ar_diff": k_ar_diff,
         "rank": int(rank),
         "choice": choice,
         "rule": "VECM si rank>0 (trace@5%), sinon VAR_diff",
-        # résumés EG (indicatif)
         "eg_n_pairs": int(eg_n),
         "eg_n_fail": int(eg_fail),
         "eg_p_min": eg_p_min,
         "eg_p_q10": eg_p_q10,
-        # résumé Johansen (trace)
-        "trace_stat_0": float(trace_stat[0]) if len(trace_stat) else None,
-        "trace_crit5_0": float(trace_crit5[0]) if len(trace_crit5) else None,
-        "trace_reject5_0": bool(reject5[0]) if len(reject5) else None,
+        "trace_stat_0": trace_stat_0,
+        "trace_crit5_0": trace_crit5_0,
+        "trace_reject5_0": trace_reject5_0,
+        "johansen_error": joh_error,
     }
 
-    # Audit détaillé séparé (traçabilité complète)
     coint_audit = {
         "engle_granger": {
             "n_pairs": int(eg_n),
@@ -164,19 +439,19 @@ def cointegration_pack(df_vars: pd.DataFrame, det_order: int = 0, k_ar_diff: int
     if use_vecm:
         vecm = VECM(X, k_ar_diff=k_ar_diff, deterministic="co").fit()
 
-        # beta (k x rank) / alpha (k x rank)
-        beta = pd.DataFrame(vecm.beta, index=cols)
-        alpha = pd.DataFrame(vecm.alpha, index=cols)
+        beta = pd.DataFrame(vecm.beta, index=cols)   # (k x rank)
+        alpha = pd.DataFrame(vecm.alpha, index=cols) # (k x rank)
 
-        # table lisible : première relation (col 0) si rank>=1
-        rnk = int(beta.shape[1]) if beta.ndim == 2 else 0
-        if rnk >= 1:
-            out["tables"]["tbl.vecm.params"] = pd.DataFrame({
-                "alpha_1": alpha.iloc[:, 0].values,
-                "beta_1": beta.iloc[:, 0].values,
-            }, index=cols)
+        # table lisible : 1ère relation (col 0)
+        if beta.shape[1] >= 1 and alpha.shape[1] >= 1:
+            out["tables"]["tbl.vecm.params"] = pd.DataFrame(
+                {
+                    "alpha_1": alpha.iloc[:, 0].astype(float).values,
+                    "beta_1": beta.iloc[:, 0].astype(float).values,
+                },
+                index=cols,
+            )
 
-        # audit VECM (complet)
         out["metrics"]["m.vecm.meta"] = {
             "nobs": nobs,
             "vars": cols,
@@ -192,12 +467,13 @@ def cointegration_pack(df_vars: pd.DataFrame, det_order: int = 0, k_ar_diff: int
         out["models"] = {"model.vecm": vecm}
 
     # -----------------------------
-    # 6) Note narrative step6 (avec key_points auditables)
+    # 6) Note narrative Step6
     # -----------------------------
     note6 = (
         f"**Étape 6 — Cointégration** : Johansen (trace @5%) ⇒ rang = **{int(rank)}** "
-        f"⇒ choix **{choice}** (det_order={int(det_order)}, k_ar_diff={int(k_ar_diff)}). "
-        "Si VECM : interprétation via vecteurs de cointégration (β) et vitesses d’ajustement (α)."
+        f"⇒ choix **{choice}** (det_order={det_order}, k_ar_diff={k_ar_diff}). "
+        + ("VECM estimé : interprétation via β (long terme) et α (ajustement)." if use_vecm else "Pas de VECM : VAR en différences.")
+        + (f" (Johansen error={joh_error})." if joh_error else "")
     )
 
     out["metrics"]["m.note.step6"] = {
@@ -207,13 +483,14 @@ def cointegration_pack(df_vars: pd.DataFrame, det_order: int = 0, k_ar_diff: int
             "choice": choice,
             "vars": cols,
             "nobs": nobs,
-            "det_order": int(det_order),
-            "k_ar_diff": int(k_ar_diff),
+            "det_order": det_order,
+            "k_ar_diff": k_ar_diff,
             "eg_p_min": eg_p_min,
             "eg_p_q10": eg_p_q10,
-            "trace_stat_0": coint_meta["trace_stat_0"],
-            "trace_crit5_0": coint_meta["trace_crit5_0"],
-            "trace_reject5_0": coint_meta["trace_reject5_0"],
+            "trace_stat_0": trace_stat_0,
+            "trace_crit5_0": trace_crit5_0,
+            "trace_reject5_0": trace_reject5_0,
+            "johansen_error": joh_error,
         },
     }
 

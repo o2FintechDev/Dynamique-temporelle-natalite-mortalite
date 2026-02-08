@@ -1,7 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict
-
+import re
 from src.narrative.sections.base import (
     SectionSpec,
     lookup,
@@ -10,10 +10,6 @@ from src.narrative.sections.base import (
     include_figure,
     narr_call,
 )
-
-
-import re
-from typing import Tuple, Union
 
 def _parse_order(order: Any) -> tuple[int, int, int] | None:
     """
@@ -94,6 +90,13 @@ def render_sec_univariate(
     sec: SectionSpec,
     metrics_cache: Dict[str, Dict[str, Any]],
 ) -> str:
+    
+    def _pick(*vals):
+        for v in vals:
+            if v is not None:
+                return v
+        return None
+    
     uni = metrics_cache.get("m.uni.best") or {}
     kp = uni.get("key_points") or {}
 
@@ -108,11 +111,11 @@ def render_sec_univariate(
         best_label = "Modèle univarié (order indisponible)"
         order_str = "NA"
 
-    aic = kp.get("aic") or (uni.get("best") or {}).get("aic")
-    bic = kp.get("bic") or (uni.get("best") or {}).get("bic")
+    aic = _pick(kp.get("aic") or (uni.get("best") or {}).get("aic"))
+    bic = _pick(kp.get("bic") or (uni.get("best") or {}).get("bic"))
 
-    lb_p = kp.get("lb_p") or kp.get("ljungbox_p")
-    jb_p = kp.get("jb_p") or kp.get("jarque_bera_p")
+    lb_p = _pick(kp.get("lb_p"), kp.get("ljungbox_p"))
+    jb_p = _pick(kp.get("jb_p") or kp.get("jarque_bera_p"))
     arch_p = kp.get("arch_p")
 
     tsds = metrics_cache.get("m.diag.ts_vs_ds") or {}
@@ -376,5 +379,102 @@ def render_sec_univariate(
         narr_call("m.uni.best"),
         "",
     ]
-
+    # ============================================================
+    # SECTION : Mémoire longue (cadre)
+    # ============================================================
+    lines += [
+        r"\section{Analyse de la mémoire longue}",
+        "",
+        md_basic_to_tex(
+            "L’analyse de la mémoire longue vise à caractériser la persistance temporelle des chocs au-delà du cadre classique des modèles ARMA. "
+            "Dans de nombreuses séries macroéconomiques et démographiques, la dépendance temporelle ne décroît pas de manière exponentielle "
+            "mais selon une loi hyperbolique, traduisant une inertie structurelle profonde. Cette propriété remet en cause l’hypothèse de mémoire "
+            "courte implicite des modèles ARMA et justifie le recours à des outils spécifiques."
+        ),
+        "",
+        r"\subsection*{5.1 Mémoire courte versus mémoire longue}",
+        md_basic_to_tex(
+            "Mémoire courte : la somme des autocorrélations est absolument convergente. "
+            "Mémoire longue : la somme diverge et l’autocorrélation décroît selon une loi hyperbolique."
+        ),
+        "",
+        r"\begin{equation}",
+        r"\sum_{h=0}^{\infty}|\rho(h)| < \infty",
+        r"\end{equation}",
+        r"\begin{equation}",
+        r"\sum_{h=0}^{\infty}|\rho(h)| = \infty",
+        r"\end{equation}",
+        "",
+        r"\begin{equation}",
+        r"\rho(h) \sim C h^{2H-2}\quad \text{lorsque } h\to\infty",
+        r"\end{equation}",
+        "",
+        r"\subsection*{5.2 Fondements théoriques de la mémoire longue}",
+        md_basic_to_tex(
+            "La mémoire longue traduit des mécanismes d’agrégation et des rigidités institutionnelles générant une persistance de long terme. "
+            "En démographie : structures familiales stables, politiques publiques durables, inerties biologiques et sociales. "
+            "Économétriquement, elle peut être confondue avec une racine unitaire, d’où la nécessité de diagnostics robustes."
+        ),
+        "",
+        r"\subsection*{5.3 Statistique du Rescaled Range (R/S)}",
+        md_basic_to_tex(
+            "L’approche R/S (Hurst) examine la croissance de l’amplitude cumulée des écarts à la moyenne."
+        ),
+        "",
+        r"\begin{equation}",
+        r"X_k=\sum_{t=1}^{k}(Y_t-\bar{Y})",
+        r"\end{equation}",
+        r"\begin{equation}",
+        r"R(n)=\max_{1\le k\le n}X_k-\min_{1\le k\le n}X_k",
+        r"\end{equation}",
+        r"\begin{equation}",
+        r"\frac{R(n)}{S(n)}",
+        r"\end{equation}",
+        "",
+        r"\begin{equation}",
+        r"\mathbb{E}\left[\frac{R(n)}{S(n)}\right]=C n^{H}",
+        r"\end{equation}",
+        "",
+        r"\subsection*{5.4 Exposant de Hurst : interprétation}",
+        md_basic_to_tex(
+            "H=0,5 : absence de mémoire longue (bruit blanc/ARMA). "
+            "H>0,5 : persistance (les chocs tendent à se prolonger). "
+            "H<0,5 : antipersistence (retour rapide vers la moyenne)."
+        ),
+        "",
+        r"\subsection*{5.5 Lien entre Hurst et intégration fractionnaire}",
+        "",
+        r"\begin{equation}",
+        r"H=d+\frac{1}{2}",
+        r"\end{equation}",
+        "",
+        md_basic_to_tex(
+            "d=0 : ARMA ; 0<d<0,5 : mémoire longue stationnaire ; d≥0,5 : non-stationnarité. "
+            "Ce lien conduit naturellement aux modèles ARFIMA."
+        ),
+        "",
+        r"\subsection*{5.6 Modèles ARFIMA(p,d,q)}",
+        "",
+        r"\begin{equation}",
+        r"\Phi(L)(1-L)^{d}Y_t=\Theta(L)\varepsilon_t",
+        r"\end{equation}",
+        "",
+        md_basic_to_tex(
+            "Le paramètre d capture l’intensité de la mémoire longue : persistance intermédiaire entre stationnarité et non-stationnarité."
+        ),
+        "",
+        r"\subsection*{5.8 Pièges et limites}",
+        md_basic_to_tex(
+            "Risques : confusion entre mémoire longue et ruptures, sensibilité aux erreurs de mesure, instabilité en échantillon fini. "
+            "Les diagnostics doivent être confrontés aux tests de racine unitaire et à l’analyse des ruptures."
+        ),
+        "",
+        r"\subsection*{5.9 Implications économétriques et économiques}",
+        md_basic_to_tex(
+            "Une mémoire longue implique des effets persistants à très long horizon : "
+            "les modèles ARMA sous-estiment la persistance, et les politiques publiques peuvent produire des effets différés durables. "
+            "Cela justifie une extension multivariée pour analyser les canaux dynamiques."
+        ),
+        "",
+    ]
     return "\n".join(lines).strip() + "\n"

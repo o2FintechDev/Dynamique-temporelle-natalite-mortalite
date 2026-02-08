@@ -141,12 +141,6 @@ class RunWriter:
 \usepackage{xcolor}
 \usepackage{hyperref}
 \usepackage{pdflscape}
-\usepackage{chngcntr}
-\counterwithout{section}{chapter}
-\renewcommand{\thesection}{\Roman{section}} % I, II, III...
-\setcounter{secnumdepth}{1}
-\setcounter{tocdepth}{1}
-
 \usepackage{etoolbox}
 \AtBeginEnvironment{figure}{\centering}
 \AtBeginEnvironment{table}{\centering}

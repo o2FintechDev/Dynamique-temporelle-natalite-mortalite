@@ -61,11 +61,31 @@ def label_tex_safe(s: str) -> str:
 
 def read_json(path: Path) -> Dict[str, Any]:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        txt = path.read_text(encoding="utf-8")
+    except Exception:
+        try:
+            txt = path.read_text(encoding="utf-8-sig")
+        except Exception:
+            return {}
+    try:
+        return json.loads(txt)
     except Exception:
         return {}
 
+def looks_like_full_table(tex: str) -> bool:
+    t = (tex or "").lower()
+    return (
+        ("\\begin{table" in t) or ("\\end{table" in t)
+        or ("\\begin{longtable" in t) or ("\\end{longtable" in t)
+        or ("\\begin{threeparttable" in t) or ("\\end{threeparttable" in t)
+    )
 
+def read_text_safe(p: Path) -> str:
+    try:
+        return p.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return ""
+    
 def lookup(manifest: Dict[str, Any], kind: str, key: str) -> Optional[str]:
     lu = (manifest.get("lookup") or {}).get(kind) or {}
     if key in lu:
@@ -122,15 +142,20 @@ def include_table_tex(
     arraystretch: float = 0.95,
     max_height_ratio: float = 0.85,
 ) -> str:
-
+    
     fname = Path(tbl_rel).name.replace(" ", "_")
 
     cap = escape_tex(caption)
     lab = label_tex_safe(label)
 
-    # Chemin relatif attendu côté report.tex (comme ton code actuel)
     inp = r"\input{../artefacts/tables/" + fname + r"}"
 
+    # --- auto-detect full environment if mode != raw ---
+    tbl_path = (run_root / tbl_rel).resolve()
+    content = read_text_safe(tbl_path) if tbl_path.exists() else ""
+    if mode != "raw" and looks_like_full_table(content):
+        mode = "raw"
+        
     # Compactage local (évite d'impacter tout le document)
     compact_block = [
         r"\begingroup",

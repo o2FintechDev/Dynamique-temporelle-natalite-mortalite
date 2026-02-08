@@ -62,7 +62,7 @@ def default_spec() -> List[SectionSpec]:
             ),
             figure_keys=[],
             table_keys=["tbl.coint.eg", "tbl.coint.johansen", "tbl.coint.var_vs_vecm_choice", "tbl.vecm.params"],
-            metric_keys=["m.coint.meta", "m.coint.audit", "m.note.step6"],
+            metric_keys=["m.coint.meta", "m.coint.audit", "m.vecm.meta", "m.note.step6"]
         ),
         SectionSpec(
             key="sec_anthropology",
