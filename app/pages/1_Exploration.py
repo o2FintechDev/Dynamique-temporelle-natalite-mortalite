@@ -52,7 +52,10 @@ def _render_metrics(run_id: str, items: List[Dict[str, Any]]) -> None:
     for it in items:
         key = it.get("key", "")
         rel = it.get("path", "")
-        st.subheader(key or "metric")
+        st.subheader(pretty_label(key) if key else "Métrique")
+        if key:
+            st.caption(f"`{key}`")
+
         p = _abs_path(run_id, rel)
         try:
             payload = read_metric_json(p)
@@ -75,7 +78,7 @@ def _render_tables(run_id: str, items: List[Dict[str, Any]]) -> None:
         key = it.get("key", "")
         st.subheader(pretty_label(key) if key else "Table")
         if key:
-            st.caption(f"`{key}`")  # optionnel (recommandé pour debug)
+            st.caption(f"`{key}`")
 
 
         try:
@@ -93,7 +96,10 @@ def _render_figures(run_id: str, items: List[Dict[str, Any]]) -> None:
     for it in items:
         key = it.get("key", "")
         rel = it.get("path", "")
-        st.subheader(key or "figure")
+        st.subheader(pretty_label(key) if key else "Figures")
+        if key:
+            st.caption(f"`{key}`")
+
         p = _abs_path(run_id, rel)
         if not p.exists():
             st.error(f"Figure introuvable: {rel}")

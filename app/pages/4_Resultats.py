@@ -44,7 +44,7 @@ def _render_figures(run_id: str, items: List[Dict[str, Any]]) -> None:
         return
     for it in items:
         key = it.get("key", "")
-        st.subheader(pretty_label(key) if key else "Métrique")
+        st.subheader(pretty_label(key) if key else "Figures")
         if key:
             st.caption(f"`{key}`")
         p = _abs_path(run_id, it.get("path", ""))
@@ -61,7 +61,7 @@ def _render_tables(run_id: str, items: List[Dict[str, Any]]) -> None:
 
     for it in items:
         key = it.get("key", "")
-        st.subheader(pretty_label(key) if key else "Métrique")
+        st.subheader(pretty_label(key) if key else "Tables")
         if key:
             st.caption(f"`{key}`")
 
