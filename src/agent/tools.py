@@ -24,7 +24,7 @@ from src.utils.run_reader import get_run_files, read_manifest, RunManager, read_
 from pathlib import Path
 from src.narrative import build_narrative_from_run, save_narrative_packet
 from src.narrative.schema import NarrativePacket
-
+from src.narrative.latex_renderer import render_all_section_blocks
 log = get_logger("agent.tools")
 
 TOOL_REGISTRY: dict[str, Callable[..., dict[str, Any]]] = {}
@@ -159,9 +159,15 @@ def step7_anthropology(*, variables: list[str], y: str, **params: Any) -> dict[s
 
 @register("export_latex_pdf")
 def export_latex_pdf(*, variables: list[str], run_id: str, **params: Any) -> dict[str, Any]:
+    """
+    Export LaTeX/PDF (mémoire-like) :
+    - génère les blocks LaTeX par section (plan stable) depuis manifest + metrics
+    - compile uniquement latex/master.tex (wrapper unique)
+    - nettoie les fichiers legacy (run_root/narrative.json et latex/report.tex)
+    """
+    from pathlib import Path
     from src.narrative.latex_report import try_compile_pdf
-    from src.narrative import build_narrative_from_run, save_narrative_packet, render_report_tex
-    import json
+    from src.narrative.latex_renderer import render_all_section_blocks
 
     rf = get_run_files(run_id)
     manifest = read_manifest(run_id)
@@ -170,26 +176,40 @@ def export_latex_pdf(*, variables: list[str], run_id: str, **params: Any) -> dic
 
     run_root = Path(rf.root)
 
-    # 1) narrative.json (load or build)
-    nar_path = run_root / "artefacts" / "narrative" / "narrative.json"
-    if nar_path.exists():
-        packet = NarrativePacket.parse_obj(json.loads(nar_path.read_text(encoding="utf-8")))
-    else:
-        packet = build_narrative_from_run(run_root, manifest)
-        save_narrative_packet(run_root, packet)
+    # --- Nettoyage legacy à la racine du run ---
+    legacy_narr = run_root / "narrative.json"
+    if legacy_narr.exists():
+        try:
+            legacy_narr.unlink()
+        except Exception:
+            pass
 
-    # 2) render report
-    tex_path = render_report_tex(run_root, packet, tex_name="report.tex")
+    # --- Nettoyage legacy report.tex si présent ---
+    legacy_report = run_root / "latex" / "report.tex"
+    if legacy_report.exists():
+        try:
+            legacy_report.unlink()
+        except Exception:
+            pass
 
-    # 3) compile
-    pdf_path, log_text = try_compile_pdf(run_root=run_root, tex_path=tex_path, runs=1)
+    # 1) Génère les blocks par section (latex/blocks/sec_*.tex)
+    #    => chaque block inclut : intro méthodo + analyse unitaire figures/tables + conclusion (metrics)
+    blocks_map = render_all_section_blocks(run_root, manifest)
+
+    # 2) Compile uniquement le wrapper master.tex
+    tex_master = run_root / "latex" / "master.tex"
+    if not tex_master.exists():
+        return {"metrics": {"m.report.export": {"ok": False, "error": "latex/master.tex introuvable", "run_id": run_id}}}
+
+    pdf_path, log_text = try_compile_pdf(run_root=run_root / "latex", tex_path=tex_master, runs=1)
 
     out = {
         "ok": True,
         "run_id": run_id,
-        "tex_path": str(tex_path),
+        "master_tex": str(tex_master),
+        "blocks_generated": blocks_map,  # dict sec_key -> relpath
         "pdf_path": str(pdf_path) if pdf_path else None,
-        "note": "PDF compilé si pdflatex disponible; sinon report.tex seulement.",
+        "note": "Compilation sur latex/master.tex (plan stable via blocks sec_*.tex).",
     }
     if log_text:
         out["pdflatex_log_head"] = log_text[:2000]
@@ -203,7 +223,17 @@ def build_narrative(*, variables: list[str], run_id: str, **params: Any) -> dict
     if not manifest:
         return {"metrics": {"m.narrative.build": {"ok": False, "error": "manifest introuvable", "run_id": run_id}}}
 
-    packet = build_narrative_from_run(Path(rf.root), manifest)
-    out_path = save_narrative_packet(Path(rf.root), packet)
+    run_root = Path(rf.root)
+
+    # --- CLEAN legacy narrative at run root ---
+    legacy = run_root / "narrative.json"
+    if legacy.exists():
+        try:
+            legacy.unlink()
+        except Exception:
+            pass
+
+    packet = build_narrative_from_run(run_root, manifest)
+    out_path = save_narrative_packet(run_root, packet)
 
     return {"metrics": {"m.narrative.build": {"ok": True, "run_id": run_id, "narrative_path": str(out_path)}}}

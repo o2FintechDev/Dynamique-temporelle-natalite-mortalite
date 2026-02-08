@@ -1,10 +1,10 @@
 from .schema import NarrativePacket
 from .generator import build_narrative_from_run, save_narrative_packet
-from .latex_renderer import render_report_tex
+from .latex_renderer import render_all_section_blocks
 
 __all__ = [
     "NarrativePacket",
     "build_narrative_from_run",
     "save_narrative_packet",
-    "render_report_tex",
+    "render_all_section_blocks",
 ]
