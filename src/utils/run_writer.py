@@ -121,6 +121,9 @@ class RunWriter:
         return r"""\documentclass[11pt,a4paper]{report}
 
 \usepackage[utf8]{inputenc}
+\usepackage{newunicodechar}
+\newunicodechar{−}{-}
+
 \usepackage[T1]{fontenc}
 \usepackage[french]{babel}
 
@@ -142,7 +145,13 @@ class RunWriter:
 \AtBeginEnvironment{figure}{\centering}
 \AtBeginEnvironment{table}{\centering}
 
-\graphicspath{{artefacts/figures/}{./}}
+% IMPORTANT: compilation depuis run_root/latex => artefacts est au niveau parent
+\graphicspath{{../artefacts/figures/}{./}}
+
+% --- IA narrative snippets (robust) ---
+\newcommand{\Narrative}[1]{%
+  \IfFileExists{../artefacts/text/#1.tex}{\input{../artefacts/text/#1.tex}}{}%
+}
 
 \title{Dynamique temporelle de la natalité et de la mortalité en France (1975--2025)}
 \author{AnthroDem Lab - Aude Bernier, Clara Pierreuse, Justine Reiter -- Guerville}
@@ -157,9 +166,6 @@ class RunWriter:
 \clearpage
 
 \chapter{Introduction et Préparation}
-\section{Mise en contexte : l'exception démographique française et l'inversion de 2023}
-\section{Construction de la variable : passage en taux pour corriger l'hétéroscédasticité}
-\section{Définition formelle : équation du solde naturel}
 
 % AUTO
 \input{blocks/sec_data.tex}

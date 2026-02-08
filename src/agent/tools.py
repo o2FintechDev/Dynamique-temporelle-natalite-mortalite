@@ -25,6 +25,9 @@ from pathlib import Path
 from src.narrative import build_narrative_from_run, save_narrative_packet
 from src.narrative.schema import NarrativePacket
 from src.narrative.latex_renderer import render_all_section_blocks
+from src.narrative.interpretation_engine import build_snippets_from_run
+from src.narrative.tex_snippets import write_snippets
+
 log = get_logger("agent.tools")
 
 TOOL_REGISTRY: dict[str, Callable[..., dict[str, Any]]] = {}
@@ -58,15 +61,26 @@ def step1_load_and_profile(*, variables: list[str], y: str, **params: Any) -> di
 
     # ---- NOTE STEP1 (persistée) ----
     miss = float(prof.missing.loc[y, "missing_rate"]) if y in prof.missing.index else None
+
+    meta = dict(prof.meta)
+    meta["missing_rate"] = miss
     nobs = int(prof.meta.get("nobs", len(df)))
     start = prof.meta.get("start")
     end = prof.meta.get("end")
+
+    # infer frequency from index if possible
+    try:
+        if isinstance(df.index, pd.DatetimeIndex):
+            meta["freq"] = pd.infer_freq(df.index) or meta.get("freq")
+    except Exception:
+        pass
+    
     note = (
         f"**Étape 1 — Traitement des données** : série `{y}` construite (taux_naissances − taux_deces), "
         f"mensuelle 1975–2025. Observations: **{nobs}**, période: **{start} → {end}**, "
         f"taux de valeurs manquantes: **{miss:.2%}**."
     )
-
+    note = note.replace("−", "-")
     return {
         "tables": {
             "tbl.data.desc_stats": prof.desc,
@@ -74,7 +88,7 @@ def step1_load_and_profile(*, variables: list[str], y: str, **params: Any) -> di
             "tbl.data.coverage_report": cov,
         },
         "metrics": {
-            "m.data.dataset_meta": prof.meta,
+            "m.data.dataset_meta": meta,
             "m.note.step1": {"markdown": note},
         },
     }
@@ -159,15 +173,14 @@ def step7_anthropology(*, variables: list[str], y: str, **params: Any) -> dict[s
 
 @register("export_latex_pdf")
 def export_latex_pdf(*, variables: list[str], run_id: str, **params: Any) -> dict[str, Any]:
-    """
-    Export LaTeX/PDF (mémoire-like) :
-    - génère les blocks LaTeX par section (plan stable) depuis manifest + metrics
-    - compile uniquement latex/master.tex (wrapper unique)
-    - nettoie les fichiers legacy (run_root/narrative.json et latex/report.tex)
-    """
     from pathlib import Path
+    import time
+
     from src.narrative.latex_report import try_compile_pdf
-    from src.narrative.latex_renderer import render_all_section_blocks
+    from src.narrative.latex_renderer import build_section_blocks_from_manifest
+    from src.narrative.interpretation_engine import build_snippets_from_run
+    from src.narrative.tex_snippets import write_snippets
+    from src.utils.run_writer import RunWriter
 
     rf = get_run_files(run_id)
     manifest = read_manifest(run_id)
@@ -176,44 +189,63 @@ def export_latex_pdf(*, variables: list[str], run_id: str, **params: Any) -> dic
 
     run_root = Path(rf.root)
 
-    # --- Nettoyage legacy à la racine du run ---
-    legacy_narr = run_root / "narrative.json"
-    if legacy_narr.exists():
-        try:
-            legacy_narr.unlink()
-        except Exception:
-            pass
+    # 0) Nettoyage legacy
+    for p in [run_root / "narrative.json", run_root / "latex" / "report.tex"]:
+        if p.exists():
+            try:
+                p.unlink()
+            except Exception:
+                pass
 
-    # --- Nettoyage legacy report.tex si présent ---
-    legacy_report = run_root / "latex" / "report.tex"
-    if legacy_report.exists():
-        try:
-            legacy_report.unlink()
-        except Exception:
-            pass
+    # 1) SNIPPETS IA (artefacts/text/*.tex) AVANT blocks
+    try:
+        snippets = build_snippets_from_run(run_id=run_id, y=Y_CANON)
+        snippets_audit = write_snippets(run_root, snippets)
+    except Exception as e:
+        snippets_audit = {"_error": f"{type(e).__name__}: {e}"}
 
-    # 1) Génère les blocks par section (latex/blocks/sec_*.tex)
-    #    => chaque block inclut : intro méthodo + analyse unitaire figures/tables + conclusion (metrics)
-    blocks_map = render_all_section_blocks(run_root, manifest)
+    # 2) Blocks sec_*.tex
+    patch_blocks = build_section_blocks_from_manifest(run_root, manifest)
+    blocks_audit = (patch_blocks.get("metrics") or {}).get("m.report.blocks", {})
 
-    # 2) Compile uniquement le wrapper master.tex
+    # 3) Compile master.tex
     tex_master = run_root / "latex" / "master.tex"
     if not tex_master.exists():
-        return {"metrics": {"m.report.export": {"ok": False, "error": "latex/master.tex introuvable", "run_id": run_id}}}
+        return {"metrics": {"m.report.export": {
+            "ok": False,
+            "error": "latex/master.tex introuvable",
+            "run_id": run_id,
+            "snippets_written": snippets_audit,
+            "blocks": blocks_audit,
+        }}}
 
+    t0 = time.time()
     pdf_path, log_text = try_compile_pdf(run_root=run_root / "latex", tex_path=tex_master, runs=1)
+    elapsed_s = round(time.time() - t0, 3)
 
-    out = {
+    export_audit = {
         "ok": True,
         "run_id": run_id,
         "master_tex": str(tex_master),
-        "blocks_generated": blocks_map,  # dict sec_key -> relpath
+        "latex_dir": str(run_root / "latex"),
         "pdf_path": str(pdf_path) if pdf_path else None,
-        "note": "Compilation sur latex/master.tex (plan stable via blocks sec_*.tex).",
+        "compile_ok": bool(pdf_path),
+        "compile_elapsed_s": elapsed_s,
+        "snippets_written": snippets_audit,
+        "blocks": blocks_audit,
+        "note": "Compilation sur latex/master.tex (blocks + snippets artefacts/text).",
     }
     if log_text:
-        out["pdflatex_log_head"] = log_text[:2000]
-    return {"metrics": {"m.report.export": out}}
+        export_audit["pdflatex_log_head"] = log_text[:2000]
+
+    base_runs_dir = run_root.parent
+    try:
+        rw = RunWriter(base_runs_dir=base_runs_dir, run_id=run_id)
+        rw.update_manifest({"metrics": {"m.report.export": export_audit}})
+    except Exception:
+        pass
+
+    return {"metrics": {"m.report.export": export_audit}}
 
 
 @register("build_narrative")

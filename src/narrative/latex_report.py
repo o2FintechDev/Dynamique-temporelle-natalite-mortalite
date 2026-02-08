@@ -2,13 +2,29 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, List
 import shutil
 import subprocess
 import datetime
 
+from src.narrative.tex_snippets import normalize_key
+from src.narrative.sections.sec_data import render_sec_data
+
+def write_blocks_from_manifest(*, run_root: Path, manifest: Dict[str, Any], y_name: str) -> Dict[str, str]:
+    blocks_dir = run_root / "latex" / "blocks"
+    blocks_dir.mkdir(parents=True, exist_ok=True)
+
+    # Chapitre 1
+    (blocks_dir / "sec_data.tex").write_text(
+        render_sec_data(run_root=run_root, manifest=manifest, y_name=y_name),
+        encoding="utf-8",
+    )
+
+    # retourne éventuellement un mapping pour log/manifest
+    return {"sec_data": "latex/blocks/sec_data.tex"}
 
 def _escape_tex(s: str) -> str:
+    """Escape TEX for normal text (NOT for file paths, NOT for \\label)."""
     if s is None:
         return ""
     return (
@@ -26,6 +42,31 @@ def _escape_tex(s: str) -> str:
     )
 
 
+# ---------- small helpers ----------
+def _filename_only(path_str: str) -> str:
+    return Path(path_str).name
+
+
+def _latex_filename(fname: str) -> str:
+    # for \input/\includegraphics: keep "_" raw, avoid spaces
+    return fname.replace(" ", "_")
+
+
+def _safe_latex_id(label: str, path_str: str) -> str:
+    # for \label{...}: strict safe charset
+    base = (label or path_str or "artefact").lower().replace(" ", "-")
+    base = "".join(ch for ch in base if ch.isalnum() or ch in "-_")[:60]
+    return base or "artefact"
+
+
+def _is_tex(path_str: str) -> bool:
+    return path_str.lower().endswith(".tex")
+
+
+def _is_fig(path_str: str) -> bool:
+    return path_str.lower().endswith((".png", ".jpg", ".jpeg", ".pdf"))
+
+
 def export_report_tex_from_manifest(
     *,
     run_root: str | Path,
@@ -34,18 +75,23 @@ def export_report_tex_from_manifest(
     tex_name: str = "main.tex",  # Overleaf convention
     title: str = "Rapport économétrique",
     author: str = "",
+    # NEW:
+    modular: bool = True,
+    narrative_snippets: bool = True,
+    strict_snippet_includes: bool = False,
 ) -> Path:
     """
-    Génère un .tex dans <run_root>/<tex_name> à partir du manifest + (optionnel) narrative_markdown.
+    Génère un rapport LaTeX à partir du manifest.
 
-    CIBLE OVERLEAF (strict, sans CSV):
-    - artefacts/figures/*.png
-    - artefacts/tables/*.tex   (tables prêtes à \input)
-    - artefacts/metrics/*.json (non rendues automatiquement ici)
-    - Aucun \IfFileExists : LaTeX tente directement d’inclure.
+    MODE MODULAR :
+    - écrit main.tex (preamble + \\input{sec_*.tex})
+    - écrit des blocs sec_*.tex générés automatiquement
+    - supporte des snippets IA en artefacts/text/<normalized_key>.tex via \\Narrative{normalized_key}
 
-    RÈGLE CENTRAGE:
-    - Figures et tables centrées systématiquement (sans centrer tout le texte).
+    Snippets IA:
+    - narrative_snippets=True :
+        - strict_snippet_includes=False -> inclusion conditionnelle (robuste)
+        - strict_snippet_includes=True  -> \\input direct (échoue si absent)
     """
     run_root = Path(run_root)
     run_root.mkdir(parents=True, exist_ok=True)
@@ -62,47 +108,30 @@ def export_report_tex_from_manifest(
 
     lookup = manifest.get("lookup", {}) or {}
 
-    # --- Overleaf layout (fixed folders) ---
+    # Overleaf folders (fixed, relative to run_root because main.tex is written in run_root)
     OVERLEAF_FIG_DIR = "artefacts/figures"
     OVERLEAF_TAB_DIR = "artefacts/tables"
     OVERLEAF_MET_DIR = "artefacts/metrics"
+    OVERLEAF_TXT_DIR = "artefacts/text"
 
     def resolve_path(item: dict) -> str:
         p = item.get("path") or item.get("relpath") or ""
         if not p:
             k = item.get("key") or item.get("label")
             if k and isinstance(lookup, dict):
-                # lookup typé
-                for bucket in lookup.values() if any(isinstance(v, dict) for v in lookup.values()) else []:
-                    if isinstance(bucket, dict) and k in bucket:
-                        p = bucket[k]
-                        break
+                # lookup typé (dict of dict)
+                if any(isinstance(v, dict) for v in lookup.values()):
+                    for bucket in lookup.values():
+                        if isinstance(bucket, dict) and k in bucket:
+                            p = bucket[k]
+                            break
                 # lookup plat
                 if not p and k in lookup and isinstance(lookup[k], str):
                     p = lookup[k]
         return str(p or "")
 
-    def filename_only(path_str: str) -> str:
-        return Path(path_str).name
-
-    def latex_filename(fname: str) -> str:
-        # \input/\includegraphics : garder "_" brut (pas \_) et éviter espaces
-        return fname.replace(" ", "_")
-
-    def safe_latex_id(label: str, path_str: str) -> str:
-        # IMPORTANT: destiné à \label{} => doit contenir UNIQUEMENT des caractères "sûrs"
-        base = (label or path_str or "artefact").lower().replace(" ", "-")
-        base = "".join(ch for ch in base if ch.isalnum() or ch in "-_")[:60]
-        return base or "artefact"
-
-    def is_tex(path_str: str) -> bool:
-        return path_str.lower().endswith(".tex")
-
-    def is_fig(path_str: str) -> bool:
-        return path_str.lower().endswith((".png", ".jpg", ".jpeg", ".pdf"))
-
     def overleaf_target_path(path_str: str) -> str:
-        fname = filename_only(path_str)
+        fname = _filename_only(path_str)
         ext = path_str.lower()
         if ext.endswith((".png", ".jpg", ".jpeg", ".pdf")):
             return f"{OVERLEAF_FIG_DIR}/{fname}"
@@ -110,8 +139,157 @@ def export_report_tex_from_manifest(
             return f"{OVERLEAF_TAB_DIR}/{fname}"
         return f"{OVERLEAF_MET_DIR}/{fname}"
 
-    lines: list[str] = []
-    lines += [
+    # ---------- write blocks ----------
+    def write_block(name: str, lines: List[str]) -> Path:
+        p = run_root / name
+        p.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
+        return p
+
+    def narrative_macro_lines() -> List[str]:
+        """
+        Define \\Narrative{key} where key is already normalized (normalize_key()).
+        Paths are relative to main.tex (run_root), so artefacts/text is correct.
+        """
+        if not narrative_snippets:
+            return []
+        if strict_snippet_includes:
+            return [
+                r"% --- IA narrative snippets (strict) ---",
+                r"\newcommand{\Narrative}[1]{\input{" + f"{OVERLEAF_TXT_DIR}/" + r"#1.tex}}",
+                "",
+            ]
+        return [
+            r"% --- IA narrative snippets (robust) ---",
+            r"\newcommand{\Narrative}[1]{%",
+            r"  \IfFileExists{" + f"{OVERLEAF_TXT_DIR}/" + r"#1.tex}{\input{" + f"{OVERLEAF_TXT_DIR}/" + r"#1.tex}}{}%",
+            r"}",
+            "",
+        ]
+
+    def _narr_key(raw: str) -> str:
+        # NEVER TeX-escape here. Normalize to filesystem-safe key.
+        return normalize_key(raw)
+
+    def section_figures() -> List[str]:
+        if not figures:
+            return []
+        out: List[str] = []
+        out += [r"\section{Figures}", ""]
+        for it in figures:
+            key = it.get("key") or it.get("label") or it.get("name") or ""
+            src_path = resolve_path(it)
+            safe_id = _safe_latex_id(key, src_path)
+            title_txt = key or _filename_only(src_path) or "Figure"
+
+            if not src_path:
+                out += [r"\textit{Chemin indisponible dans le manifest.}\\", ""]
+                continue
+
+            target = overleaf_target_path(src_path)
+            out += [r"\subsection{" + _escape_tex(title_txt) + r"}", r"\texttt{" + _escape_tex(target) + r"}\\", ""]
+
+            if _is_fig(src_path):
+                fname = _latex_filename(_filename_only(target))
+                out += [
+                    r"\begin{figure}[H]",
+                    r"\includegraphics[width=0.95\linewidth]{" + fname + r"}",
+                    r"\caption{" + _escape_tex(title_txt) + r"}",
+                    r"\label{fig:" + safe_id + r"}",
+                    r"\end{figure}",
+                    "",
+                ]
+                if key:
+                    out += [r"\Narrative{" + _narr_key(key) + r"}", ""]
+            else:
+                out += [r"\textit{Type de fichier non géré pour rendu figure.}\\", ""]
+
+        return out
+
+    def section_tables() -> List[str]:
+        if not tables:
+            return []
+        out: List[str] = []
+        out += [r"\section{Tables}", ""]
+        for it in tables:
+            key = it.get("key") or it.get("label") or it.get("name") or ""
+            src_path = resolve_path(it)
+            safe_id = _safe_latex_id(key, src_path)
+            title_txt = key or _filename_only(src_path) or "Table"
+
+            if not src_path:
+                out += [r"\textit{Chemin indisponible dans le manifest.}\\", ""]
+                continue
+
+            target = overleaf_target_path(src_path)
+            out += [r"\subsection{" + _escape_tex(title_txt) + r"}", r"\texttt{" + _escape_tex(target) + r"}\\", ""]
+
+            if _is_tex(src_path):
+                fname = _latex_filename(_filename_only(src_path))
+                out += [
+                    r"\begin{table}[H]",
+                    r"\caption{" + _escape_tex(title_txt) + r"}",
+                    r"\label{tab:" + safe_id + r"}",
+                    r"\begin{adjustbox}{max width=\linewidth,center}",
+                    r"\input{" + f"{OVERLEAF_TAB_DIR}/{fname}" + r"}",
+                    r"\end{adjustbox}",
+                    r"\end{table}",
+                    "",
+                ]
+                if key:
+                    out += [r"\Narrative{" + _narr_key(key) + r"}", ""]
+            else:
+                out += [r"\textit{Type de fichier non géré pour rendu table.}\\", ""]
+
+        return out
+
+    def section_metrics() -> List[str]:
+        if not metrics:
+            return []
+        out: List[str] = []
+        out += [r"\section{Métriques}", ""]
+        for it in metrics:
+            key = it.get("key") or it.get("label") or it.get("name") or ""
+            src_path = resolve_path(it)
+            title_txt = key or _filename_only(src_path) or "Métrique"
+            out += [r"\subsection{" + _escape_tex(title_txt) + r"}"]
+            if src_path:
+                target = overleaf_target_path(src_path)
+                out += [
+                    r"\texttt{" + _escape_tex(target) + r"}\\",
+                    r"\textit{Métrique non rendue automatiquement (JSON/texte).}\\",
+                    "",
+                ]
+                if key:
+                    out += [r"\Narrative{" + _narr_key(key) + r"}", ""]
+            else:
+                out += [r"\textit{Chemin indisponible dans le manifest.}\\", ""]
+        return out
+
+    def section_models() -> List[str]:
+        if not models:
+            return []
+        out: List[str] = []
+        out += [r"\section{Modèles}", ""]
+        for it in models:
+            key = it.get("key") or it.get("label") or it.get("name") or ""
+            src_path = resolve_path(it)
+            title_txt = key or _filename_only(src_path) or "Modèle"
+            out += [r"\subsection{" + _escape_tex(title_txt) + r"}"]
+            if src_path:
+                out += [
+                    r"\texttt{" + _escape_tex(src_path) + r"}\\",
+                    r"\textit{Artefact modèle non rendu (binaire / non-LaTeX).}\\",
+                    "",
+                ]
+                if key:
+                    out += [r"\Narrative{" + _narr_key(key) + r"}", ""]
+            else:
+                out += [r"\textit{Chemin indisponible dans le manifest.}\\", ""]
+        return out
+
+    # ---------- main.tex ----------
+    preamble: List[str] = []
+    preamble += [
         r"\documentclass[11pt,a4paper]{article}",
         r"\usepackage[utf8]{inputenc}",
         r"\usepackage[T1]{fontenc}",
@@ -119,133 +297,62 @@ def export_report_tex_from_manifest(
         r"\usepackage{geometry}",
         r"\geometry{margin=2.2cm}",
         r"\usepackage{float}",
-
         r"\usepackage{graphicx}",
         r"\setkeys{Gin}{draft=false}",
-
         r"\usepackage{booktabs}",
         r"\usepackage{longtable}",
         r"\usepackage{adjustbox}",
-
         r"\usepackage{xcolor}",
         r"\usepackage{hyperref}",
-
-        # Centrage automatique des floats (sans centrer tout le texte)
         r"\usepackage{etoolbox}",
         r"\AtBeginEnvironment{figure}{\centering}",
         r"\AtBeginEnvironment{table}{\centering}",
-
-        # Images
         r"\graphicspath{{./artefacts/figures/}}",
         r"\DeclareGraphicsExtensions{.pdf,.png,.jpg,.jpeg}",
+    ]
+    # define \\Narrative only once (robust or strict)
+    preamble += narrative_macro_lines()
 
+    main_lines: List[str] = []
+    main_lines += preamble
+    main_lines += [
         r"\begin{document}",
         r"\title{" + _escape_tex(title) + r"}",
         r"\author{" + _escape_tex(author) + r"}",
         r"\date{" + _escape_tex(created) + r"}",
         r"\maketitle",
+        "",
     ]
-
     if run_id:
-        lines += [r"\textbf{Run ID:} " + _escape_tex(run_id) + r"\\", ""]
+        main_lines += [r"\textbf{Run ID:} " + _escape_tex(run_id) + r"\\", ""]
 
+    # Optional raw narrative markdown (legacy)
     if narrative_markdown:
-        lines += [r"\section{Interprétation}", ""]
-        lines += [r"\begin{verbatim}", narrative_markdown, r"\end{verbatim}", ""]
+        main_lines += [r"\section{Interprétation (legacy)}", ""]
+        main_lines += [r"\begin{verbatim}", narrative_markdown, r"\end{verbatim}", ""]
 
-    def section_block(lines_ref: list[str], name: str, items: list[dict]) -> None:
-        if not items:
-            return
+    if modular:
+        blocks = [
+            ("sec_figures.tex", section_figures()),
+            ("sec_tables.tex", section_tables()),
+            ("sec_metrics.tex", section_metrics()),
+            ("sec_models.tex", section_models()),
+        ]
+        for fname, content in blocks:
+            if content:
+                write_block(fname, content)
+                main_lines += [r"\input{" + fname + r"}", ""]
+    else:
+        content: List[str] = []
+        content += section_figures()
+        content += section_tables()
+        content += section_metrics()
+        content += section_models()
+        main_lines += content
 
-        lines_ref.append(r"\section{" + _escape_tex(name) + r"}")
+    main_lines += [r"\end{document}"]
 
-        for it in items:
-            label = it.get("key") or it.get("label") or it.get("name") or ""
-            src_path = resolve_path(it)
-
-            safe_id = safe_latex_id(label, src_path)
-            title_txt = label or filename_only(src_path) or "Artefact"
-            lines_ref.append(r"\subsection{" + _escape_tex(title_txt) + r"}")
-
-            if not src_path:
-                lines_ref.append(r"\textit{Chemin indisponible dans le manifest.}\\")
-                lines_ref.append("")
-                continue
-
-            target = overleaf_target_path(src_path)
-            lines_ref.append(r"\texttt{" + _escape_tex(target) + r"}\\")
-            lines_ref.append("")
-
-            # --- FIGURES ---
-            if is_fig(src_path):
-                fname = latex_filename(filename_only(target))
-                lines_ref += [
-                    r"\begin{figure}[H]",
-                    r"\includegraphics[width=0.95\linewidth]{" + fname + r"}",
-                    r"\caption{" + _escape_tex(title_txt) + r"}",
-                    # IMPORTANT: pas de _escape_tex ici (sinon \_ dans \label -> crash)
-                    r"\label{fig:" + safe_id + r"}",
-                    r"\end{figure}",
-                    "",
-                ]
-                continue
-
-            # --- TABLES (.tex) ---
-            if is_tex(src_path):
-                fname = latex_filename(filename_only(src_path))
-                lines_ref += [
-                    r"\begin{table}[H]",
-                    r"\caption{" + _escape_tex(title_txt) + r"}",
-                    r"\label{tab:" + safe_id + r"}",
-                    r"\begin{adjustbox}{max width=\linewidth,center}",
-                    # IMPORTANT: pas de \detokenize dans \input
-                    r"\input{" + f"{OVERLEAF_TAB_DIR}/{fname}" + r"}",
-                    r"\end{adjustbox}",
-                    r"\end{table}",
-                    "",
-                ]
-                continue
-
-            lines_ref.append(r"\textit{Type de fichier non géré pour rendu LaTeX.}\\")
-            lines_ref.append("")
-
-    section_block(lines, "Figures", figures)
-    section_block(lines, "Tables", tables)
-
-    # Metrics: non rendues automatiquement (JSON/texte). On liste les chemins pour traçabilité.
-    if metrics:
-        lines.append(r"\section{Métriques}")
-        for it in metrics:
-            label = it.get("key") or it.get("label") or it.get("name") or ""
-            src_path = resolve_path(it)
-            title_txt = label or filename_only(src_path) or "Métrique"
-            lines.append(r"\subsection{" + _escape_tex(title_txt) + r"}")
-            if src_path:
-                target = overleaf_target_path(src_path)
-                lines.append(r"\texttt{" + _escape_tex(target) + r"}\\")
-                lines.append(r"\textit{Métrique non rendue automatiquement (JSON/texte).}\\")
-            else:
-                lines.append(r"\textit{Chemin indisponible dans le manifest.}\\")
-            lines.append("")
-
-    # Models: généralement txt/pkl/json => non rendus
-    if models:
-        lines.append(r"\section{Modèles}")
-        for it in models:
-            label = it.get("key") or it.get("label") or it.get("name") or ""
-            src_path = resolve_path(it)
-            title_txt = label or filename_only(src_path) or "Modèle"
-            lines.append(r"\subsection{" + _escape_tex(title_txt) + r"}")
-            if src_path:
-                lines.append(r"\texttt{" + _escape_tex(src_path) + r"}\\")
-                lines.append(r"\textit{Artefact modèle non rendu (binaire / non-LaTeX).}\\")
-            else:
-                lines.append(r"\textit{Chemin indisponible dans le manifest.}\\")
-            lines.append("")
-
-    lines.append(r"\end{document}")
-
-    tex_path.write_text("\n".join(lines), encoding="utf-8")
+    tex_path.write_text("\n".join(main_lines), encoding="utf-8")
     return tex_path
 
 
