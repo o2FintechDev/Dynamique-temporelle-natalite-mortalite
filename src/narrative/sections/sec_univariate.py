@@ -3,16 +3,47 @@ from pathlib import Path
 from typing import Any, Dict
 
 from src.narrative.sections.base import (
-    SectionSpec, lookup, md_basic_to_tex, escape_tex,
-    include_table_tex, include_figure, narr_call
+    SectionSpec,
+    lookup,
+    md_basic_to_tex,
+    include_table_tex,
+    include_figure,
+    narr_call,
 )
 
-def render_sec_univariate(*, run_root: Path, manifest: Dict[str, Any], sec: SectionSpec, metrics_cache: Dict[str, Dict[str, Any]]) -> str:
+def _fmt2(x: Any) -> str:
+    try:
+        return f"{float(x):.2f}"
+    except Exception:
+        return "NA"
+
+def _fmt_p(x: Any) -> str:
+    try:
+        v = float(x)
+    except Exception:
+        return "NA"
+    if v < 1e-4:
+        return f"{v:.2e}"
+    return f"{v:.3f}"
+
+
+def render_sec_univariate(
+    *,
+    run_root: Path,
+    manifest: Dict[str, Any],
+    sec: SectionSpec,
+    metrics_cache: Dict[str, Dict[str, Any]],
+) -> str:
     uni = metrics_cache.get("m.uni.best") or {}
     kp = uni.get("key_points") or {}
+
     order = kp.get("order") or (uni.get("best") or {}).get("order") or "NA"
     aic = kp.get("aic") or (uni.get("best") or {}).get("aic")
     bic = kp.get("bic") or (uni.get("best") or {}).get("bic")
+
+    lb_p = kp.get("lb_p") or kp.get("ljungbox_p")
+    jb_p = kp.get("jb_p") or kp.get("jarque_bera_p")
+    arch_p = kp.get("arch_p")
 
     tsds = metrics_cache.get("m.diag.ts_vs_ds") or {}
     verdict = tsds.get("verdict", "NA")
@@ -20,49 +51,258 @@ def render_sec_univariate(*, run_root: Path, manifest: Dict[str, Any], sec: Sect
     if d_force is None:
         d_force = 1 if verdict == "DS" else 0 if verdict == "TS" else "auto"
 
-    note = (metrics_cache.get("m.note.step4") or {}).get("markdown") or ""
+    note = (metrics_cache.get("m.note.step4") or {})
+    note_md = ""
+    if isinstance(note, dict):
+        note_md = note.get("markdown") or note.get("text") or note.get("summary") or ""
+    elif isinstance(note, str):
+        note_md = note
+    note_md = note_md.replace("−", "-")
 
-    lines: list[str] = [
-        r"\section{" + escape_tex(sec.title) + r"}", "",
-        md_basic_to_tex(sec.intro_md), "",
-        r"\subsection{Synthèse quantitative}",
-        md_basic_to_tex(f"Modèle candidat : **ARIMA{order}** avec $d={d_force}$ ; AIC={aic}, BIC={bic}."),
+    # artefacts (figures)
+    fig_fit = lookup(manifest, "figures", "fig.uni.fit")
+    fig_resid_acf = lookup(manifest, "figures", "fig.uni.resid_acf")
+    fig_qq = lookup(manifest, "figures", "fig.uni.qq")
+
+    # artefacts (tables)
+    tbl_summary = lookup(manifest, "tables", "tbl.uni.summary")
+    tbl_arima = lookup(manifest, "tables", "tbl.uni.arima")
+    tbl_resid = lookup(manifest, "tables", "tbl.uni.resid_diag")
+    tbl_memory = lookup(manifest, "tables", "tbl.uni.memory")
+
+    lines: list[str] = []
+
+    # ============================================================
+    # SECTION 1 : Cadre théorique (Box–Jenkins)
+    # ============================================================
+    lines += [
+        r"\section{Analyse univariée : modèles AR, MA, ARMA et ARIMA}",
+        "",
+        md_basic_to_tex(
+            "L’analyse univariée vise à modéliser la dynamique propre de la croissance naturelle, indépendamment de toute variable explicative. "
+            "Elle repose sur l’hypothèse que l’information contenue dans l’historique de la série suffit à expliquer sa dynamique présente, "
+            "une fois la stationnarité assurée. Cette étape constitue un préalable indispensable avant toute extension multivariée. "
+            "La méthodologie de Box–Jenkins fournit un cadre systématique fondé sur : identification, estimation et validation."
+        ),
+        "",
+        r"\subsection*{4.1 Cadre probabiliste général}",
+        md_basic_to_tex(
+            "On considère une série stationnaire au second ordre : espérance constante, variance finie, autocovariance ne dépendant que du retard. "
+            "Le terme d’erreur est supposé bruit blanc, non autocorrélé et de variance constante."
+        ),
+        "",
+        r"\subsection*{4.2 Modèles autorégressifs AR(p)}",
+        "",
+        r"\begin{equation}",
+        r"Y_t = c + \sum_{i=1}^{p}\phi_i Y_{t-i} + \varepsilon_t",
+        r"\end{equation}",
+        "",
+        md_basic_to_tex(
+            "Interprétation : chaque observation dépend linéairement des valeurs passées ; les coefficients mesurent la persistance. "
+            "Condition de stationnarité : les racines du polynôme caractéristique doivent être hors cercle unité. "
+            "Identification : ACF décroît progressivement, PACF coupure au retard $p$. "
+            "Lecture économique : un $p$ élevé traduit une inertie démographique importante."
+        ),
+        "",
+        r"\subsection*{4.3 Modèles à moyenne mobile MA(q)}",
+        "",
+        r"\begin{equation}",
+        r"Y_t = c + \varepsilon_t + \sum_{j=1}^{q}\theta_j \varepsilon_{t-j}",
+        r"\end{equation}",
+        "",
+        md_basic_to_tex(
+            "Interprétation : la série dépend des chocs présents et passés (effets transitoires). "
+            "Condition d’inversibilité : racines hors cercle unité. "
+            "Identification : ACF coupure au retard $q$, PACF décroît progressivement. "
+            "Lecture économique : capte des chocs ponctuels (ex. crises sanitaires temporaires)."
+        ),
+        "",
+        r"\subsection*{4.4 Modèles ARMA(p,q)}",
+        "",
+        r"\begin{equation}",
+        r"Y_t = c + \sum_{i=1}^{p}\phi_i Y_{t-i} + \varepsilon_t + \sum_{j=1}^{q}\theta_j \varepsilon_{t-j}",
+        r"\end{equation}",
+        "",
+        md_basic_to_tex(
+            "Intérêt : modéliser simultanément la persistance structurelle (AR) et les effets transitoires (MA). "
+            "L’identification ACF/PACF est souvent ambiguë : la sélection finale repose sur des critères d’information."
+        ),
+        "",
+        r"\subsection*{4.5 Modèles ARIMA(p,d,q)}",
+        md_basic_to_tex(
+            "Lorsque la série est intégrée d’ordre $d$, on estime un ARMA sur la série transformée. "
+            "Un $d=1$ traduit l’existence de chocs permanents."
+        ),
+        "",
+        r"\begin{equation}",
+        r"\Delta Y_t = c + \sum_{i=1}^{p}\phi_i \Delta Y_{t-i} + \varepsilon_t + \sum_{j=1}^{q}\theta_j \varepsilon_{t-j}",
+        r"\end{equation}",
+        "",
+        r"\subsection*{4.6 Sélection du modèle optimal}",
+        md_basic_to_tex(
+            "Le choix repose sur un arbitrage biais–variance. "
+            "AIC pénalise faiblement la complexité ; BIC pénalise plus fortement et limite la surparamétrisation, "
+            "souvent préférable en démographie."
+        ),
+        "",
+        r"\begin{equation}",
+        r"AIC = -2\ell + 2k",
+        r"\end{equation}",
+        r"\begin{equation}",
+        r"BIC = -2\ell + k\ln(T)",
+        r"\end{equation}",
+        "",
+        r"\subsection*{4.8 Diagnostics des résidus}",
+        md_basic_to_tex(
+            "Un modèle correctement spécifié produit des résidus assimilables à un bruit blanc : "
+            "absence d’autocorrélation (Ljung–Box), normalité raisonnable, variance stable. "
+            "Toute autocorrélation résiduelle signale une mauvaise spécification de $p$ ou $q$."
+        ),
+        "",
+        r"\subsection*{4.9 Limites des modèles univariés}",
+        md_basic_to_tex(
+            "Limites : absence de déterminants explicites, confusion possible entre mémoire longue et racine unitaire, "
+            "interprétation économique parfois restreinte. Ces limites justifient l’analyse de la mémoire et l’extension multivariée."
+        ),
+        "",
+        r"\subsection*{4.10 Rôle dans la stratégie globale}",
+        md_basic_to_tex(
+            "Cette étape fournit un benchmark, stabilise l’identification, et sert de contrôle de cohérence "
+            "avant les modèles multivariés."
+        ),
         "",
     ]
 
-    for fk in sec.figure_keys:
-        rel = lookup(manifest, "figures", fk)
-        if not rel:
-            continue
-        lines += [
-            r"\subsection{Figure : " + escape_tex(fk) + r"}",
-            include_figure(fig_rel=rel, caption=fk, label=f"fig:{fk}"),
-            narr_call(fk),
-            "",
-        ]
-
-    for tk in sec.table_keys:
-        rel = lookup(manifest, "tables", tk)
-        if not rel:
-            continue
-        lines += [
-            r"\subsection{Tableau : " + escape_tex(tk) + r"}",
-            include_table_tex(run_root=run_root, tbl_rel=rel, caption=tk, label=f"tab:{tk}"),
-            narr_call(tk),
-            "",
-        ]
-
+    # ============================================================
+    # SECTION 2 : Résultats empiriques (Step4)
+    # ============================================================
     lines += [
-        r"\subsection{Conclusion de section}",
+        r"\section{Résultats de la modélisation univariée (Step4)}",
+        "",
         md_basic_to_tex(
-            f"Le modèle **ARIMA{order}** est retenu sous la contrainte $d={d_force}$ (verdict {verdict}). "
-            "La validité est jugée sur diagnostics résiduels (blancheur, normalité, hétéroscédasticité)."
+            f"Synthèse quantitative : **ARIMA{order}** sous contrainte $d={d_force}$ (verdict {verdict}). "
+            f"AIC={_fmt2(aic)}, BIC={_fmt2(bic)}. "
+            f"Diagnostics résiduels (si disponibles) : Ljung–Box p={_fmt_p(lb_p)}, JB p={_fmt_p(jb_p)}, ARCH p={_fmt_p(arch_p)}."
         ),
         narr_call("m.uni.best"),
         "",
     ]
 
-    if note.strip():
-        lines += [md_basic_to_tex(note), narr_call("m.note.step4"), ""]
+    if fig_fit:
+        lines += [
+            r"\paragraph{Figure 1 — Ajustement du modèle}",
+            md_basic_to_tex(
+                "Lecture : vérifier l’adéquation globale (niveau/variations) et repérer les périodes mal expliquées. "
+                "Des écarts systématiques signalent une spécification insuffisante ou un changement de régime."
+            ),
+            "",
+            include_figure(fig_rel=fig_fit, caption="fig.uni.fit", label="fig:fig-uni-fit"),
+            narr_call("fig.uni.fit"),
+            "",
+        ]
+
+    if tbl_summary:
+        lines += [
+            r"\paragraph{Tableau 1 — Synthèse des candidats / sélection}",
+            md_basic_to_tex(
+                "Lecture : comparer les critères d’information et vérifier la stabilité du compromis biais–variance. "
+                "Un gain marginal d’AIC au prix d’une explosion de paramètres est une mauvaise décision."
+            ),
+            "",
+            include_table_tex(run_root=run_root, tbl_rel=tbl_summary, caption="tbl.uni.summary", label="tab:tbl-uni-summary"),
+            narr_call("tbl.uni.summary"),
+            "",
+        ]
+
+    if tbl_arima:
+        lines += [
+            r"\paragraph{Tableau 2 — Paramètres ARIMA retenus}",
+            md_basic_to_tex(
+                "Lecture : contrôler signes, significativité et plausibilité (persistance AR vs correction MA). "
+                "Des coefficients instables ou non significatifs en bloc suggèrent un sur-ajustement."
+            ),
+            "",
+            include_table_tex(run_root=run_root, tbl_rel=tbl_arima, caption="tbl.uni.arima", label="tab:tbl-uni-arima"),
+            narr_call("tbl.uni.arima"),
+            "",
+        ]
+
+    if fig_resid_acf:
+        lines += [
+            r"\paragraph{Figure 2 — ACF des résidus}",
+            md_basic_to_tex(
+                "Lecture : la corrélogramme des résidus doit être compatible avec un bruit blanc. "
+                "Des pics persistants indiquent une dynamique non capturée (ordre $p$/$q$ insuffisant, saisonnalité, rupture)."
+            ),
+            "",
+            include_figure(fig_rel=fig_resid_acf, caption="fig.uni.resid_acf", label="fig:fig-uni-resid-acf"),
+            narr_call("fig.uni.resid_acf"),
+            "",
+        ]
+
+    if fig_qq:
+        lines += [
+            r"\paragraph{Figure 3 — QQ-plot des résidus}",
+            md_basic_to_tex(
+                "Lecture : évaluer l’écart à la normalité (queues épaisses). "
+                "Des queues épaisses sont cohérentes avec des chocs rares mais extrêmes et justifient une prudence sur l’inférence classique."
+            ),
+            "",
+            include_figure(fig_rel=fig_qq, caption="fig.uni.qq", label="fig:fig-uni-qq"),
+            narr_call("fig.uni.qq"),
+            "",
+        ]
+
+    if tbl_resid:
+        lines += [
+            r"\paragraph{Tableau 3 — Diagnostics résiduels}",
+            md_basic_to_tex(
+                "Lecture : Ljung–Box (blancheur), Jarque–Bera (normalité), ARCH (hétéroscédasticité). "
+                "Un rejet de blancheur invalide la spécification ; un rejet de normalité appelle une lecture robuste ; "
+                "un signal ARCH indique variance conditionnelle non constante."
+            ),
+            "",
+            include_table_tex(run_root=run_root, tbl_rel=tbl_resid, caption="tbl.uni.resid_diag", label="tab:tbl-uni-resid-diag"),
+            narr_call("tbl.uni.resid_diag"),
+            "",
+        ]
+
+    if tbl_memory:
+        lines += [
+            r"\paragraph{Tableau 4 — Indices de mémoire / persistance}",
+            md_basic_to_tex(
+                "Lecture : distinguer persistance ARIMA standard et mémoire longue potentielle. "
+                "Une persistance élevée peut refléter des structures sociales lentes, mais elle peut aussi être confondue avec une racine unitaire "
+                "ou des ruptures non modélisées."
+            ),
+            "",
+            include_table_tex(run_root=run_root, tbl_rel=tbl_memory, caption="tbl.uni.memory", label="tab:tbl-uni-memory"),
+            narr_call("tbl.uni.memory"),
+            "",
+        ]
+
+    if note_md.strip():
+        lines += [
+            md_basic_to_tex("**Note d’interprétation automatisée (Step4)**"),
+            md_basic_to_tex(
+                "Cette note doit rester cohérente avec : (i) le choix ARIMA, (ii) les critères d’information, "
+                "(iii) les diagnostics résiduels. Toute conclusion de “bon modèle” exige une blancheur acceptable."
+            ),
+            "",
+            md_basic_to_tex(note_md),
+            narr_call("m.note.step4"),
+            "",
+        ]
+
+    lines += [
+        md_basic_to_tex("**Conclusion**"),
+        md_basic_to_tex(
+            f"Le modèle retenu est **ARIMA{order}** avec $d={d_force}$ (verdict {verdict}). "
+            "La décision finale repose sur l’acceptabilité des résidus (blancheur en priorité), "
+            "puis sur la parcimonie (BIC) et la stabilité des paramètres."
+        ),
+        narr_call("m.uni.best"),
+        "",
+    ]
 
     return "\n".join(lines).strip() + "\n"

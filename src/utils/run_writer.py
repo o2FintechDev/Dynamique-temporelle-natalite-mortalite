@@ -140,6 +140,7 @@ class RunWriter:
 \usepackage{adjustbox}
 \usepackage{xcolor}
 \usepackage{hyperref}
+\usepackage{pdflscape}
 
 \usepackage{etoolbox}
 \AtBeginEnvironment{figure}{\centering}
@@ -153,9 +154,72 @@ class RunWriter:
   \IfFileExists{../artefacts/text/#1.tex}{\input{../artefacts/text/#1.tex}}{}%
 }
 
-\title{Dynamique temporelle de la natalité et de la mortalité en France (1975--2025)}
-\author{AnthroDem Lab - Aude Bernier, Clara Pierreuse, Justine Reiter -- Guerville}
-\date{\today}
+% =================================================
+% PAGE DE GARDE
+% =================================================
+\begin{titlepage}
+\thispagestyle{empty}
+
+% -------------------------------------------------
+% Logos
+% -------------------------------------------------
+\begin{minipage}{0.48\textwidth}
+    \raggedright
+    \includegraphics[width=0.70\textwidth]{image1.png}
+\end{minipage}
+\hfill
+\begin{minipage}{0.48\textwidth}
+    \raggedleft
+    \includegraphics[width=0.45\textwidth]{image2.png}
+\end{minipage}
+
+\vspace*{3cm}
+
+% -------------------------------------------------
+% Titre
+% -------------------------------------------------
+\begin{center}
+    {\Large Analyse économétrique automatisée}\\[0.3cm]
+    {\Large par pipeline déterministe}\\[0.6cm]
+
+    {\Huge\bfseries Automate économétrique}\\[0.4cm]
+    {\LARGE\bfseries Croissance naturelle en France (1975--2025)}
+\end{center}
+
+\vspace{2.5cm}
+
+% -------------------------------------------------
+% Auteurs
+% -------------------------------------------------
+\begin{center}
+    {\large Aude \textsc{Bernier}}\\
+    {\large Clara \textsc{Pierreuse}}\\
+    {\large Justine \textsc{Reiter--Guerville}}
+\end{center}
+
+\vfill
+
+% -------------------------------------------------
+% Formation
+% -------------------------------------------------
+\begin{center}
+    {\large Master Monnaie Banque Finance Assurance}\\
+    {\itshape Parcours Systèmes d’Information Économiques et Financiers (SIEF)}\\[0.3cm]
+    Université de Montpellier\\[0.6cm]
+    Année universitaire 2025--2026
+\end{center}
+
+\vspace{1.2cm}
+
+% -------------------------------------------------
+% Encadrement (NON centré)
+% -------------------------------------------------
+\vspace{1.2cm}
+\begin{flushleft}
+{\small Sous la supervision de : Monsieur Mestre Roman}
+\end{flushleft}
+
+\end{titlepage}
 
 \begin{document}
 

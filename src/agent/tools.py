@@ -23,10 +23,7 @@ from src.utils.session_state import get_state
 from src.utils.run_reader import get_run_files, read_manifest, RunManager, read_metric_json
 from pathlib import Path
 from src.narrative import build_narrative_from_run, save_narrative_packet
-from src.narrative.schema import NarrativePacket
-from src.narrative.latex_renderer import render_all_section_blocks
-from src.narrative.interpretation_engine import build_snippets_from_run
-from src.narrative.tex_snippets import write_snippets
+
 
 log = get_logger("agent.tools")
 
@@ -74,7 +71,7 @@ def step1_load_and_profile(*, variables: list[str], y: str, **params: Any) -> di
             meta["freq"] = pd.infer_freq(df.index) or meta.get("freq")
     except Exception:
         pass
-    
+
     note = (
         f"**Étape 1 — Traitement des données** : série `{y}` construite (taux_naissances − taux_deces), "
         f"mensuelle 1975–2025. Observations: **{nobs}**, période: **{start} → {end}**, "

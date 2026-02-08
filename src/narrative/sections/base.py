@@ -25,12 +25,25 @@ def normalize_unicode(s: str) -> str:
 def escape_tex(s: Any) -> str:
     """
     Escape texte LaTeX pour contenu "normal".
-    IMPORTANT: ne pas échapper "\" sinon tu casses tes macros.
+    IMPORTANT: on n'échappe PAS "\" ici pour ne pas casser les macros que TU injectes.
     """
     if s is None:
         return ""
+
     s = normalize_unicode(str(s))
-    return (
+
+    # Normalisation typographique (safe pdflatex)
+    s = (
+        s.replace("−", "-")
+         .replace("–", "--")
+         .replace("—", "---")
+         .replace("’", "'")
+         .replace("“", '"')
+         .replace("”", '"')
+    )
+
+    # Escape LaTeX (hors backslash)
+    s = (
         s.replace("&", r"\&")
          .replace("%", r"\%")
          .replace("$", r"\$")
@@ -41,7 +54,7 @@ def escape_tex(s: Any) -> str:
          .replace("~", r"\textasciitilde{}")
          .replace("^", r"\textasciicircum{}")
     )
-
+    return s
 
 def label_tex_safe(s: str) -> str:
     out = re.sub(r"[^a-zA-Z0-9:\-]+", "-", str(s or "na"))
@@ -100,20 +113,83 @@ def narr_call(raw_key: str) -> str:
 
 
 # ---------- include artefacts ----------
-def include_table_tex(*, run_root: Path, tbl_rel: str, caption: str, label: str) -> str:
+def include_table_tex(
+    *,
+    run_root: Path,
+    tbl_rel: str,
+    caption: str,
+    label: str,
+    mode: str = "fit",
+    font_size: str = r"\small",
+    tabcolsep_pt: int = 3,
+    arraystretch: float = 0.95,
+    max_height_ratio: float = 0.85,
+) -> str:
     """
     Tables exportées via save_table_tex(wrap_table_env=False) => fragment tabular.
     On wrap ici (caption/label/adjustbox) de façon stable.
+
+    Modes:
+      - "fit"       : float + adjustbox (largeur + hauteur) + compactage (recommandé)
+      - "landscape" : idem mais en paysage (nécessite \usepackage{pdflscape})
+      - "raw"       : juste \input (utile si le fragment est déjà un longtable)
     """
     fname = Path(tbl_rel).name.replace(" ", "_")
+
+    cap = escape_tex(caption)
+    lab = label_tex_safe(label)
+
+    # Chemin relatif attendu côté report.tex (comme ton code actuel)
+    inp = r"\input{../artefacts/tables/" + fname + r"}"
+
+    # Compactage local (évite d'impacter tout le document)
+    compact_block = [
+        r"\begingroup",
+        font_size,
+        rf"\setlength{{\tabcolsep}}{{{int(tabcolsep_pt)}pt}}",
+        rf"\renewcommand{{\arraystretch}}{{{arraystretch}}}",
+    ]
+    compact_end = [r"\endgroup"]
+
+    adjust = (
+        r"\begin{adjustbox}{"
+        + rf"max width=\textwidth, max totalheight={max_height_ratio:.2f}\textheight, keepaspectratio, center"
+        + r"}"
+    )
+
+    if mode == "raw":
+        # Cas: le fichier est déjà un environnement complet (ex: longtable)
+        return "\n".join([inp, ""])
+
+    if mode == "landscape":
+        # Nécessite dans le preamble: \usepackage{pdflscape}
+        return "\n".join([
+            r"\begin{landscape}",
+            r"\begin{table}[H]",
+            r"\centering",
+            r"\caption{" + cap + r"}",
+            r"\label{" + lab + r"}",
+            *compact_block,
+            adjust,
+            inp,
+            r"\end{adjustbox}",
+            *compact_end,
+            r"\end{table}",
+            r"\end{landscape}",
+            "",
+        ])
+
+    # mode == "fit" (default)
     return "\n".join([
         r"\begin{table}[H]",
         r"\centering",
-        r"\caption{" + escape_tex(caption) + r"}",
-        r"\label{" + label_tex_safe(label) + r"}",
-        r"\begin{adjustbox}{max width=\linewidth,center}",
-        r"\input{../artefacts/tables/" + fname + r"}",
+        r"\caption{" + cap + r"}",
+        r"\label{" + lab + r"}",
+        *compact_block,
+        adjust,
+        inp,
         r"\end{adjustbox}",
+        *compact_end,
         r"\end{table}",
         "",
     ])
