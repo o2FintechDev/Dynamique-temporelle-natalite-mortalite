@@ -6,6 +6,8 @@ from typing import Any, Dict, List
 
 import pandas as pd
 import streamlit as st
+from src.visualization.ui_labels import pretty_label
+
 
 from src.utils.session_state import get_state
 from src.utils.run_reader import get_run_files, read_manifest, read_metric_json, read_table_from_artefact
@@ -42,7 +44,10 @@ def _render_figures(run_id: str, items: List[Dict[str, Any]]) -> None:
         st.info("Aucune figure pour cette page.")
         return
     for it in items:
-        st.subheader(it.get("key", "figure"))
+        key = it.get("key", "")
+        st.subheader(pretty_label(key) if key else "Figure")
+        if key:
+            st.caption(f"`{key}`")
         p = _abs_path(run_id, it.get("path", ""))
         if p.exists():
             st.image(str(p), width='stretch')
@@ -57,7 +62,10 @@ def _render_tables(run_id: str, items: List[Dict[str, Any]]) -> None:
 
     for it in items:
         key = it.get("key", "")
-        st.subheader(key or "table")
+        st.subheader(pretty_label(key) if key else "Table")
+        if key:
+            st.caption(f"`{key}`")
+
 
         try:
             df = read_table_from_artefact(run_id, it)
@@ -71,7 +79,11 @@ def _render_metrics(run_id: str, items: List[Dict[str, Any]]) -> None:
         st.info("Aucune métrique pour cette page.")
         return
     for it in items:
-        st.subheader(it.get("key", "metric"))
+        key = it.get("key", "")
+        st.subheader(pretty_label(key) if key else "Métrique")
+        if key:
+            st.caption(f"`{key}`")
+
         p = _abs_path(run_id, it.get("path", ""))
         try:
             payload = read_metric_json(p)
