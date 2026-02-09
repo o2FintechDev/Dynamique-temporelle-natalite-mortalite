@@ -1,3 +1,4 @@
+# src/narrative/sections/spec.py
 from __future__ import annotations
 from typing import List
 from src.narrative.sections.base import SectionSpec

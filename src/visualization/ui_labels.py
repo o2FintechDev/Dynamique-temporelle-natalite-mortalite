@@ -1,4 +1,4 @@
-# src/visu/ui_labels.py
+# src/visualization/ui_labels.py
 from __future__ import annotations
 
 import re

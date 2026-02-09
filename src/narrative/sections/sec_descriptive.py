@@ -1,3 +1,4 @@
+# src/narrative/sections/sec_descriptive.py
 from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict

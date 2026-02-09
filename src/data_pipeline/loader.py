@@ -1,3 +1,4 @@
+# src/data_pipeline/loader.py
 from __future__ import annotations
 
 import io

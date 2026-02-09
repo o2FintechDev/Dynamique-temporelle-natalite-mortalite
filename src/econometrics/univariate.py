@@ -1,4 +1,4 @@
-# econometrics/univariate.py
+# src/econometrics/univariate.py
 from __future__ import annotations
 from typing import Any, Optional, Tuple
 import numpy as np

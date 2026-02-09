@@ -1,4 +1,4 @@
-#agent/intent.py
+# src/agent/intent.py
 from __future__ import annotations
 
 import re

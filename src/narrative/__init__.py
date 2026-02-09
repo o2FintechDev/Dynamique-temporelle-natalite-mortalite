@@ -1,3 +1,4 @@
+# src/narrative/_init_.py
 from .schema import NarrativePacket
 from .generator import build_narrative_from_run, save_narrative_packet
 from .latex_renderer import render_all_section_blocks
