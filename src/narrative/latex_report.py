@@ -322,59 +322,8 @@ def export_report_tex_from_manifest(
         r"\date{" + _escape_tex(created) + r"}",
         r"\maketitle",
         "",
-        # ============================================================
-        # PAGE DE REMERCIEMENTS (après page de garde)
-        # ============================================================
-        r"\clearpage",
-        r"\thispagestyle{empty}",
-        r"",
-        r"\begin{center}",
-        r"{\Large \textbf{Remerciements}}",
-        r"\end{center}",
-        r"",
-        r"\vspace{1cm}",
-        r"",
-        r"Nous souhaitons adresser nos sincères remerciements à Monsieur \textbf{Mestre Roman} pour son accompagnement tout au long de nos deux années de Master. "
-        r"Ses enseignements en économétrie, sa rigueur méthodologique et ses exigences académiques ont joué un rôle central dans la structuration de notre raisonnement empirique et dans la conduite de ce projet.",
-        r"",
-        r"Nous remercions également Monsieur \textbf{Paraguette} pour ses interventions en tant que professionnel sur les thématiques liées à l'intelligence artificielle et aux modèles de langage (IA/LLM). "
-        r"Ses apports ont permis de mieux comprendre les enjeux actuels de l'automatisation de l'analyse économique et l'usage de ces outils en fin de cursus universitaire.",
-        r"",
-        r"Enfin, nous remercions nos camarades de promotion pour les échanges et discussions qui ont accompagné ce travail et contribué à enrichir notre réflexion collective.",
-        r"",
-        r"\clearpage",
-        "",
     ]
-
-    # ============================================================
-    # PAGE D'AVANT-PROPOS (troisième page)
-    # ============================================================
-    main_lines += [
-        r"\clearpage",
-        r"\thispagestyle{empty}",
-        r"",
-        r"\begin{center}",
-        r"{\Large \textbf{Avant-propos}}",
-        r"\end{center}",
-        r"",
-        r"\vspace{1cm}",
-        r"",
-        r"Le présent rapport a été généré automatiquement par un automate économétrique public, développé sous forme d'une application Streamlit. "
-        r"Cet automate produit l'ensemble du document en format \LaTeX, permettant une compilation et une lecture optimales via la plateforme Overleaf.",
-        r"",
-        r"L'intégralité des analyses, tableaux, graphiques et sections textuelles est générée de manière automatisée par cet outil. "
-        r"Le système repose sur un pipeline économétrique déterministe, garantissant la reproductibilité complète des résultats présentés dans ce rapport.",
-        r"",
-        r"L'automate a été intégralement conçu et codé par nos soins en langage Python. "
-        r"Dans le cadre de ce travail, l'intelligence artificielle a été mobilisée comme outil d'assistance, notamment via l'utilisation de ChatGPT (version 5.2), "
-        r"afin de faciliter certaines étapes de structuration, de rédaction et d'interprétation, sans jamais se substituer aux choix méthodologiques ni à la conception du modèle.",
-        r"",
-        r"Ce projet illustre ainsi une articulation volontairement maîtrisée entre automatisation, intelligence artificielle et rigueur académique, "
-        r"dans une démarche conforme aux exigences scientifiques du Master.",
-        r"",
-        r"\clearpage",
-        "",
-    ]
+    
 
     if run_id:
         main_lines += [r"\textbf{Run ID:} " + _escape_tex(run_id) + r"\\", ""]

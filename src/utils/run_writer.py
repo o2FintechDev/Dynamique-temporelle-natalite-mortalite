@@ -176,20 +176,20 @@ class RunWriter:
 % =================================================
 % PAGE DE GARDE
 % =================================================
-% Page de garde construite manuellement
-% Centrage vertical du contenu principal
-% Encadrement en bas à droite
-% =================================================
+
 
 \begin{document}
 
 \begin{titlepage}
-\thispagestyle{empty} % Pas de numéro de page sur la page de garde
+\thispagestyle{empty}
+
+% Décalage initial pour éviter un démarrage trop haut
+\vspace*{2.5cm}
 
 \vfill
 
 % -------------------------------------------------
-% BLOC CENTRAL (centré verticalement)
+% BLOC CENTRAL (centrage visuel)
 % -------------------------------------------------
 \begin{center}
     {\Large Analyse économétrique automatisée}\\[0.3cm]
@@ -203,7 +203,7 @@ class RunWriter:
     {\large Justine \textsc{Reiter--Guerville}}\\[1.5cm]
 
     {\large Master Monnaie Banque Finance Assurance}\\
-    {\itshape Parcours Systèmes d’Information Économiques et Financiers (SIEF)}\\[0.3cm]
+    {\itshape Parcours Systèmes d'Information Économiques et Financiers (SIEF)}\\[0.3cm]
     Université de Montpellier\\[0.6cm]
     Année universitaire 2025--2026
 \end{center}
@@ -282,6 +282,51 @@ sans jamais se substituer aux choix méthodologiques et scientifiques.
 Ce travail illustre ainsi une articulation maîtrisée entre automatisation,
 intelligence artificielle et rigueur académique,
 conforme aux exigences du Master.
+
+\clearpage
+
+% =================================================
+% ABSTRACT
+% =================================================
+\clearpage
+\thispagestyle{empty}
+
+\begin{center}
+{\Large \textbf{Automate économétrique appliqué à la croissance naturelle en France (1975--2025)}}\\[0.4cm]
+{\large \textit{Analyse automatisée par pipeline économétrique déterministe}}\\[1cm]
+
+Aude Bernier, Clara Pierreuse, Justine Reiter--Guerville\\
+Master Monnaie Banque Finance Assurance -- Parcours SIEF\\
+Université de Montpellier
+\end{center}
+
+\vspace{1cm}
+
+\noindent\textbf{Résumé}
+
+\vspace{0.3cm}
+
+\noindent
+Ce rapport présente une analyse économétrique automatisée de la croissance naturelle de la population française sur la période 1975--2025, définie comme la différence entre les taux de natalité et de mortalité. L’étude repose sur des données mensuelles officielles issues de l’INSEE et s’inscrit dans une démarche de reproductibilité complète grâce à l’utilisation d’un pipeline économétrique entièrement automatisé.
+
+Le cadre méthodologique combine une analyse descriptive approfondie, des décompositions saisonnières, des tests de stationnarité, une modélisation univariée des séries temporelles ainsi qu’une analyse dynamique multivariée. Les choix de modèles et les diagnostics sont réalisés de manière systématique et traçable, garantissant une cohérence méthodologique sur l’ensemble du processus d’analyse.
+
+Les résultats mettent en évidence des évolutions structurelles de long terme de la dynamique démographique française, caractérisées par des tendances persistantes, des composantes saisonnières marquées et des changements de régime potentiels. Ces éléments soulignent l’intérêt des outils économétriques automatisés pour l’analyse démographique et le suivi des politiques publiques dans des contextes temporels complexes.
+
+Ce travail illustre la manière dont l’automatisation et l’assistance par l’intelligence artificielle peuvent renforcer la pratique économétrique, tout en préservant la rigueur scientifique et l’interprétabilité des résultats.
+
+\vspace{0.5cm}
+
+\noindent\textbf{Mots-clés :} Démographie ; Croissance naturelle ; Économétrie des séries temporelles ; Automatisation économétrique ; France
+
+\vspace{0.2cm}
+
+\noindent\textbf{Codes JEL :}  
+C22 (Time-Series Models),  
+C51 (Model Construction and Estimation),  
+J11 (Demographic Trends),  
+J13 (Fertility, Mortality, Family Structure),  
+O38 (Technological Change – Automation and AI)
 
 \clearpage
 
