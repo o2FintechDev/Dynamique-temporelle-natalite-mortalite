@@ -156,24 +156,31 @@ class RunWriter:
 % =================================================
 % PAGE DE GARDE
 % =================================================
+% Page de garde construite manuellement.
+% Elle doit tenir sur UNE SEULE PAGE.
+% On n'utilise PAS \maketitle dans ce fichier.
+
+\begin{document}
+
 \begin{titlepage}
-\thispagestyle{empty}
+\thispagestyle{empty} % Pas de numéro de page sur la page de garde
 
 % -------------------------------------------------
-% Titre
+% TITRE ET SOUS-TITRE
 % -------------------------------------------------
 \begin{center}
     {\Large Analyse économétrique automatisée}\\[0.3cm]
-    {\Large par pipeline déterministe}\\[0.6cm]
+    {\Large par pipeline déterministe}\\[0.8cm]
 
     {\Huge\bfseries Automate économétrique}\\[0.4cm]
     {\LARGE\bfseries Croissance naturelle en France (1975--2025)}
 \end{center}
 
-\vspace{2.5cm}
+% Espacement vertical maîtrisé (évite le débordement sur 2 pages)
+\vspace{2cm}
 
 % -------------------------------------------------
-% Auteurs
+% AUTEURS
 % -------------------------------------------------
 \begin{center}
     {\large Aude \textsc{Bernier}}\\
@@ -181,10 +188,11 @@ class RunWriter:
     {\large Justine \textsc{Reiter--Guerville}}
 \end{center}
 
-\vfill
+% Espacement intermédiaire
+\vspace{2cm}
 
 % -------------------------------------------------
-% Formation
+% FORMATION
 % -------------------------------------------------
 \begin{center}
     {\large Master Monnaie Banque Finance Assurance}\\
@@ -193,21 +201,24 @@ class RunWriter:
     Année universitaire 2025--2026
 \end{center}
 
-\vspace{1.2cm}
+% Remplit l’espace restant pour caler l’encadrement en bas
+\vfill
 
 % -------------------------------------------------
-% Encadrement (NON centré)
+% ENCADREMENT (ALIGNÉ À GAUCHE)
 % -------------------------------------------------
-\vspace{1.2cm}
 \begin{flushleft}
 {\small Sous la supervision de : Monsieur Mestre Roman}
 \end{flushleft}
 
 \end{titlepage}
 
-\begin{document}
+% =================================================
+% DÉBUT DU DOCUMENT PRINCIPAL
+% =================================================
+% IMPORTANT : \maketitle est SUPPRIMÉ volontairement
+% car la page de garde est déjà définie manuellement.
 
-\maketitle
 \tableofcontents
 \listoffigures
 \listoftables
