@@ -4,14 +4,18 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List
 
-import pandas as pd
 import streamlit as st
-from src.visualization.ui_labels import pretty_label
 
+from src.visualization.page_layouts import PAGE_LAYOUTS
+from src.visualization.rendering import render_ordered_page
 
 from src.utils.session_state import get_state
-from src.utils.run_reader import get_run_files, read_manifest, RunManager, read_metric_json, read_table_from_artefact
-
+from src.utils.run_reader import (
+    get_run_files,
+    read_manifest,
+    RunManager,
+    read_metric_json,
+)
 
 PAGE_ID = "1_Exploration"
 PAGE_TITLE = "1 — Exploration"
@@ -25,11 +29,6 @@ def _get_run_id() -> str | None:
     return st.session_state.get("run_id")
 
 
-def _load_manifest(run_id: str) -> Dict[str, Any]:
-    m = read_manifest(run_id)
-    return m or {}
-
-
 def _run_root(run_id: str) -> Path:
     rf = get_run_files(run_id)
     return Path(rf.root)
@@ -38,73 +37,6 @@ def _run_root(run_id: str) -> Path:
 def _filter_items(m: Dict[str, Any], kind: str) -> List[Dict[str, Any]]:
     items = (m.get("artefacts", {}) or {}).get(kind, []) or []
     return [it for it in items if it.get("page") == PAGE_ID]
-
-
-def _abs_path(run_id: str, rel: str) -> Path:
-    return _run_root(run_id) / rel
-
-
-def _render_metrics(run_id: str, items: List[Dict[str, Any]]) -> None:
-    if not items:
-        st.info("Aucune métrique pour cette page.")
-        return
-
-    for it in items:
-        key = it.get("key", "")
-        rel = it.get("path", "")
-        st.subheader(pretty_label(key) if key else "Métrique")
-        if key:
-            st.caption(f"`{key}`")
-
-        p = _abs_path(run_id, rel)
-        try:
-            payload = read_metric_json(p)
-        except Exception as e:
-            st.error(f"Lecture métrique impossible: {rel} ({e})")
-            continue
-
-        if isinstance(payload, dict) and "markdown" in payload:
-            st.markdown(payload["markdown"])
-        else:
-            st.json(payload)
-
-
-def _render_tables(run_id: str, items: List[Dict[str, Any]]) -> None:
-    if not items:
-        st.info("Aucune table pour cette page.")
-        return
-
-    for it in items:
-        key = it.get("key", "")
-        st.subheader(pretty_label(key) if key else "Table")
-        if key:
-            st.caption(f"`{key}`")
-
-
-        try:
-            df = read_table_from_artefact(run_id, it)
-            st.dataframe(df, width="stretch")
-        except Exception as e:
-            st.error(f"Lecture table impossible: {it.get('path','')} ({e})")
-
-
-def _render_figures(run_id: str, items: List[Dict[str, Any]]) -> None:
-    if not items:
-        st.info("Aucune figure pour cette page.")
-        return
-
-    for it in items:
-        key = it.get("key", "")
-        rel = it.get("path", "")
-        st.subheader(pretty_label(key) if key else "Figures")
-        if key:
-            st.caption(f"`{key}`")
-
-        p = _abs_path(run_id, rel)
-        if not p.exists():
-            st.error(f"Figure introuvable: {rel}")
-            continue
-        st.image(str(p), width='stretch')
 
 
 def main() -> None:
@@ -116,11 +48,10 @@ def main() -> None:
         st.warning("Aucun run sélectionné.")
         return
 
-    m = _load_manifest(run_id)
-
+    m = read_manifest(run_id) or {}
     st.caption(f"Run: {run_id}")
 
-    # Step meta
+    # --- Statut Step 1 (inchangé) ---
     steps = m.get("steps", {}) or {}
     s1 = steps.get("step1_load_and_profile", {}) or {}
     st.markdown("### Statut")
@@ -134,25 +65,18 @@ def main() -> None:
         }
     )
 
-    st.markdown("### Note")
-    p_note = RunManager.get_artefact_path("m.note.step1", run_id=run_id)
-    if p_note:
-        payload = read_metric_json(p_note)
-        if isinstance(payload, dict) and "markdown" in payload:
-            st.markdown(payload["markdown"])
-        else:
-            st.json(payload)
-    else:
-        st.info("Note step1 non disponible.")
 
-    st.markdown("### Tables")
-    _render_tables(run_id, _filter_items(m, "tables"))
-
-    st.markdown("### Figures")
-    _render_figures(run_id, _filter_items(m, "figures"))
-
-    st.markdown("### Métriques")
-    _render_metrics(run_id, _filter_items(m, "metrics"))
+    # --- Rendu ordonné (figures / tables) + métriques à la fin ---
+    layout = PAGE_LAYOUTS.get(PAGE_ID, [])
+    render_ordered_page(
+        run_id=run_id,
+        run_root=_run_root(run_id),
+        figs=_filter_items(m, "figures"),
+        tables=_filter_items(m, "tables"),
+        metrics=_filter_items(m, "metrics"),
+        layout=layout,
+        show_unlisted=True,
+    )
 
 
 if __name__ == "__main__":
