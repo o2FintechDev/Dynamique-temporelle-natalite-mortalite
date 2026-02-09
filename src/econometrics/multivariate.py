@@ -1,7 +1,7 @@
 # src/econometrics/multivariate.py
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, Iterable
 
 import numpy as np
 import pandas as pd
@@ -10,6 +10,9 @@ import statsmodels.api as sm
 from statsmodels.tsa.api import VAR
 
 
+# -----------------------------
+# Utils
+# -----------------------------
 def _safe_float(x: Any) -> Optional[float]:
     try:
         v = float(x)
@@ -20,6 +23,81 @@ def _safe_float(x: Any) -> Optional[float]:
         return None
 
 
+def _coerce_numeric_df(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    for c in out.columns:
+        out[c] = pd.to_numeric(out[c], errors="coerce")
+    return out
+
+
+def _align_endog_exog(
+    df_endog: pd.DataFrame, df_exog: Optional[pd.DataFrame]
+) -> tuple[pd.DataFrame, Optional[pd.DataFrame]]:
+    """
+    Alignement strict index endog/exog, coercition numérique.
+    Ne dropna PAS ici (géré au niveau pack).
+    """
+    Y = _coerce_numeric_df(df_endog)
+    if df_exog is None or df_exog.empty:
+        return Y, None
+    X = _coerce_numeric_df(df_exog)
+
+    # intersection d'index, ordre endog
+    idx = Y.index.intersection(X.index)
+    Y = Y.loc[idx]
+    X = X.loc[idx]
+    return Y, X
+
+
+# -----------------------------
+# Corr Matrix + Heatmap
+# -----------------------------
+def corr_matrix(df_endog: pd.DataFrame, df_exog: Optional[pd.DataFrame] = None) -> pd.DataFrame:
+    """
+    Matrice de corrélation sur (endog + exog) après alignement & dropna.
+    """
+    Y, X = _align_endog_exog(df_endog, df_exog)
+    mat = Y if X is None else pd.concat([Y, X], axis=1)
+    mat = mat.dropna()
+    if mat.empty:
+        return pd.DataFrame([])
+    return mat.corr()
+
+
+def corr_heatmap_figure(corr: pd.DataFrame, title: str = "Matrice de corrélation (endog + exog)"):
+    """
+    Figure matplotlib (pas seaborn).
+    """
+    fig, ax = plt.subplots(figsize=(8, 6))
+    if corr is None or corr.empty:
+        ax.text(0.5, 0.5, "Corrélation indisponible (données vides après dropna)", ha="center", va="center")
+        ax.axis("off")
+        fig.suptitle(title)
+        return fig
+
+    im = ax.imshow(corr.values, aspect="auto")
+    ax.set_xticks(range(corr.shape[0]))
+    ax.set_yticks(range(corr.shape[0]))
+    ax.set_xticklabels(list(corr.columns), rotation=45, ha="right")
+    ax.set_yticklabels(list(corr.index))
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+    # annotations légères (optionnel)
+    try:
+        for i in range(corr.shape[0]):
+            for j in range(corr.shape[1]):
+                ax.text(j, i, f"{corr.values[i, j]:.2f}", ha="center", va="center", fontsize=7)
+    except Exception:
+        pass
+
+    fig.suptitle(title)
+    fig.tight_layout()
+    return fig
+
+
+# -----------------------------
+# Sims causality (unchanged)
+# -----------------------------
 def sims_causality_test(
     X: pd.DataFrame, *, caused: str, causing: str, p: int, q: int
 ) -> dict[str, float | int | None]:
@@ -60,20 +138,17 @@ def sims_causality_test(
 
     nobs_used = int(data.shape[0])
 
-    # Trop peu d'observations => NA
     if nobs_used < (p + q + 5):
         return {"stat": float("nan"), "pvalue": float("nan"), "nobs_used": nobs_used}
 
     y_clean = data[caused]
     X_clean = sm.add_constant(data.drop(columns=[caused]), has_constant="add")
-
     res_ols = sm.OLS(y_clean, X_clean).fit()
 
     lead_cols = [c for c in X_clean.columns if c in lead_names]
     if not lead_cols:
         return {"stat": float("nan"), "pvalue": float("nan"), "nobs_used": nobs_used}
 
-    # R beta = 0 pour les leads
     R = []
     for col in lead_cols:
         r = [0.0] * X_clean.shape[1]
@@ -98,34 +173,174 @@ def sims_causality_test(
     return out
 
 
-def var_pack(df_vars: pd.DataFrame, maxlags: int = 12) -> dict[str, Any]:
+# -----------------------------
+# Lag selection robust (VAR / VARX)
+# -----------------------------
+def _lag_grid(
+    model: VAR,
+    *,
+    maxlags: int,
+    p_min: int = 1,
+    whiteness_nlags: Optional[int] = None,
+) -> tuple[pd.DataFrame, dict[int, Any]]:
     """
-    Pack VAR auditable:
-      - sélection de lag (critères)
-      - estimation VAR(p)
-      - diagnostics: stabilité (roots), résidus (whiteness/normalité)
-      - Granger pairwise (fit VAR)
-      - Sims leads tests + audit erreurs
-      - IRF + FEVD
-      - meta + audit payloads
+    Fit p=1..maxlags, stocke IC + diagnostics (stabilité, whiteness).
+    Retourne:
+      - tbl_grid
+      - fitted_results_by_p
     """
-    X0 = df_vars.copy()
-    cols = list(X0.columns)
+    rows: list[dict[str, Any]] = []
+    fitted: dict[int, Any] = {}
 
-    # ---- couverture / nettoyage ----
-    X = X0.dropna().astype(float)
-    nobs_raw = int(X0.shape[0])
-    nobs_used_dropna = int(X.shape[0])
+    for p in range(p_min, maxlags + 1):
+        try:
+            res = model.fit(p)
+            fitted[p] = res
+
+            stable = None
+            max_root_mod = None
+            try:
+                stable = bool(res.is_stable())
+            except Exception:
+                stable = None
+
+            roots = getattr(res, "roots", None)
+            if roots is not None:
+                try:
+                    r = np.asarray(roots, dtype=complex).ravel()
+                    mod = np.abs(r)
+                    max_root_mod = float(np.max(mod)) if mod.size else None
+                    if stable is None and max_root_mod is not None:
+                        stable = bool(max_root_mod < 1.0)
+                except Exception:
+                    max_root_mod = None
+
+            w_p = None
+            try:
+                nl = whiteness_nlags
+                if nl is None:
+                    nl = min(12, max(1, p))
+                w = res.test_whiteness(nlags=int(nl))
+                w_p = _safe_float(getattr(w, "pvalue", None))
+            except Exception:
+                w_p = None
+
+            rows.append(
+                {
+                    "p": int(p),
+                    "aic": _safe_float(getattr(res, "aic", None)),
+                    "bic": _safe_float(getattr(res, "bic", None)),
+                    "hqic": _safe_float(getattr(res, "hqic", None)),
+                    "fpe": _safe_float(getattr(res, "fpe", None)),
+                    "nobs": int(getattr(res, "nobs", 0)),
+                    "stable": stable,
+                    "max_root_modulus": max_root_mod,
+                    "whiteness_pvalue": w_p,
+                }
+            )
+        except Exception as e:
+            rows.append({"p": int(p), "error": type(e).__name__})
+            continue
+
+    tbl = pd.DataFrame(rows)
+    return tbl, fitted
+
+
+def _choose_p_from_grid(
+    grid: pd.DataFrame,
+    *,
+    prefer: str = "bic",
+    whiteness_alpha: float = 0.05,
+    require_stable: bool = True,
+) -> Optional[int]:
+    """
+    Politique ferme:
+    - Filtre: stable==True si require_stable
+    - Filtre: whiteness_pvalue > alpha si dispo
+    - Sélection: min(prefer) sinon fallback min(aic)
+    """
+    if grid is None or grid.empty or "p" not in grid.columns:
+        return None
+
+    g = grid.copy()
+
+    # garde uniquement lignes valides
+    g = g[g["p"].notna()]
+
+    if require_stable and "stable" in g.columns:
+        g = g[g["stable"] == True]  # noqa: E712
+
+    if "whiteness_pvalue" in g.columns:
+        g_ok = g[g["whiteness_pvalue"].notna() & (g["whiteness_pvalue"] > float(whiteness_alpha))]
+        if not g_ok.empty:
+            g = g_ok  # sinon on garde g (dégradé)
+
+    # critère
+    crit = prefer.lower()
+    if crit not in g.columns or g[crit].isna().all():
+        crit = "aic"
+    if crit not in g.columns or g[crit].isna().all():
+        return None
+
+    g2 = g[g[crit].notna()].sort_values(by=crit, ascending=True)
+    if g2.empty:
+        return None
+    return int(g2.iloc[0]["p"])
+
+
+# -----------------------------
+# Main pack: VAR / VARX
+# -----------------------------
+def var_pack(
+    df_vars: pd.DataFrame,
+    maxlags: int = 12,
+    *,
+    df_exog: Optional[pd.DataFrame] = None,
+    prefer_ic: str = "bic",
+    whiteness_alpha: float = 0.05,
+    require_stable: bool = True,
+) -> dict[str, Any]:
+    """
+    Pack VAR / VARX auditable (compat: l'appel existant reste OK).
+
+    Ajouts:
+      - Matrice corr (endog + exog) + heatmap
+      - VARX (exog) via param df_exog
+      - Choix p robuste via grid (IC + stabilité + blancheur)
+      - FEVD tableau (déjà) + grid lag table
+    """
+    # ---- corr au début (endog + exog) ----
+    corr = corr_matrix(df_vars, df_exog=df_exog)
+    fig_corr = corr_heatmap_figure(corr)
+
+    # ---- align + nettoyage ----
+    Y0, X0 = _align_endog_exog(df_vars, df_exog)
+    cols = list(Y0.columns)
+    exog_cols = list(X0.columns) if X0 is not None else []
+
+    if X0 is None:
+        XY = Y0.copy()
+    else:
+        XY = pd.concat([Y0, X0], axis=1)
+
+    nobs_raw = int(XY.shape[0])
+    XY_clean = XY.dropna().astype(float)
+    nobs_used_dropna = int(XY_clean.shape[0])
     dropna_rows = int(nobs_raw - nobs_used_dropna)
 
+    # split clean
+    Y = XY_clean[cols]
+    X = XY_clean[exog_cols] if exog_cols else None
+
     # Protection minimale
-    if X.shape[0] < 10 or X.shape[1] < 2:
+    if Y.shape[0] < 10 or Y.shape[1] < 2:
         note5 = (
-            "**Étape 5 — VAR** : données insuffisantes pour estimer un VAR multivarié "
-            f"(nobs_used={X.shape[0]}, k={X.shape[1]})."
+            "**Étape 5 — VAR/VARX** : données insuffisantes pour estimer un VAR multivarié "
+            f"(nobs_used={Y.shape[0]}, k={Y.shape[1]})."
         )
         return {
             "tables": {
+                "tbl.multi.corr": corr,
                 "tbl.var.lag_selection": pd.DataFrame(
                     {
                         "aic": [np.nan],
@@ -133,13 +348,16 @@ def var_pack(df_vars: pd.DataFrame, maxlags: int = 12) -> dict[str, Any]:
                         "hqic": [np.nan],
                         "fpe": [np.nan],
                         "maxlags": [int(maxlags)],
-                        "selected_aic": [np.nan],
+                        "selected_p": [np.nan],
+                        "prefer_ic": [prefer_ic],
+                        "has_exog": [bool(exog_cols)],
                         "nobs_raw": [nobs_raw],
                         "nobs_used": [nobs_used_dropna],
                         "rows_dropped_dropna": [dropna_rows],
                     },
                     index=["lag_selection"],
                 ),
+                "tbl.var.lag_grid": pd.DataFrame([]),
                 "tbl.var.granger": pd.DataFrame([]),
                 "tbl.var.sims": pd.DataFrame([]),
                 "tbl.var.fevd": pd.DataFrame([]),
@@ -147,8 +365,10 @@ def var_pack(df_vars: pd.DataFrame, maxlags: int = 12) -> dict[str, Any]:
             "metrics": {
                 "m.var.meta": {
                     "vars": cols,
+                    "exog": exog_cols,
                     "k": int(len(cols)),
-                    "selected_lag_aic": None,
+                    "selected_p": None,
+                    "prefer_ic": prefer_ic,
                     "maxlags": int(maxlags),
                     "nobs_raw": nobs_raw,
                     "nobs_used": nobs_used_dropna,
@@ -156,60 +376,65 @@ def var_pack(df_vars: pd.DataFrame, maxlags: int = 12) -> dict[str, Any]:
                     "irf_h": None,
                     "fevd_h": None,
                 },
-                "m.var.sims": {
-                    "lead_q_tested": [],
-                    "method": "joint_f_test_on_leads (OLS eq-by-eq, Sims)",
-                    "n_errors": 0,
-                    "min_nobs_used": None,
-                },
-                "m.var.audit": {
-                    "selection": None,
-                    "data": {
-                        "vars": cols,
-                        "nobs_raw": nobs_raw,
-                        "nobs_used_dropna": nobs_used_dropna,
-                        "rows_dropped_dropna": dropna_rows,
-                        "index_start": str(X.index.min()) if nobs_used_dropna else None,
-                        "index_end": str(X.index.max()) if nobs_used_dropna else None,
-                    },
-                    "diagnostics": None,
-                    "tests": None,
-                },
                 "m.note.step5": {"markdown": note5, "key_points": {}},
             },
             "models": {},
-            "figures": {},
+            "figures": {
+                "fig.multi.corr_heatmap": fig_corr,
+            },
         }
 
-    model = VAR(X)
-    sel = model.select_order(maxlags=maxlags)
+    # ---- build VAR/VARX model ----
+    model = VAR(Y, exog=X) if X is not None else VAR(Y)
 
-    # sélection AIC par défaut
-    # (statsmodels peut renvoyer float/np.int64)
-    p = int(sel.aic)
+    # ---- lag grid + choix p robuste ----
+    grid, fitted = _lag_grid(model, maxlags=maxlags)
+    p = _choose_p_from_grid(
+        grid,
+        prefer=prefer_ic,
+        whiteness_alpha=whiteness_alpha,
+        require_stable=require_stable,
+    )
 
-    res = model.fit(p)
+    # fallback: select_order si grid KO
+    if p is None:
+        sel = model.select_order(maxlags=maxlags)
+        try:
+            p = int(sel.bic) if str(prefer_ic).lower() == "bic" else int(sel.aic)
+        except Exception:
+            p = int(getattr(sel, "aic", 1) or 1)
+
+    res = fitted.get(int(p))
+    if res is None:
+        res = model.fit(int(p))
 
     # -----------------------------
-    # Table sélection de lag
+    # Table sélection de lag (résumé)
     # -----------------------------
+    # IC du modèle retenu
     tbl_sel = pd.DataFrame(
         {
-            "aic": [float(sel.aic)],
-            "bic": [float(sel.bic)],
-            "hqic": [float(sel.hqic)],
-            "fpe": [float(sel.fpe)],
+            "aic": [_safe_float(getattr(res, "aic", None))],
+            "bic": [_safe_float(getattr(res, "bic", None))],
+            "hqic": [_safe_float(getattr(res, "hqic", None))],
+            "fpe": [_safe_float(getattr(res, "fpe", None))],
             "maxlags": [int(maxlags)],
-            "selected_aic": [int(p)],
+            "selected_p": [int(p)],
+            "prefer_ic": [str(prefer_ic)],
+            "require_stable": [bool(require_stable)],
+            "whiteness_alpha": [float(whiteness_alpha)],
+            "has_exog": [bool(exog_cols)],
             "nobs_raw": [nobs_raw],
-            "nobs_used": [int(res.nobs)],
+            "nobs_used": [int(getattr(res, "nobs", Y.shape[0]))],
             "rows_dropped_dropna": [dropna_rows],
+            "endog_vars": [", ".join(cols)],
+            "exog_vars": [", ".join(exog_cols) if exog_cols else ""],
         },
         index=["lag_selection"],
     )
 
     # -----------------------------
-    # Granger (pairwise)
+    # Granger (pairwise) sur endog
     # -----------------------------
     granger_rows: list[dict[str, Any]] = []
     for caused in cols:
@@ -230,18 +455,9 @@ def var_pack(df_vars: pd.DataFrame, maxlags: int = 12) -> dict[str, Any]:
                 )
             except Exception as e:
                 granger_rows.append(
-                    {
-                        "caused": caused,
-                        "causing": causing,
-                        "stat": None,
-                        "pvalue": None,
-                        "error": type(e).__name__,
-                    }
+                    {"caused": caused, "causing": causing, "stat": None, "pvalue": None, "error": type(e).__name__}
                 )
-
     tbl_granger = pd.DataFrame(granger_rows).replace([np.inf, -np.inf], np.nan)
-
-    # Nettoyage df_* si totalement vides
     for c in ["df_num", "df_denom"]:
         if c in tbl_granger.columns and tbl_granger[c].isna().all():
             tbl_granger = tbl_granger.drop(columns=[c])
@@ -250,7 +466,6 @@ def var_pack(df_vars: pd.DataFrame, maxlags: int = 12) -> dict[str, Any]:
 
     # -----------------------------
     # Sims (leads) : q=1..p
-    # + audit erreurs / couverture
     # -----------------------------
     sims_rows: list[dict[str, Any]] = []
     sims_errors = 0
@@ -258,9 +473,9 @@ def var_pack(df_vars: pd.DataFrame, maxlags: int = 12) -> dict[str, Any]:
         for causing in cols:
             if caused == causing:
                 continue
-            for q in range(1, p + 1):
+            for q in range(1, int(p) + 1):
                 try:
-                    t = sims_causality_test(X, caused=caused, causing=causing, p=p, q=q)
+                    t = sims_causality_test(Y, caused=caused, causing=causing, p=int(p), q=int(q))
                     sims_rows.append(
                         {
                             "caused": caused,
@@ -295,16 +510,15 @@ def var_pack(df_vars: pd.DataFrame, maxlags: int = 12) -> dict[str, Any]:
     irf = res.irf(irf_h)
     fig_irf = irf.plot(orth=False)
     try:
-        fig_irf.suptitle("IRF (VAR)")
+        fig_irf.suptitle("IRF (VAR/VARX)")
     except Exception:
         pass
 
     # -----------------------------
-    # FEVD (horizon 12)
+    # FEVD (horizon 12) : endog-only
     # -----------------------------
     fevd_h = 12
     fevd = res.fevd(fevd_h)
-
     fevd_rows: list[dict[str, Any]] = []
     for i, target in enumerate(cols):
         m = fevd.decomp[:, i, :]  # (h, shocks)
@@ -316,13 +530,12 @@ def var_pack(df_vars: pd.DataFrame, maxlags: int = 12) -> dict[str, Any]:
     tbl_fevd = pd.DataFrame(fevd_rows)
 
     # -----------------------------
-    # Diagnostics VAR: stabilité + résidus
+    # Diagnostics
     # -----------------------------
     stable: Optional[bool] = None
     max_root_modulus: Optional[float] = None
     roots_modulus: Optional[list[float]] = None
 
-    # Stabilité native (source de vérité si dispo)
     try:
         stable = bool(res.is_stable())
     except Exception:
@@ -345,7 +558,7 @@ def var_pack(df_vars: pd.DataFrame, maxlags: int = 12) -> dict[str, Any]:
     normality_pvalue: Optional[float] = None
 
     try:
-        w = res.test_whiteness(nlags=min(12, max(1, p)))
+        w = res.test_whiteness(nlags=min(12, max(1, int(p))))
         whiteness_pvalue = _safe_float(getattr(w, "pvalue", None))
     except Exception:
         whiteness_pvalue = None
@@ -363,22 +576,26 @@ def var_pack(df_vars: pd.DataFrame, maxlags: int = 12) -> dict[str, Any]:
         sigma_u = None
 
     # -----------------------------
-    # Metrics (meta + sims + audit)
+    # Metrics
     # -----------------------------
     metrics_meta = {
         "vars": cols,
+        "exog": exog_cols,
         "k": int(len(cols)),
-        "selected_lag_aic": int(p),
+        "selected_p": int(p),
+        "prefer_ic": str(prefer_ic),
         "maxlags": int(maxlags),
         "nobs_raw": nobs_raw,
-        "nobs_used": int(res.nobs),
+        "nobs_used": int(getattr(res, "nobs", Y.shape[0])),
         "rows_dropped_dropna": dropna_rows,
         "irf_h": int(irf_h),
         "fevd_h": int(fevd_h),
+        "require_stable": bool(require_stable),
+        "whiteness_alpha": float(whiteness_alpha),
     }
 
     sims_meta = {
-        "lead_q_tested": list(range(1, p + 1)),
+        "lead_q_tested": list(range(1, int(p) + 1)),
         "method": "joint_f_test_on_leads (OLS eq-by-eq, Sims)",
         "n_errors": int(sims_errors),
         "min_nobs_used": (
@@ -389,21 +606,19 @@ def var_pack(df_vars: pd.DataFrame, maxlags: int = 12) -> dict[str, Any]:
     }
 
     metrics_audit = {
-        "selection": {
-            "aic": float(sel.aic),
-            "bic": float(sel.bic),
-            "hqic": float(sel.hqic),
-            "fpe": float(sel.fpe),
-            "selected_lag_aic": int(p),
-            "maxlags": int(maxlags),
-        },
         "data": {
-            "vars": cols,
+            "endog_vars": cols,
+            "exog_vars": exog_cols,
             "nobs_raw": nobs_raw,
             "nobs_used_dropna": nobs_used_dropna,
             "rows_dropped_dropna": dropna_rows,
-            "index_start": str(X.index.min()) if nobs_used_dropna else None,
-            "index_end": str(X.index.max()) if nobs_used_dropna else None,
+            "index_start": str(Y.index.min()) if nobs_used_dropna else None,
+            "index_end": str(Y.index.max()) if nobs_used_dropna else None,
+        },
+        "lag_grid": {
+            "prefer_ic": str(prefer_ic),
+            "require_stable": bool(require_stable),
+            "whiteness_alpha": float(whiteness_alpha),
         },
         "diagnostics": {
             "stable": stable,
@@ -421,15 +636,21 @@ def var_pack(df_vars: pd.DataFrame, maxlags: int = 12) -> dict[str, Any]:
     }
 
     note5 = (
-        f"**Étape 5 — VAR(p)** : sélection AIC → p={p}, variables={cols}, nobs={int(res.nobs)}. "
+        f"**Étape 5 — VAR/VARX(p)** : choix p={p} (préférence={prefer_ic}, stable={require_stable}, "
+        f"blancheur α={whiteness_alpha}). nobs={int(getattr(res, 'nobs', Y.shape[0]))}, "
+        f"endog={cols}, exog={exog_cols if exog_cols else '∅'}. "
         f"Stabilité={stable} (max|root|={max_root_modulus}). "
         f"Whiteness p={whiteness_pvalue}, normalité p={normality_pvalue}. "
-        "IRF/FEVD décrivent la dynamique interne; Granger/Sims = dépendance prédictive (pas causalité structurelle)."
+        "FEVD/IRF décrivent la dynamique des endogènes; les exogènes sont des contrôles (pas de FEVD par exog)."
     )
 
     return {
         "tables": {
+            # NEW (multi start)
+            "tbl.multi.corr": corr,
+            # VAR/VARX
             "tbl.var.lag_selection": tbl_sel,
+            "tbl.var.lag_grid": grid,
             "tbl.var.granger": tbl_granger,
             "tbl.var.sims": tbl_sims,
             "tbl.var.fevd": tbl_fevd,
@@ -441,5 +662,10 @@ def var_pack(df_vars: pd.DataFrame, maxlags: int = 12) -> dict[str, Any]:
             "m.note.step5": {"markdown": note5, "key_points": metrics_meta},
         },
         "models": {"model.var.best": res},
-        "figures": {"fig.var.irf": fig_irf},
+        "figures": {
+            # NEW
+            "fig.multi.corr_heatmap": fig_corr,
+            # existing
+            "fig.var.irf": fig_irf,
+        },
     }
