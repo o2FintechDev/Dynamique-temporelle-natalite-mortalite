@@ -295,6 +295,7 @@ def render_sec_univariate(
     # --- Grilles de sélection (trop volumineux -> annexe/artefacts)
     if tbl_ar or tbl_ma or tbl_arma:
         lines += [
+            r"\paragraph{Tableau 2 — Grille complète des candidats AR/MA/ARMA}",
             md_basic_to_tex(
                 "**Annexe (sélection Box–Jenkins)** : grilles complètes AR/MA/ARMA disponibles dans les artefacts "
                 "(non insérées dans le corps pour préserver la lisibilité)."
@@ -370,7 +371,7 @@ def render_sec_univariate(
             narr_call("tbl.uni.memory"),
             "",
         ]
-        
+
         lines += [
             r"\paragraph{Analyse — mémoire longue (lecture empirique)}",
             md_basic_to_tex(
