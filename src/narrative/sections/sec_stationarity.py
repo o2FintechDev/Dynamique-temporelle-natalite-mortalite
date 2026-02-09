@@ -53,7 +53,7 @@ def render_sec_stationarity(
     lines: list[str] = []
 
     # ============================================================
-    # SECTION 1 : Cadre théorique (texte structurant)
+    # SECTION : Cadre théorique (texte structurant)
     # ============================================================
     lines += [
         r"\section{Diagnostics statistiques et stationnarité}",
@@ -66,14 +66,14 @@ def render_sec_stationarity(
             "les transformations nécessaires avant toute modélisation dynamique."
         ),
         "",
-        r"\subsection*{3.1 Notion formelle de stationnarité}",
+        r"\subsection*{Notion formelle de stationnarité}",
         md_basic_to_tex(
             "En pratique, on retient la stationnarité au second ordre : (i) une espérance constante, "
             "(ii) une variance finie et constante, et (iii) une autocovariance dépendant uniquement du décalage. "
             "La non-stationnarité viole ces conditions et empêche l’utilisation directe des outils ARMA classiques."
         ),
         "",
-        r"\subsection*{3.2 Processus TS versus DS : enjeu conceptuel}",
+        r"\subsection*{Processus TS versus DS : enjeu conceptuel}",
         md_basic_to_tex(
             "Deux familles doivent être distinguées. "
             "Processus à tendance déterministe (TS) : les chocs sont transitoires et la série revient vers une tendance. "
@@ -88,14 +88,14 @@ def render_sec_stationarity(
         r"Y_t = Y_{t-1} + \varepsilon_t",
         r"\end{equation}",
         "",
-        r"\subsection*{3.3 Analyse corrélographique : ACF et PACF}",
+        r"\subsection*{Analyse corrélographique : ACF et PACF}",
         md_basic_to_tex(
             "Avant tout test formel, ACF/PACF fournissent une information qualitative sur la persistance. "
             "Une décroissance lente de l’ACF est typique d’une non-stationnarité, alors qu’une coupure rapide suggère une stationnarité. "
             "Ces outils restent indicatifs : la décision doit être statistique."
         ),
         "",
-        r"\subsection*{3.4 Test de Dickey-Fuller augmenté (ADF)}",
+        r"\subsection*{Test de Dickey-Fuller augmenté (ADF)}",
         md_basic_to_tex(
             "Le test ADF est l’outil central de détection de racine unitaire. Il estime une régression en différence "
             "incluant des retards pour purger l’autocorrélation des résidus. Trois spécifications sont à considérer : "
@@ -114,13 +114,13 @@ def render_sec_stationarity(
             "Il détecte les cas fragiles où le rejet/non-rejet de $H_0$ dépend fortement de la paramétrisation."
         ),
         "",
-        r"\subsection*{3.7 Limites des tests de racine unitaire}",
+        r"\subsection*{Limites des tests de racine unitaire}",
         md_basic_to_tex(
             "Limites classiques : faible puissance, sensibilité aux ruptures structurelles, confusion entre mémoire longue et racine unitaire. "
             "Un non-rejet de $H_0$ n’est pas une preuve définitive de non-stationnarité."
         ),
         "",
-        r"\subsection*{3.8 Décision finale et transformation de la série}",
+        r"\subsection*{Décision finale et transformation de la série}",
         md_basic_to_tex(
             "La décision économétrique synthétise les diagnostics. Trois cas : stationnarité en niveau (rien), "
             "stationnarité autour d’une tendance (détrendage), stationnarité en différence (différenciation). "
@@ -131,7 +131,7 @@ def render_sec_stationarity(
         r"\Delta Y_t = Y_t - Y_{t-1}",
         r"\end{equation}",
         "",
-        r"\subsection*{3.9 Implications pour la suite de l’analyse}",
+        r"\subsection*{Implications pour la suite de l’analyse}",
         md_basic_to_tex(
             "La stationnarité pilote l’identification AR/MA, l’estimation univariée, la validité multivariée et la cointégration. "
             "Une erreur ici se propage mécaniquement à toutes les étapes suivantes."
@@ -143,7 +143,7 @@ def render_sec_stationarity(
     # SECTION 2 : Résultats empiriques (artefacts + analyses)
     # ============================================================
     lines += [
-        r"\section{Résultats des diagnostics (Step3)}",
+        r"\section{Résultats des diagnostics}",
         "",
         md_basic_to_tex(
             f"Synthèse quantitative : **verdict ADF-only = {verdict}** "
@@ -182,7 +182,7 @@ def render_sec_stationarity(
 
     if tbl_adf:
         lines += [
-            r"\paragraph{Tableau 1 — Test ADF (Step3)}",
+            r"\paragraph{Tableau 1 — Test ADF (diagnostic principal)}",
             md_basic_to_tex(
                 "Lecture : comparer les p-values et la cohérence entre spécifications (avec/sans tendance). "
                 "Une conclusion instable selon la spécification signale une frontière TS/DS, une rupture non modélisée, ou une persistance élevée."
@@ -234,7 +234,7 @@ def render_sec_stationarity(
 
     if note_md.strip():
         lines += [
-            md_basic_to_tex("**Note d’interprétation automatisée (Step3)**"),
+            md_basic_to_tex("**Note d’interprétation automatisée**"),
             md_basic_to_tex(
                 "Cette note doit être strictement cohérente avec ADF, bande et tableau TS/DS. "
                 "Toute mention de transformation retenue doit reprendre explicitement le verdict et les p-values clés."

@@ -47,7 +47,7 @@ def render_sec_descriptive(
     lines: list[str] = []
 
     # ============================================================
-    # SECTION 1 : Analyse descriptive (texte structurant)
+    # SECTION : Analyse descriptive (texte structurant)
     # ============================================================
     lines += [
         r"\section{Analyse descriptive et décomposition de la série}",
@@ -59,7 +59,7 @@ def render_sec_descriptive(
             "elle conditionne directement le choix des tests de stationnarité et des modèles dynamiques."
         ),
         "",
-        r"\subsection*{2.1 Représentation graphique et analyse qualitative}",
+        r"\subsection*{Représentation graphique et analyse qualitative}",
         md_basic_to_tex(
             "La représentation graphique de la croissance naturelle en niveau permet une première lecture de la dynamique temporelle. "
             "La visualisation vise à identifier : (i) une tendance de long terme, (ii) d’éventuels cycles de moyen terme, "
@@ -85,7 +85,7 @@ def render_sec_descriptive(
         ]
 
     lines += [
-        r"\subsection*{2.2 Décomposition formelle de la série temporelle}",
+        r"\subsection*{Décomposition formelle de la série temporelle}",
         md_basic_to_tex(
             "Afin de structurer l’analyse, la série est décomposée selon un schéma additif classique :"
         ),
@@ -100,7 +100,7 @@ def render_sec_descriptive(
             "déforme ACF/PACF et les diagnostics ultérieurs."
         ),
         "",
-        r"\subsection*{2.3 Analyse de la tendance}",
+        r"\subsection*{Analyse de la tendance}",
         md_basic_to_tex(
             "La tendance traduit l’évolution structurelle de long terme. Elle peut être déterministe (fonction explicite du temps) "
             "ou stochastique (accumulation de chocs permanents). Cette distinction est critique : elle conditionne TS/DS et le traitement "
@@ -108,7 +108,7 @@ def render_sec_descriptive(
             "notamment dans les tests de racine unitaire."
         ),
         "",
-        r"\subsection*{2.4 Analyse de la saisonnalité : cadre théorique}",
+        r"\subsection*{Analyse de la saisonnalité : cadre théorique}",
         md_basic_to_tex(
             "Une saisonnalité mal spécifiée a des conséquences directes : distorsion des autocorrélations, perte de puissance des tests de "
             "stationnarité, et identification erronée des ordres AR/MA. Quatre configurations doivent être envisagées : "
@@ -116,27 +116,27 @@ def render_sec_descriptive(
             "et saisonnalité évolutive (amplitude/forme variable)."
         ),
         "",
-        r"\subsection*{2.5 Conséquences économétriques de la saisonnalité}",
+        r"\subsection*{Conséquences économétriques de la saisonnalité}",
         md_basic_to_tex(
             "Conclusion opérationnelle : l’analyse de la saisonnalité doit précéder toute estimation ARMA/ARIMA. "
             "C’est un prérequis pour interpréter correctement ACF/PACF et calibrer les différenciations éventuelles."
         ),
         "",
-        r"\subsection*{2.6 Analyse descriptive de la volatilité}",
+        r"\subsection*{Analyse descriptive de la volatilité}",
         md_basic_to_tex(
             "La volatilité descriptive correspond à l’étude de la dispersion dans le temps. En démographie, une variance relativement stable "
             "est attendue hors chocs exceptionnels (crises sanitaires, épisodes extrêmes). Une hausse persistante de variance peut signaler "
             "une rupture, un changement de régime, ou une transformation du DGP, et prépare la discussion sur les diagnostics résiduels."
         ),
         "",
-        r"\subsection*{2.7 Détection visuelle des ruptures structurelles}",
+        r"\subsection*{Détection visuelle des ruptures structurelles}",
         md_basic_to_tex(
             "L’analyse graphique permet d’identifier des dates candidates de rupture, potentiellement liées à politiques familiales, chocs "
             "macro-économiques, ou événements sanitaires. Toute rupture repérée ici doit être considérée lors de l’interprétation des tests "
             "de stationnarité et des modèles, car les ruptures non modélisées biaisent les inférences."
         ),
         "",
-        r"\subsection*{2.8 Rôle de l’analyse descriptive dans la stratégie globale}",
+        r"\subsection*{Rôle de l’analyse descriptive dans la stratégie globale}",
         md_basic_to_tex(
             "Cette étape joue un rôle structurant : elle formalise des hypothèses plausibles sur la stationnarité, oriente les tests, "
             "et limite les erreurs de spécification dans les modèles dynamiques. Elle sert de pont entre la construction des données "
@@ -203,7 +203,7 @@ def render_sec_descriptive(
 
     if note_md.strip():
         lines += [
-            md_basic_to_tex("**Note d’interprétation automatisée (Step2)**"),
+            md_basic_to_tex("**Note d’interprétation automatisée**"),
             md_basic_to_tex(
                 "La table détaillée des composantes est disponible dans les artefacts (tables) ; le rapport présente une synthèse et les graphiques. "
                 "Toute affirmation sur tendance/saisonnalité doit être justifiée par les artefacts ci-dessus."

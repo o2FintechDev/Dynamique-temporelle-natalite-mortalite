@@ -158,13 +158,13 @@ def render_sec_univariate(
             "La méthodologie de Box–Jenkins fournit un cadre systématique fondé sur : identification, estimation et validation."
         ),
         "",
-        r"\subsection*{4.1 Cadre probabiliste général}",
+        r"\subsection*{Cadre probabiliste général}",
         md_basic_to_tex(
             "On considère une série stationnaire au second ordre : espérance constante, variance finie, autocovariance ne dépendant que du retard. "
             "Le terme d’erreur est supposé bruit blanc, non autocorrélé et de variance constante."
         ),
         "",
-        r"\subsection*{4.2 Modèles autorégressifs AR(p)}",
+        r"\subsection*{Modèles autorégressifs AR(p)}",
         "",
         r"\begin{equation}",
         r"Y_t = c + \sum_{i=1}^{p}\phi_i Y_{t-i} + \varepsilon_t",
@@ -177,7 +177,7 @@ def render_sec_univariate(
             "Lecture économique : un $p$ élevé traduit une inertie démographique importante."
         ),
         "",
-        r"\subsection*{4.3 Modèles à moyenne mobile MA(q)}",
+        r"\subsection*{Modèles à moyenne mobile MA(q)}",
         "",
         r"\begin{equation}",
         r"Y_t = c + \varepsilon_t + \sum_{j=1}^{q}\theta_j \varepsilon_{t-j}",
@@ -190,7 +190,7 @@ def render_sec_univariate(
             "Lecture économique : capte des chocs ponctuels (ex. crises sanitaires temporaires)."
         ),
         "",
-        r"\subsection*{4.4 Modèles ARMA(p,q)}",
+        r"\subsection*{Modèles ARMA(p,q)}",
         "",
         r"\begin{equation}",
         r"Y_t = c + \sum_{i=1}^{p}\phi_i Y_{t-i} + \varepsilon_t + \sum_{j=1}^{q}\theta_j \varepsilon_{t-j}",
@@ -201,7 +201,7 @@ def render_sec_univariate(
             "L’identification ACF/PACF est souvent ambiguë : la sélection finale repose sur des critères d’information."
         ),
         "",
-        r"\subsection*{4.5 Modèles ARIMA(p,d,q)}",
+        r"\subsection*{Modèles ARIMA(p,d,q)}",
         md_basic_to_tex(
             "Lorsque la série est intégrée d’ordre $d$, on estime un ARMA sur la série transformée. "
             "Un $d=1$ traduit l’existence de chocs permanents."
@@ -225,20 +225,20 @@ def render_sec_univariate(
         r"BIC = -2\ell + k\ln(T)",
         r"\end{equation}",
         "",
-        r"\subsection*{4.8 Diagnostics des résidus}",
+        r"\subsection*{Diagnostics des résidus}",
         md_basic_to_tex(
             "Un modèle correctement spécifié produit des résidus assimilables à un bruit blanc : "
             "absence d’autocorrélation (Ljung–Box), normalité raisonnable, variance stable. "
             "Toute autocorrélation résiduelle signale une mauvaise spécification de $p$ ou $q$."
         ),
         "",
-        r"\subsection*{4.9 Limites des modèles univariés}",
+        r"\subsection*{Limites des modèles univariés}",
         md_basic_to_tex(
             "Limites : absence de déterminants explicites, confusion possible entre mémoire longue et racine unitaire, "
             "interprétation économique parfois restreinte. Ces limites justifient l’analyse de la mémoire et l’extension multivariée."
         ),
         "",
-        r"\subsection*{4.10 Rôle dans la stratégie globale}",
+        r"\subsection*{Rôle dans la stratégie globale}",
         md_basic_to_tex(
             "Cette étape fournit un benchmark, stabilise l’identification, et sert de contrôle de cohérence "
             "avant les modèles multivariés."
@@ -247,10 +247,10 @@ def render_sec_univariate(
     ]
 
     # ============================================================
-    # SECTION 2 : Résultats empiriques (Step4)
+    # SECTION : Résultats empiriques
     # ============================================================
     lines += [
-        r"\section{Résultats de la modélisation univariée (Step4)}",
+        r"\section{Résultats de la modélisation univariée}",
         "",
         md_basic_to_tex(
             f"Synthèse quantitative : **{best_label}**. "
@@ -358,7 +358,7 @@ def render_sec_univariate(
 
     if note_md.strip():
         lines += [
-            md_basic_to_tex("**Note d’interprétation automatisée (Step4)**"),
+            md_basic_to_tex("**Note d’interprétation automatisée**"),
             md_basic_to_tex(
                 "Cette note doit rester cohérente avec : (i) le choix ARIMA, (ii) les critères d’information, "
                 "(iii) les diagnostics résiduels. Toute conclusion de “bon modèle” exige une blancheur acceptable."
@@ -392,7 +392,7 @@ def render_sec_univariate(
             "courte implicite des modèles ARMA et justifie le recours à des outils spécifiques."
         ),
         "",
-        r"\subsection*{5.1 Mémoire courte versus mémoire longue}",
+        r"\subsection*{Mémoire courte versus mémoire longue}",
         md_basic_to_tex(
             "Mémoire courte : la somme des autocorrélations est absolument convergente. "
             "Mémoire longue : la somme diverge et l’autocorrélation décroît selon une loi hyperbolique."
@@ -409,14 +409,14 @@ def render_sec_univariate(
         r"\rho(h) \sim C h^{2H-2}\quad \text{lorsque } h\to\infty",
         r"\end{equation}",
         "",
-        r"\subsection*{5.2 Fondements théoriques de la mémoire longue}",
+        r"\subsection*{Fondements théoriques de la mémoire longue}",
         md_basic_to_tex(
             "La mémoire longue traduit des mécanismes d’agrégation et des rigidités institutionnelles générant une persistance de long terme. "
             "En démographie : structures familiales stables, politiques publiques durables, inerties biologiques et sociales. "
             "Économétriquement, elle peut être confondue avec une racine unitaire, d’où la nécessité de diagnostics robustes."
         ),
         "",
-        r"\subsection*{5.3 Statistique du Rescaled Range (R/S)}",
+        r"\subsection*{Statistique du Rescaled Range (R/S)}",
         md_basic_to_tex(
             "L’approche R/S (Hurst) examine la croissance de l’amplitude cumulée des écarts à la moyenne."
         ),
@@ -435,14 +435,14 @@ def render_sec_univariate(
         r"\mathbb{E}\left[\frac{R(n)}{S(n)}\right]=C n^{H}",
         r"\end{equation}",
         "",
-        r"\subsection*{5.4 Exposant de Hurst : interprétation}",
+        r"\subsection*{Exposant de Hurst : interprétation}",
         md_basic_to_tex(
             "H=0,5 : absence de mémoire longue (bruit blanc/ARMA). "
             "H>0,5 : persistance (les chocs tendent à se prolonger). "
             "H<0,5 : antipersistence (retour rapide vers la moyenne)."
         ),
         "",
-        r"\subsection*{5.5 Lien entre Hurst et intégration fractionnaire}",
+        r"\subsection*{Lien entre Hurst et intégration fractionnaire}",
         "",
         r"\begin{equation}",
         r"H=d+\frac{1}{2}",
@@ -453,7 +453,7 @@ def render_sec_univariate(
             "Ce lien conduit naturellement aux modèles ARFIMA."
         ),
         "",
-        r"\subsection*{5.6 Modèles ARFIMA(p,d,q)}",
+        r"\subsection*{Modèles ARFIMA(p,d,q)}",
         "",
         r"\begin{equation}",
         r"\Phi(L)(1-L)^{d}Y_t=\Theta(L)\varepsilon_t",
@@ -463,13 +463,13 @@ def render_sec_univariate(
             "Le paramètre d capture l’intensité de la mémoire longue : persistance intermédiaire entre stationnarité et non-stationnarité."
         ),
         "",
-        r"\subsection*{5.8 Pièges et limites}",
+        r"\subsection*{Pièges et limites}",
         md_basic_to_tex(
             "Risques : confusion entre mémoire longue et ruptures, sensibilité aux erreurs de mesure, instabilité en échantillon fini. "
             "Les diagnostics doivent être confrontés aux tests de racine unitaire et à l’analyse des ruptures."
         ),
         "",
-        r"\subsection*{5.9 Implications économétriques et économiques}",
+        r"\subsection*{Implications économétriques et économiques}",
         md_basic_to_tex(
             "Une mémoire longue implique des effets persistants à très long horizon : "
             "les modèles ARMA sous-estiment la persistance, et les politiques publiques peuvent produire des effets différés durables. "
@@ -477,4 +477,6 @@ def render_sec_univariate(
         ),
         "",
     ]
+
+    # ==== FAIRE CONCLU MAYBE ====
     return "\n".join(lines).strip() + "\n"

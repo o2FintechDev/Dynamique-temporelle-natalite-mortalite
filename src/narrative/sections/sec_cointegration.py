@@ -66,7 +66,7 @@ def render_sec_cointegration(
     lines: list[str] = []
 
     # ============================================================
-    # SECTION 1 : Cadre théorique (cointégration / VECM)
+    # SECTION : Cadre théorique (cointégration / VECM)
     # ============================================================
     lines += [
         r"\section{Cointégration et dynamique de long terme : le cadre VECM}",
@@ -78,7 +78,7 @@ def render_sec_cointegration(
             "économiques, malgré des fluctuations de court terme."
         ),
         "",
-        r"\subsection*{7.1 Motivation théorique de la cointégration}",
+        r"\subsection*{Motivation théorique de la cointégration}",
         md_basic_to_tex(
             "Soient deux séries $X_t$ et $Y_t$ intégrées d’ordre 1. Individuellement, elles dérivent, mais il peut exister une combinaison "
             "linéaire stationnaire $Z_t$ : dans ce cas, les séries sont cointégrées et un mécanisme de rappel empêche la divergence illimitée."
@@ -88,7 +88,7 @@ def render_sec_cointegration(
         r"Z_t = Y_t - \beta X_t \sim I(0)",
         r"\end{equation}",
         "",
-        r"\subsection*{7.2 Lien entre VAR et VECM}",
+        r"\subsection*{Lien entre VAR et VECM}",
         md_basic_to_tex(
             "Un VAR($p$) en variables $I(1)$ peut se réécrire en VECM, où la matrice $\Pi=\alpha\beta'$ concentre l’information de long terme : "
             r"$\beta$ décrit les relations d’équilibre, $\alpha$ la vitesse d’ajustement."
@@ -98,19 +98,19 @@ def render_sec_cointegration(
         r"\Delta Y_t = \Pi Y_{t-1} + \sum_{i=1}^{p-1}\Gamma_i \Delta Y_{t-i} + \varepsilon_t",
         r"\end{equation}",
         "",
-        r"\subsection*{7.3 Test d’Engle–Granger}",
+        r"\subsection*{Test d’Engle–Granger}",
         md_basic_to_tex(
             "Procédure en deux étapes : estimation de la relation de long terme (MCO), puis test de racine unitaire sur les résidus. "
             "Limite : identification d’un seul vecteur de cointégration et biais de normalisation."
         ),
         "",
-        r"\subsection*{7.4 Test de Johansen : cadre général}",
+        r"\subsection*{Test de Johansen : cadre général}",
         md_basic_to_tex(
             "La méthode de Johansen détermine le rang de cointégration $r$ dans un système multivarié via l’analyse spectrale de $\Pi$. "
             "Les conclusions dépendent du traitement de la constante et de la tendance (choix déterministe)."
         ),
         "",
-        r"\subsection*{7.5 Statistiques de test}",
+        r"\subsection*{Statistiques de test}",
         "",
         r"\begin{equation}",
         r"\lambda_{\text{trace}}(r) = -T\sum_{i=r+1}^{k}\ln(1-\hat{\lambda}_i)",
@@ -119,26 +119,26 @@ def render_sec_cointegration(
         r"\lambda_{\max}(r,r+1) = -T\ln(1-\hat{\lambda}_{r+1})",
         r"\end{equation}",
         "",
-        r"\subsection*{7.6 Choix de la composante déterministe}",
+        r"\subsection*{Choix de la composante déterministe}",
         md_basic_to_tex(
             "Cinq cas standards (constante/tendance restreinte ou non). Un mauvais choix déforme le rang estimé. "
             "La décision doit rester cohérente avec le profil des séries et les diagnostics amont."
         ),
         "",
-        r"\subsection*{7.7 Interprétation du rang}",
+        r"\subsection*{Interprétation du rang}",
         md_basic_to_tex(
             r"$r=0$ : pas de relation de long terme (VAR en différences). "
             r"$r=1$ : équilibre unique (souvent plausible en démographie). "
             r"$r>1$ : plusieurs équilibres structurels."
         ),
         "",
-        r"\subsection*{7.8 Estimation du VECM}",
+        r"\subsection*{Estimation du VECM}",
         "",
         r"\begin{equation}",
         r"\Delta Y_t = \alpha\beta'Y_{t-1} + \sum_{i=1}^{p-1}\Gamma_i\Delta Y_{t-i} + \varepsilon_t",
         r"\end{equation}",
         "",
-        r"\subsection*{7.9 Vitesse d’ajustement}",
+        r"\subsection*{Vitesse d’ajustement}",
         md_basic_to_tex(
             "Si un coefficient d’ajustement $\\alpha_i<0$ et significatif, la variable contribue au retour vers l’équilibre. "
             "Une mesure intuitive du temps moyen de correction est $\\tau = 1/|\\alpha|$."
@@ -148,7 +148,7 @@ def render_sec_cointegration(
         r"\tau=\frac{1}{|\alpha|}",
         r"\end{equation}",
         "",
-        r"\subsection*{7.11 Implications économiques}",
+        r"\subsection*{Implications économiques}",
         md_basic_to_tex(
             "La cointégration implique une cohérence structurelle de long terme : absence de divergence illimitée, "
             "et articulation explicite entre dynamique de court terme et équilibre démographique. "
@@ -161,7 +161,7 @@ def render_sec_cointegration(
     # SECTION 2 : Résultats empiriques (Step6)
     # ============================================================
     lines += [
-        r"\section{Résultats cointégration et VECM (Step6)}",
+        r"\section{Résultats cointégration et VECM}",
         "",
         md_basic_to_tex(
             f"Synthèse quantitative : choix **{choice}** ; rang (Johansen) **{joh_rank_sel}**."
@@ -233,7 +233,7 @@ def render_sec_cointegration(
     # Audit (if any)
     if audit:
         lines += [
-            md_basic_to_tex("**Audit de robustesse (Step6)**"),
+            md_basic_to_tex("**Audit de robustesse**"),
             md_basic_to_tex(
                 "Les sorties d’audit cadrent la robustesse du rang et la cohérence du choix VAR/VECM. "
                 "Toute instabilité du rang ou dépendance excessive au cas déterministe doit être explicitée."
@@ -245,7 +245,7 @@ def render_sec_cointegration(
 
     if note_md.strip():
         lines += [
-            md_basic_to_tex("**Note d’interprétation automatisée (Step6)**"),
+            md_basic_to_tex("**Note d’interprétation automatisée**"),
             md_basic_to_tex(
                 "Cette note doit rester cohérente avec : (i) EG/Johansen, (ii) le cas déterministe, "
                 "(iii) le choix VAR/VECM, (iv) les paramètres VECM (signes/ajustement). "

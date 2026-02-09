@@ -53,7 +53,7 @@ def render_sec_data(
     lines: list[str] = []
 
     # ============================================================
-    # SECTION 1 : Contexte & construction (texte long)
+    # SECTION : Contexte & construction (texte long)
     # ============================================================
     lines += [
         r"\section{Contexte et construction de la variable}",
@@ -69,7 +69,7 @@ def render_sec_data(
             "fortement liés aux comportements familiaux, aux politiques publiques et aux conditions socio-économiques générales."
         ),
         "",
-        r"\subsection*{1.1 Choix des données et justification des sources}",
+        r"\subsection*{Choix des données et justification des sources}",
         md_basic_to_tex(
             "Les données utilisées proviennent exclusivement de l’INSEE, garantissant une homogénéité institutionnelle et une comparabilité "
             "temporelle sur l’ensemble de la période étudiée. Les séries mobilisées sont :\n\n"
@@ -79,7 +79,7 @@ def render_sec_data(
             "Le choix d’une fréquence mensuelle s’impose pour capturer les dynamiques de moyen/long terme tout en conservant la saisonnalité."
         ),
         "",
-        r"\subsection*{1.2 Problématique de l’échelle et choix des taux}",
+        r"\subsection*{Problématique de l’échelle et choix des taux}",
         md_basic_to_tex(
             "Les flux en niveau (naissances/décès) sont mécaniquement corrélés à la taille de la population, induisant une hétéroscédasticité "
             "structurelle et un risque de conclusions biaisées en stationnarité. La normalisation en taux vise à stabiliser la variance et à rendre "
@@ -93,7 +93,7 @@ def render_sec_data(
         r"\text{Taux de mortalité}_t = \frac{\text{Décès}_t}{\text{Population}_t} \times 1000",
         r"\end{equation}",
         "",
-        r"\subsection*{1.3 Définition formelle de la croissance naturelle}",
+        r"\subsection*{Définition formelle de la croissance naturelle}",
         "",
         r"\begin{equation}",
         r"\text{Croissance naturelle}_t = \text{Taux de natalité}_t - \text{Taux de mortalité}_t",
@@ -104,19 +104,19 @@ def render_sec_data(
             "Une croissance négative signale un vieillissement structurel susceptible d’affecter la soutenabilité des systèmes sociaux."
         ),
         "",
-        r"\subsection*{1.4 Cohérence temporelle et continuité méthodologique}",
+        r"\subsection*{Cohérence temporelle et continuité méthodologique}",
         md_basic_to_tex(
             "Toute rupture méthodologique non identifiée peut être confondue avec une rupture structurelle. "
             "L’hypothèse retenue est une continuité suffisante des méthodes INSEE sur la période, à expliciter pour cadrer l’interprétation des tests."
         ),
         "",
-        r"\subsection*{1.5 Gestion des valeurs manquantes et anomalies}",
+        r"\subsection*{Gestion des valeurs manquantes et anomalies}",
         md_basic_to_tex(
             "Les manquants/anomalies créent des sauts artificiels et perturbent tests de racine unitaire et diagnostics résiduels. "
             "La stratégie est conservatrice : identification, traçabilité, refus d’interpolations agressives."
         ),
         "",
-        r"\subsection*{1.6 Implications économétriques pour la suite}",
+        r"\subsection*{Implications économétriques pour la suite}",
         md_basic_to_tex(
             "Une variable mal construite entraîne erreurs de stationnarité, persistance surévaluée et cointégrations fallacieuses. "
             "Le reste du rapport est conditionné par la qualité de cette étape."
@@ -199,7 +199,7 @@ def render_sec_data(
     # --- Note Step1 (optionnelle)
     if note_md.strip():
         lines += [
-            md_basic_to_tex("**Synthèse automatisée (Step1)**"),
+            md_basic_to_tex("**Synthèse automatisée**"),
             md_basic_to_tex(
                 "Cette note sert d’audit : elle doit rester cohérente avec les trois diagnostics ci-dessus. "
                 "Toute mention de correction/interpolation doit être explicitée et traçable."

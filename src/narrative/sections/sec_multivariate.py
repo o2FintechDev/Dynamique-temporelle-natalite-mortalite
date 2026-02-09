@@ -113,7 +113,7 @@ def render_sec_multivariate(
     lines: list[str] = []
 
     # ============================================================
-    # SECTION 1 : Cadre VAR (théorie + conditions)
+    # SECTION: Cadre VAR (théorie + conditions)
     # ============================================================
     lines += [
         r"\section{Analyse multivariée : modèles VAR et dépendances dynamiques}",
