@@ -18,6 +18,10 @@ def _fmt2(x: Any) -> str:
     except Exception:
         return "NA"
 
+def _looks_too_large_table(tbl_rel: str) -> bool:
+    # Heuristique simple : si le fichier contient "longtable" ou si c’est la table STL détaillée connue.
+    # On évite d’ouvrir/compter les lignes (coût/IO) : règle métier stable.
+    return "tbl.desc.decomp_components" in (tbl_rel or "")
 
 def render_sec_descriptive(
     *,
@@ -160,6 +164,32 @@ def render_sec_descriptive(
         narr_call("m.desc.seasonality_type"),
         "",
     ]
+    # --- Analyse économétrique guidée par les métriques STL
+    strength_txt = _fmt2(m_strength)
+    qual_txt = str(m_type or "NA")
+
+    lines += [
+        r"\paragraph{Analyse — saisonnalité et implications de spécification}",
+        md_basic_to_tex(
+            "La force saisonnière issue de la STL synthétise le poids de la composante saisonnière relativement à la variance totale. "
+            "Elle sert de critère opérationnel pour décider si la saisonnalité doit être traitée explicitement (différence saisonnière, "
+            "dummies mensuelles, ou composante saisonnière dans un modèle)."
+        ),
+        "",
+        md_basic_to_tex(
+            f"Dans les résultats présents : **force = {strength_txt}** et **qualification = {qual_txt}**. "
+            "Interprétation : si la saisonnalité est faible/absente, la dynamique est dominée par la tendance et/ou des ruptures ; "
+            "si elle est forte et stable, un traitement saisonnier explicite est requis avant l’identification ARMA/ARIMA afin d’éviter "
+            "des autocorrélations artificielles et un mauvais choix d’ordres."
+        ),
+        "",
+        md_basic_to_tex(
+            "Conséquence directe pour la section suivante (stationnarité) : une saisonnalité non traitée peut faire rejeter à tort "
+            "une hypothèse de stationnarité, ou dégrader la puissance des tests (ADF/PP), car les corrélations périodiques contaminent "
+            "les résidus des régressions de test."
+        ),
+        "",
+    ]
 
     if fig_decomp:
         lines += [
@@ -174,7 +204,14 @@ def render_sec_descriptive(
             narr_call("fig.desc.decomp"),
             "",
         ]
-
+        
+        lines += [
+            md_basic_to_tex(
+                "Contrôle de cohérence : la composante saisonnière visualisée doit être compatible avec la force saisonnière reportée ci-dessus ; "
+                "si divergence apparente, cela suggère une hétérogénéité temporelle de la saisonnalité (amplitude variable) et impose prudence."
+            ),
+            "",
+        ]
     if tbl_summary:
         lines += [
             r"\paragraph{Tableau 1 — Synthèse descriptive}",
@@ -201,6 +238,35 @@ def render_sec_descriptive(
             narr_call("tbl.desc.seasonality"),
             "",
         ]
+
+    # --- Table détaillée des composantes (trop volumineuse -> annexe contrôlée)
+    if tbl_decomp:
+        if _looks_too_large_table(tbl_decomp):
+            lines += [
+                md_basic_to_tex(
+                    "**Table détaillée des composantes (STL)** : disponible en annexe/artefacts (non insérée dans le corps du rapport "
+                    "pour préserver la lisibilité)."
+                ),
+                narr_call("tbl.desc.decomp_components"),
+                "",
+            ]
+        else:
+            lines += [
+                r"\paragraph{Tableau — Détail des composantes (STL)}",
+                md_basic_to_tex(
+                    "Lecture : contrôle fin des composantes (tendance, saisonnalité, résidu) au niveau observationnel. "
+                    "Cette table sert d’audit, pas de synthèse."
+                ),
+                "",
+                include_table_tex(
+                    run_root=run_root,
+                    tbl_rel=tbl_decomp,
+                    caption="tbl.desc.decomp_components",
+                    label="tab:tbl-desc-decomp-components",
+                ),
+                narr_call("tbl.desc.decomp_components"),
+                "",
+            ]
 
     if note_md.strip():
         lines += [
