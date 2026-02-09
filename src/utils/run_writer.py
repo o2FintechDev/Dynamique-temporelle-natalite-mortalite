@@ -176,59 +176,48 @@ class RunWriter:
 % =================================================
 % PAGE DE GARDE
 % =================================================
-% Page de garde construite manuellement.
-% Elle doit tenir sur UNE SEULE PAGE.
-% On n'utilise PAS \maketitle dans ce fichier.
+% Page de garde construite manuellement
+% Centrage vertical du contenu principal
+% Encadrement en bas à droite
+% =================================================
 
 \begin{document}
 
 \begin{titlepage}
 \thispagestyle{empty} % Pas de numéro de page sur la page de garde
 
+\vfill
+
 % -------------------------------------------------
-% TITRE ET SOUS-TITRE
+% BLOC CENTRAL (centré verticalement)
 % -------------------------------------------------
 \begin{center}
     {\Large Analyse économétrique automatisée}\\[0.3cm]
     {\Large par pipeline déterministe}\\[0.8cm]
 
     {\Huge\bfseries Automate économétrique}\\[0.4cm]
-    {\LARGE\bfseries Croissance naturelle en France (1975--2025)}
-\end{center}
+    {\LARGE\bfseries Croissance naturelle en France (1975--2025)}\\[1.5cm]
 
-% Espacement vertical maîtrisé (évite le débordement sur 2 pages)
-\vspace{2cm}
-
-% -------------------------------------------------
-% AUTEURS
-% -------------------------------------------------
-\begin{center}
     {\large Aude \textsc{Bernier}}\\
     {\large Clara \textsc{Pierreuse}}\\
-    {\large Justine \textsc{Reiter--Guerville}}
-\end{center}
+    {\large Justine \textsc{Reiter--Guerville}}\\[1.5cm]
 
-% Espacement intermédiaire
-\vspace{2cm}
-
-% -------------------------------------------------
-% FORMATION
-% -------------------------------------------------
-\begin{center}
     {\large Master Monnaie Banque Finance Assurance}\\
     {\itshape Parcours Systèmes d’Information Économiques et Financiers (SIEF)}\\[0.3cm]
     Université de Montpellier\\[0.6cm]
     Année universitaire 2025--2026
 \end{center}
 
-% Remplit l’espace restant pour caler l’encadrement en bas
+
 \vfill
 
 % -------------------------------------------------
-% ENCADREMENT (ALIGNÉ À GAUCHE)
+% ENCADREMENT (bas à gauche)
 % -------------------------------------------------
 \begin{flushleft}
-{\small Sous la supervision de : Monsieur Mestre Roman}
+{\small Sous la supervision de :\\
+Monsieur Mestre Roman\\
+Monsieur Paraguette Maurice}
 \end{flushleft}
 
 \end{titlepage}
