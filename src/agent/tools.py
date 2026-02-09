@@ -30,6 +30,8 @@ log = get_logger("agent.tools")
 TOOL_REGISTRY: dict[str, Callable[..., dict[str, Any]]] = {}
 
 Y_CANON = "Croissance_Naturelle"
+VAR_COLS_CANON = ["Croissance_Naturelle", "Nb_mariages", "IPC", "Masse_monetaire"]
+
 
 def _enforce_y(y: str) -> None:
     if y != Y_CANON:
@@ -53,36 +55,41 @@ def step1_load_and_profile(*, variables: list[str], y: str, **params: Any) -> di
     _enforce_y(y)
     df = harmonize(load_clean_dataset())
 
-    prof = profile_dataset(df, variables=[y])
-    cov = coverage_report(df, variables=[y])
+    requested = sorted(set([y] + VAR_COLS_CANON))
+    present = [c for c in requested if c in df.columns]
+    missing = [c for c in requested if c not in df.columns]
 
-    # ---- NOTE STEP1 (persistée) ----
-    miss = float(prof.missing.loc[y, "missing_rate"]) if y in prof.missing.index else None
+    # Profil/coverage uniquement sur les colonnes existantes (sinon KeyError)
+    prof = profile_dataset(df, variables=present if present else [y])
+    cov = coverage_report(df, variables=present if present else [y])
 
+    # note + audit colonnes
+    miss_rate = float(prof.missing.loc[y, "missing_rate"]) if y in prof.missing.index else None
     meta = dict(prof.meta)
-    meta["missing_rate"] = miss
-    nobs = int(prof.meta.get("nobs", len(df)))
-    start = prof.meta.get("start")
-    end = prof.meta.get("end")
-
-    # infer frequency from index if possible
-    try:
-        if isinstance(df.index, pd.DatetimeIndex):
-            meta["freq"] = pd.infer_freq(df.index) or meta.get("freq")
-    except Exception:
-        pass
+    meta["missing_rate"] = miss_rate
+    meta["columns_available"] = list(map(str, df.columns))
+    meta["requested_vars"] = requested
+    meta["present_vars"] = present
+    meta["missing_vars"] = missing
 
     note = (
-        f"**Étape 1 — Traitement des données** : série `{y}` construite (taux_naissances − taux_deces), "
-        f"mensuelle 1975–2025. Observations: **{nobs}**, période: **{start} → {end}**, "
-        f"taux de valeurs manquantes: **{miss:.2%}**."
-    )
-    note = note.replace("−", "-")
+        f"**Étape 1 — Traitement des données** : `{y}` chargée. "
+        f"Audit VAR: présentes={present}, manquantes={missing}."
+    ).replace("−", "-")
+
+    # table d’audit dédiée (utile Streamlit + LaTeX)
+    tbl_vars_audit = pd.DataFrame([{
+        "requested": ", ".join(requested),
+        "present": ", ".join(present),
+        "missing": ", ".join(missing),
+    }]).set_index(pd.Index(["vars_audit"]))
+
     return {
         "tables": {
             "tbl.data.desc_stats": prof.desc,
             "tbl.data.missing_report": prof.missing,
             "tbl.data.coverage_report": cov,
+            "tbl.data.vars_audit": tbl_vars_audit,
         },
         "metrics": {
             "m.data.dataset_meta": meta,

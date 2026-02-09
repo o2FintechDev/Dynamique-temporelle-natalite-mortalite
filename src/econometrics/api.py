@@ -402,59 +402,96 @@ def step5_var_pack(
     require_stable: bool = True,
     **params: Any
 ) -> dict[str, Any]:
-    """
-    Étape 5 — VAR(p) sur K=4 variables endogènes:
-      Croissance_Naturelle, Nb_mariages, IPC, Masse_monetaire
 
-    IMPORTANT:
-    - aucune logique VAR dans api.py (stationnarité/transfos/choix p = dans var_pack)
-    - api.py ne fait que: sélectionner les colonnes + aligner + dropna + appeler var_pack
-    """
-    # Contrat cible (tu le gardes si tu veux)
     _ = _series(df, y)
 
-    VAR_COLS = ["Croissance_Naturelle", "Nb_mariages", "IPC", "Masse_monetaire"]
-    missing = [c for c in VAR_COLS if c not in df.columns]
+    # --- normalisation noms colonnes (safe) ---
+    def _norm(c: str) -> str:
+        return (
+            str(c).strip()
+            .replace(" ", "_")
+            .replace("-", "_")
+            .replace("__", "_")
+        )
+
+    df0 = df.copy()
+    df0.columns = [_norm(c) for c in df0.columns]
+
+    # --- dictionnaire de correspondance (à étendre si besoin) ---
+    wanted = {
+        "Croissance_Naturelle": ["Croissance_Naturelle", "CroissanceNaturelle", "croissance_naturelle"],
+        "Nb_mariages": ["Nb_mariages", "Nombres_mariages", "Mariages", "NbMariages", "nb_mariages"],
+        "IPC": ["IPC", "Indice_prix", "Indice_des_prix", "CPI", "ipc"],
+        "Masse_monetaire": ["Masse_monetaire", "Masse_monétaire", "MasseMonetaire", "M3", "m3"],
+    }
+
+    # --- résolution des colonnes existantes ---
+    resolved: dict[str, str] = {}
+    missing: list[str] = []
+
+    cols_set = set(df0.columns)
+    for canonical, candidates in wanted.items():
+        found = next((c for c in candidates if _norm(c) in cols_set), None)
+        if found is None:
+            # essaye aussi matching exact après norm
+            found = next((c for c in df0.columns if _norm(c) in {_norm(x) for x in candidates}), None)
+
+        if found is None:
+            missing.append(canonical)
+        else:
+            resolved[canonical] = found
+
+    tbl_input = pd.DataFrame([{
+        "status": "ok" if not missing else "missing_columns",
+        "missing": ", ".join(missing) if missing else "",
+        "resolved": ", ".join([f"{k}->{v}" for k, v in resolved.items()]),
+        "available_cols": ", ".join(list(df0.columns)[:30]) + (" ..." if len(df0.columns) > 30 else ""),
+    }]).set_index(pd.Index(["input"]))
+
     if missing:
         return {
-            "tables": {
-                "tbl.var.input_window": pd.DataFrame([{
-                    "status": "missing_columns",
-                    "missing": ", ".join(missing),
-                    "present": ", ".join([c for c in VAR_COLS if c in df.columns]),
-                }]).set_index(pd.Index(["input"]))
-            },
+            "tables": {"tbl.var.input_window": tbl_input},
             "metrics": {
                 "m.note.step5": {
                     "markdown": f"**Étape 5 — VAR(p)** : colonnes manquantes: {missing}.",
-                    "key_points": {"missing": missing},
+                    "key_points": {"missing": missing, "resolved": resolved},
                 }
             },
             "figures": {},
             "models": {},
         }
 
-    Y4 = df[VAR_COLS].copy()
+    VAR_COLS = [resolved["Croissance_Naturelle"], resolved["Nb_mariages"], resolved["IPC"], resolved["Masse_monetaire"]]
+    Y4 = df0[VAR_COLS].copy()
+    Y4.columns = ["Croissance_Naturelle", "Nb_mariages", "IPC", "Masse_monetaire"]  # canonical
 
-    # coercition numérique + index datetime
-    for c in VAR_COLS:
+    for c in Y4.columns:
         Y4[c] = pd.to_numeric(Y4[c], errors="coerce")
+
     if not isinstance(Y4.index, pd.DatetimeIndex):
         try:
             Y4.index = pd.to_datetime(Y4.index)
         except Exception:
             pass
 
-    # dropna conjoint => fenêtre effective (Masse_monetaire démarre 1978)
+    # fenêtre effective (Masse_monetaire démarre 1978)
     Y4 = Y4.dropna()
 
-    return var_pack(
+    tbl_input.loc["input", "nobs_after_dropna"] = int(Y4.shape[0])
+    tbl_input.loc["input", "start"] = str(Y4.index.min()) if len(Y4) else None
+    tbl_input.loc["input", "end"] = str(Y4.index.max()) if len(Y4) else None
+
+    out = var_pack(
         Y4,
         maxlags=int(maxlags),
         prefer_ic=str(prefer_ic),
         whiteness_alpha=float(whiteness_alpha),
         require_stable=bool(require_stable),
     )
+
+    out_tables = (out.get("tables") or {})
+    out["tables"] = {"tbl.var.input_window": tbl_input, **out_tables}
+    return out
 
 def step6_cointegration_pack(df: pd.DataFrame, *, y: str, vars_mode: str = "decomp", **params: Any) -> dict[str, Any]:
     s = _series(df, y)

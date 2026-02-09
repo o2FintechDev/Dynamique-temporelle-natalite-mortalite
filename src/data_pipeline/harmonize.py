@@ -10,12 +10,40 @@ log = get_logger("data_pipeline.harmonize")
 
 Y = "Croissance_Naturelle"
 
+# Mapping tolérant (casse/accents/alias possibles)
+_CANON_MAP = {
+    # mariages
+    "nb_mariages": "Nb_mariages",
+    "mariages": "Nb_mariages",
+    "nombre_mariages": "Nb_mariages",
+
+    # IPC / CPI
+    "ipc": "IPC",
+    "cpi": "IPC",
+    "indice_prix_consommation": "IPC",
+    "indice_des_prix_a_la_consommation": "IPC",
+
+    # masse monétaire
+    "m3": "Masse_monetaire",
+    "masse_monetaire": "Masse_monetaire",
+    "masse_monétaire": "Masse_monetaire",
+    "massemonetaire": "Masse_monetaire",
+}
+
 def _pick_col(df: pd.DataFrame, candidates: tuple[str, ...]) -> str:
     cols = {c.lower(): c for c in df.columns}
     for cand in candidates:
         if cand.lower() in cols:
             return cols[cand.lower()]
     raise KeyError(f"Colonne introuvable. Candidates={candidates}. Colonnes={list(df.columns)}")
+
+def _to_num(s: pd.Series) -> pd.Series:
+    if s.dtype.kind in "biufc":
+        return s.astype(float)
+    x = s.astype(str).str.replace("\u202f", " ", regex=False).str.replace(" ", "", regex=False)
+    x = x.str.replace(",", ".", regex=False)
+    x = x.replace({"NA": np.nan, "nan": np.nan, "None": np.nan, "": np.nan})
+    return pd.to_numeric(x, errors="coerce")
 
 def harmonize(df_raw: pd.DataFrame) -> pd.DataFrame:
     df = df_raw.copy()
@@ -27,35 +55,46 @@ def harmonize(df_raw: pd.DataFrame) -> pd.DataFrame:
     df[c_date] = pd.to_datetime(df[c_date], errors="coerce")
     df = df.dropna(subset=[c_date]).sort_values(c_date)
 
-    # nettoyage numeric robuste
-    def to_num(s: pd.Series) -> pd.Series:
-        if s.dtype.kind in "biufc":
-            return s.astype(float)
-        x = s.astype(str).str.replace("\u202f", " ", regex=False).str.replace(" ", "", regex=False)
-        x = x.str.replace(",", ".", regex=False)
-        x = x.replace({"NA": np.nan, "nan": np.nan, "None": np.nan, "": np.nan})
-        return pd.to_numeric(x, errors="coerce")
-
-    df[c_b] = to_num(df[c_b])
-    df[c_d] = to_num(df[c_d])
-
+    # --- numeric births/deaths + Y ---
+    df[c_b] = _to_num(df[c_b])
+    df[c_d] = _to_num(df[c_d])
     df[Y] = df[c_b] - df[c_d]
 
+    # --- renames de base ---
     df = df.rename(columns={c_date: "date", c_b: "taux_naissances", c_d: "taux_deces"})
-    df = df[["date", "taux_naissances", "taux_deces", Y]]
+
+    # --- renames optionnels (VAR) ---
+    # on détecte par matching "lower"
+    lower_to_col = {c.lower(): c for c in df.columns}
+    rename_extra = {}
+    for src_lower, dst in _CANON_MAP.items():
+        if src_lower in lower_to_col:
+            rename_extra[lower_to_col[src_lower]] = dst
+    if rename_extra:
+        df = df.rename(columns=rename_extra)
+
+    # --- colonnes à conserver ---
+    base_cols = ["date", "taux_naissances", "taux_deces", Y]
+    extra_cols = [c for c in ["Nb_mariages", "IPC", "Masse_monetaire"] if c in df.columns]
+    keep = base_cols + extra_cols
+    df = df[keep]
+
+    # numeric robust sur extras
+    for c in extra_cols:
+        df[c] = _to_num(df[c])
 
     # mensuel : normalise au 1er du mois
-    df["date"] = df["date"].dt.to_period("M").dt.to_timestamp()
+    df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.to_period("M").dt.to_timestamp()
 
     # filtre 1975–2025
     df = df[(df["date"] >= "1975-01-01") & (df["date"] <= "2025-12-01")]
 
-    # index date
+    # index date + reindex mensuel complet
     df = df.drop_duplicates(subset=["date"]).set_index("date").sort_index()
     full_idx = pd.date_range("1975-01-01", "2025-12-01", freq="MS")
     df = df.reindex(full_idx)
     df.index.name = "date"
     df = df.asfreq("MS")
-    log.info(f"Harmonized: n={len(df)} from {df.index.min()} to {df.index.max()}")
-    return df
 
+    log.info(f"Harmonized: n={len(df)} from {df.index.min()} to {df.index.max()} | cols={list(df.columns)}")
+    return df
