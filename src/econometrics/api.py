@@ -148,23 +148,7 @@ def step2_descriptive_pack(df: pd.DataFrame, *, y: str, period: int = 12, **para
         },
     }
 
-def step3_stationarity_pack(df: pd.DataFrame, *, y: str, lags: int = 24, **params: Any) -> dict[str, Any]:
-    s = _series(df, y)
-    fig_acf, fig_pacf, tbl_acf = acf_pacf_figs(s, lags=lags)
 
-    tbl_adf = adf_table(s)
-    tbl_band = dickey_fuller_band_metrics(tbl_acf)
-    tbl_dec, m_tsds = ts_vs_ds_decision(tbl_adf, tbl_band)
-    tbl_lb = ljungbox_diff(s, lags=lags)
-    verdict = m_tsds.get("verdict")
-    p_c = m_tsds.get("adf_p_c")
-    p_ct = m_tsds.get("adf_p_ct")
-
-    note3 = (
-        f"**Étape 3 — Stationnarité (TS vs DS)** : verdict **{verdict}**. "
-        f"ADF(c) p={p_c:.3g}, ADF(ct) p={p_ct:.3g}"
-        + " La décision est fondée sur ADF et la lecture de persistance (bande DF via ACF)."
-    )
 def step3_stationarity_pack(df: pd.DataFrame, *, y: str, lags: int = 24, **params: Any) -> dict[str, Any]:
     s = _series(df, y)
     fig_acf, fig_pacf, tbl_acf = acf_pacf_figs(s, lags=lags)
