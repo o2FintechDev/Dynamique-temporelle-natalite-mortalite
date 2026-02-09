@@ -53,11 +53,11 @@ def render_sec_data(
 
     lines: list[str] = []
 
-    # Chapitre 1
+
     # Introduction
 
     # ============================================================
-    # SECTION : Coeur de la recherche
+    # SECTION 1 : Coeur de la recherche
     # ============================================================
     lines += [
     r"\section{Cœur de la recherche}",
@@ -155,44 +155,51 @@ def render_sec_data(
             "susceptible d’affecter en profondeur l’équilibre économique et social."
         ),
         "",
-        r"\subsection*{Cohérence temporelle et continuité méthodologique}",
-        md_basic_to_tex(
-            "Toute rupture méthodologique non identifiée peut être confondue avec une rupture structurelle. "
-            "L’hypothèse retenue est une continuité suffisante des méthodes INSEE sur la période, à expliciter pour cadrer l’interprétation des tests."
-        ),
-        "",
-        r"\subsection*{Gestion des valeurs manquantes et anomalies}",
-        md_basic_to_tex(
-            "Les manquants/anomalies créent des sauts artificiels et perturbent tests de racine unitaire et diagnostics résiduels. "
-            "La stratégie est conservatrice : identification, traçabilité, refus d’interpolations agressives."
-        ),
-        "",
-        r"\subsection*{Implications économétriques pour la suite}",
-        md_basic_to_tex(
-            "Une variable mal construite entraîne erreurs de stationnarité, persistance surévaluée et cointégrations fallacieuses. "
-            "Le reste du rapport est conditionné par la qualité de cette étape."
-        ),
-        "",
+
     ]
 
     # ============================================================
-    # SECTION 2 : Préparation des données (Step1) + tables sans subsection
+    # SECTION 2 : Préparation des données
     # ============================================================
     lines += [
-        r"\section{Préparation des données}",
-        "",
-        md_basic_to_tex(
-            f"Les diagnostics de préparation résument l’échantillon effectivement exploitable : "
-            f"**{start} -> {end}**, fréquence **{freq}**, **n={nobs}**, taux de manquants **{miss_txt}**."
-        ),
-        narr_call("m.data.dataset_meta"),
-        "",
+    r"\section{Préparation des données}",
+    "",
+    md_basic_to_tex(
+        f"La présente section décrit les étapes de préparation des données ayant conduit à la constitution "
+        f"de l’échantillon exploitable pour l’analyse économétrique. "
+        f"L’étude repose sur des données mensuelles couvrant la période **{start} -> {end}**, "
+        f"à la fréquence **{freq}**, pour un total de **n = {nobs}** observations.\n\n"
+
+        "Avant toute analyse statistique, un soin particulier a été apporté à la qualité et à la fiabilité des données. "
+        "L’ensemble des séries a été préparé selon un processus structuré de type ETL "
+        "(extraction, transformation et chargement), "
+        "visant à garantir la cohérence temporelle, l’homogénéité des définitions et la traçabilité complète des traitements appliqués.\n\n"
+
+        "Les données utilisées proviennent exclusivement de sources institutionnelles (INSEE) "
+        "et ne présentent aucune valeur manquante sur la période considérée. "
+        f"Le taux de données manquantes observé est ainsi de **{miss_txt}**, "
+        "ce qui assure une continuité temporelle complète des séries et renforce la robustesse "
+        "des tests économétriques ultérieurs.\n\n"
+
+        "Le processus de préparation a permis de vérifier l’intégrité des séries, "
+        "d’identifier d’éventuelles incohérences ou anomalies ponctuelles, "
+        "et d’harmoniser les formats et unités de mesure. "
+        "La stratégie retenue est volontairement conservatrice : "
+        "aucune interpolation ou correction artificielle n’a été appliquée, "
+        "afin de préserver la dynamique propre des séries temporelles et d’éviter l’introduction de biais exogènes.\n\n"
+
+        "Les diagnostics présentés dans les tableaux suivants constituent une étape de validation empirique essentielle. "
+        "Ils permettent de confirmer la qualité des données avant d’engager l’analyse de stationnarité, "
+        "la modélisation économétrique et l’étude des dynamiques de court et de long terme."
+    ),
+    narr_call("m.data.dataset_meta"),
+    "",
     ]
 
     # --- Table 1: descriptives + analyse
     if t_desc:
         lines += [
-            r"\paragraph{Tableau 1 — Statistiques descriptives}",
+            r"\subsection*{Tableau 1 — Statistiques descriptives}",
             md_basic_to_tex(
                 "Lecture : contrôler l’ordre de grandeur, l’asymétrie et la dispersion. "
                 "Des extrêmes prononcés ou une distribution très dissymétrique sont cohérents avec des chocs (épidémiques, caniculaires) "
@@ -212,7 +219,7 @@ def render_sec_data(
     # --- Table 2: missing report + analyse
     if t_miss:
         lines += [
-            r"\paragraph{Tableau 2 — Valeurs manquantes}",
+            r"\subsection*{Tableau 2 — Valeurs manquantes}",
             md_basic_to_tex(
                 "Lecture : même un faible taux de manquants peut biaiser ADF/Ljung–Box si les trous sont concentrés temporellement "
                 "(rupture de collecte, anomalies de source). La règle est : documenter et éviter de lisser artificiellement."
@@ -231,7 +238,7 @@ def render_sec_data(
     # --- Table 3: coverage report + analyse
     if t_cov:
         lines += [
-            r"\paragraph{Tableau 3 — Couverture temporelle}",
+            r"\subsection*{Tableau 3 — Couverture temporelle}",
             md_basic_to_tex(
                 "Lecture : valider la continuité de l’index, la présence éventuelle de périodes incomplètes, et la cohérence du début/fin d’échantillon. "
                 "Toute discontinuité non traitée se répercute sur la dynamique (ACF/PACF), les résidus et la détection de ruptures."

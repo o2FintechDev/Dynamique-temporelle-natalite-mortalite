@@ -24,6 +24,9 @@ from src.utils.run_reader import get_run_files, read_manifest, RunManager, read_
 from pathlib import Path
 from src.narrative import build_narrative_from_run, save_narrative_packet
 
+from src.visualization.tables import save_table_csv_and_tex
+from src.utils.run_writer import RunWriter
+from src.utils.run_reader import get_run_files
 
 log = get_logger("agent.tools")
 
@@ -53,18 +56,27 @@ def get_tool(name: str) -> Callable[..., dict[str, Any]]:
 @register("step1_load_and_profile")
 def step1_load_and_profile(*, variables: list[str], y: str, **params: Any) -> dict[str, Any]:
     _enforce_y(y)
+
+    # --------------------------------------------------
+    # Chargement et harmonisation des données
+    # --------------------------------------------------
     df = harmonize(load_clean_dataset())
 
     requested = sorted(set([y] + VAR_COLS_CANON))
     present = [c for c in requested if c in df.columns]
     missing = [c for c in requested if c not in df.columns]
 
-    # Profil/coverage uniquement sur les colonnes existantes (sinon KeyError)
+    # --------------------------------------------------
+    # Profil statistique et couverture
+    # --------------------------------------------------
     prof = profile_dataset(df, variables=present if present else [y])
     cov = coverage_report(df, variables=present if present else [y])
 
-    # note + audit colonnes
+    # --------------------------------------------------
+    # Méta-données et note d’audit
+    # --------------------------------------------------
     miss_rate = float(prof.missing.loc[y, "missing_rate"]) if y in prof.missing.index else None
+
     meta = dict(prof.meta)
     meta["missing_rate"] = miss_rate
     meta["columns_available"] = list(map(str, df.columns))
@@ -74,16 +86,87 @@ def step1_load_and_profile(*, variables: list[str], y: str, **params: Any) -> di
 
     note = (
         f"**Étape 1 — Traitement des données** : `{y}` chargée. "
-        f"Audit VAR: présentes={present}, manquantes={missing}."
+        f"Audit des variables — présentes : {present}, manquantes : {missing}."
     ).replace("−", "-")
 
-    # table d’audit dédiée (utile Streamlit + LaTeX)
-    tbl_vars_audit = pd.DataFrame([{
-        "requested": ", ".join(requested),
-        "present": ", ".join(present),
-        "missing": ", ".join(missing),
-    }]).set_index(pd.Index(["vars_audit"]))
+    # --------------------------------------------------
+    # Table d’audit des variables
+    # --------------------------------------------------
+    tbl_vars_audit = pd.DataFrame(
+        [{
+            "requested": ", ".join(requested),
+            "present": ", ".join(present),
+            "missing": ", ".join(missing),
+        }],
+        index=pd.Index(["vars_audit"])
+    )
 
+    # --------------------------------------------------
+    # ÉCRITURE DES TABLES LaTeX + ENREGISTREMENT MANIFEST
+    # --------------------------------------------------
+    state = get_state()
+    run_id = state.selected_run_id
+
+    if run_id:
+        rf = get_run_files(run_id)
+        run_root = Path(rf.root)
+        rw = RunWriter(base_runs_dir=run_root.parent, run_id=run_id)
+
+        # --- Tableau 1 : Statistiques descriptives
+        _, tex_desc = save_table_csv_and_tex(
+            prof.desc,
+            run_root / "artefacts" / "tables" / "desc_stats.csv",
+            caption="Statistiques descriptives",
+            label="tab:desc-stats",
+        )
+        rw.register_artefact(
+            kind="tables",
+            lookup_key="tbl.data.desc_stats",
+            rel_path=f"tables/{tex_desc.name}",
+        )
+
+        # --- Tableau 2 : Valeurs manquantes
+        _, tex_miss = save_table_csv_and_tex(
+            prof.missing,
+            run_root / "artefacts" / "tables" / "missing_report.csv",
+            caption="Valeurs manquantes",
+            label="tab:missing-report",
+        )
+        rw.register_artefact(
+            kind="tables",
+            lookup_key="tbl.data.missing_report",
+            rel_path=f"tables/{tex_miss.name}",
+        )
+
+        # --- Tableau 3 : Couverture temporelle
+        _, tex_cov = save_table_csv_and_tex(
+            cov,
+            run_root / "artefacts" / "tables" / "coverage_report.csv",
+            caption="Couverture temporelle",
+            label="tab:coverage-report",
+        )
+        rw.register_artefact(
+            kind="tables",
+            lookup_key="tbl.data.coverage_report",
+            rel_path=f"tables/{tex_cov.name}",
+        )
+
+        # --- Tableau 4 : Audit des variables
+        _, tex_vars = save_table_csv_and_tex(
+            tbl_vars_audit,
+            run_root / "artefacts" / "tables" / "vars_audit.csv",
+            caption="Audit des variables",
+            label="tab:vars-audit",
+        )
+        rw.register_artefact(
+            kind="tables",
+            lookup_key="tbl.data.vars_audit",
+            rel_path=f"tables/{tex_vars.name}",
+        )
+
+    # --------------------------------------------------
+    # Retour agent (inchangé)
+    # --------------------------------------------------
     return {
         "tables": {
             "tbl.data.desc_stats": prof.desc,

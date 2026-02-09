@@ -294,15 +294,17 @@ conforme aux exigences du Master.
 \begin{center}
 {\Large \textbf{Automate économétrique appliqué à la croissance naturelle en France (1975--2025)}}\\[0.4cm]
 {\large \textit{Analyse automatisée par pipeline économétrique déterministe}}\\[1cm]
-
-Aude Bernier, Clara Pierreuse, Justine Reiter--Guerville\\
-Master Monnaie Banque Finance Assurance -- Parcours SIEF\\
-Université de Montpellier
 \end{center}
+
+{\small
+Aude Bernier, Clara Pierreuse, Justine Reiter--Guerville\\
+Master Monnaie Banque Finance Assurance -- Parcours Systèmes d’Information Économiques et Financiers (SIEF)\\
+Université de Montpellier
+}
 
 \vspace{1cm}
 
-\noindent\textbf{Résumé}
+\noindent\textbf{Abstract}
 
 \vspace{0.3cm}
 
@@ -317,11 +319,11 @@ Ce travail illustre la manière dont l’automatisation et l’assistance par l�
 
 \vspace{0.5cm}
 
-\noindent\textbf{Mots-clés :} Démographie ; Croissance naturelle ; Économétrie des séries temporelles ; Automatisation économétrique ; France
+\noindent\textbf{Keywords:} Démographie ; Croissance naturelle ; Économétrie des séries temporelles ; Automatisation économétrique ; France
 
 \vspace{0.2cm}
 
-\noindent\textbf{Codes JEL :}  
+\noindent\textbf{JEL codes:}  
 C22 (Time-Series Models),  
 C51 (Model Construction and Estimation),  
 J11 (Demographic Trends),  
@@ -340,7 +342,11 @@ O38 (Technological Change – Automation and AI)
 \listoftables
 \clearpage
 
-\chapter{Introduction}
+% -----------------------------
+% INTRODUCTION (non numérotée)
+% -----------------------------
+\chapter*{Introduction}
+\addcontentsline{toc}{chapter}{Introduction}
 
 % AUTO
 \input{blocks/sec_data.tex}
