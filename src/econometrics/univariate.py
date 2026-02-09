@@ -30,7 +30,82 @@ def rescaled_range(x: np.ndarray) -> float:
     s = np.std(x)
     return float(r / s) if s > 0 else float("nan")
 
-def ar_grid(series: pd.Series, p_max: int = 8) -> pd.DataFrame:
+def _sig_stats_from_res(res: Any, *, alpha: float = 0.05) -> dict[str, Any]:
+    if res is None:
+        return {"is_significant": False}
+
+    try:
+        pvals = res.pvalues.dropna()
+    except Exception:
+        return {"is_significant": False}
+
+    keep = [k for k in pvals.index.astype(str) if k.startswith(("ar.L", "ma.L"))]
+    if not keep:
+        return {"is_significant": False}
+
+
+    tested = pvals.loc[keep]
+
+    return {
+        "is_significant": bool((tested < alpha).all()),
+        "max_pvalue": float(tested.max()),
+        "n_params_tested": int(len(tested)),
+        "n_sig": int((tested < alpha).sum()),
+    }
+
+def _arma_grid_core(y, orders, *, alpha_sig=0.05):
+    rows = []
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=ConvergenceWarning)
+        warnings.filterwarnings("ignore", message=".*failed to converge.*")
+
+        for p, d, q in orders:
+            try:
+                res = SARIMAX(
+                    y,
+                    order=(p, d, q),
+                    trend="c",
+                    enforce_stationarity=False,
+                    enforce_invertibility=False,
+                ).fit(disp=False)
+
+                if not bool(res.mle_retvals.get("converged", False)):
+                    continue
+
+                rows.append({
+                    "p": int(p),
+                    "q": int(q),
+                    "aic": float(res.aic),
+                    "bic": float(res.bic),
+                    **_sig_stats_from_res(res, alpha=alpha_sig),
+                })
+            except Exception:
+                continue
+
+    return pd.DataFrame(rows).sort_values(["aic", "bic"]).reset_index(drop=True)
+
+
+def ar_grid(series: pd.Series, p_max: int = 6, *, alpha_sig: float = 0.05) -> pd.DataFrame:
+    y = series.dropna().astype(float)
+    return _arma_grid_core(y, [(p, 0, 0) for p in range(1, p_max + 1)], alpha_sig=alpha_sig)
+
+def ma_grid(series: pd.Series, q_max: int = 6, *, alpha_sig: float = 0.05) -> pd.DataFrame:
+    y = series.dropna().astype(float)
+    return _arma_grid_core(y, [(0, 0, q) for q in range(1, q_max + 1)], alpha_sig=alpha_sig)
+
+def arma_grid(series: pd.Series, p_max: int = 6, q_max: int = 6, *, alpha_sig: float = 0.05) -> pd.DataFrame:
+    y = series.dropna().astype(float)
+    return _arma_grid_core(
+        y,
+        [(p, 0, q) for p in range(1, p_max + 1) for q in range(1, q_max + 1)],
+        alpha_sig=alpha_sig,
+    )
+
+
+
+
+def ar_grid(series: pd.Series, p_max: int = 6, *, alpha_sig: float = 0.05) -> pd.DataFrame:
     y = series.dropna().astype(float)
     rows = []
 
@@ -52,13 +127,18 @@ def ar_grid(series: pd.Series, p_max: int = 8) -> pd.DataFrame:
                 if not bool(res.mle_retvals.get("converged", False)):
                     continue
 
-                rows.append({"p": int(p), "aic": float(res.aic), "bic": float(res.bic)})
+                sig = _sig_stats_from_res(res, alpha=alpha_sig)
+                rows.append({
+                    "p": int(p),
+                    "aic": float(res.aic),
+                    "bic": float(res.bic),
+                    **sig,
+                })
             except Exception:
                 continue
-
     return pd.DataFrame(rows).sort_values(["aic", "bic"]).reset_index(drop=True)
 
-def ma_grid(series: pd.Series, q_max: int = 8) -> pd.DataFrame:
+def ma_grid(series: pd.Series, q_max: int = 6, *, alpha_sig: float = 0.05) -> pd.DataFrame:
     y = series.dropna().astype(float)
     rows = []
 
@@ -80,14 +160,19 @@ def ma_grid(series: pd.Series, q_max: int = 8) -> pd.DataFrame:
                 if not bool(res.mle_retvals.get("converged", False)):
                     continue
 
-                rows.append({"q": int(q), "aic": float(res.aic), "bic": float(res.bic)})
+                sig = _sig_stats_from_res(res, alpha=alpha_sig)
+                rows.append({
+                    "q": int(q),
+                    "aic": float(res.aic),
+                    "bic": float(res.bic),
+                    **sig,
+                })
             except Exception:
                 continue
-
     return pd.DataFrame(rows).sort_values(["aic", "bic"]).reset_index(drop=True)
 
 
-def arma_grid(series: pd.Series, p_max: int = 6, q_max: int = 6) -> pd.DataFrame:
+def arma_grid(series: pd.Series, p_max: int = 6, q_max: int = 6, *, alpha_sig: float = 0.05) -> pd.DataFrame:
     y = series.dropna().astype(float)
     rows = []
 
@@ -110,101 +195,100 @@ def arma_grid(series: pd.Series, p_max: int = 6, q_max: int = 6) -> pd.DataFrame
                     if not bool(res.mle_retvals.get("converged", False)):
                         continue
 
-                    rows.append({"p": int(p), "q": int(q), "aic": float(res.aic), "bic": float(res.bic)})
+                    sig = _sig_stats_from_res(res, alpha=alpha_sig)
+                    rows.append({
+                        "p": int(p),
+                        "q": int(q),
+                        "aic": float(res.aic),
+                        "bic": float(res.bic),
+                        **sig,
+                    })
                 except Exception:
                     continue
+
 
     return pd.DataFrame(rows).sort_values(["aic", "bic"]).reset_index(drop=True)
 
 def arima_grid(
     series: pd.Series,
-    p_max: int = 4,
-    d_max: int = 2,
-    q_max: int = 4,
     *,
+    p_max: int = 6,
+    d_max: int = 2,
+    q_max: int = 6,
     d_force: Optional[int] = None,
     trend: Optional[str] = None,
-) -> tuple[pd.DataFrame, dict, Any]:
-    """
-    Grid ARIMA/SARIMAX.
-    - d_force: si fourni, force la différenciation (DS => 1, TS => 0).
-    - trend: si None, choisi automatiquement:
-        - si d_force==0: trend='c' (constante) par défaut
-        - si d_force==1: trend='n' (pas de constante) par défaut (plus standard après différenciation)
-      Tu peux surcharger explicitement.
-    """
+    alpha_sig: float = 0.05,
+):
     y = series.dropna().astype(float)
 
-    best = None
+    rows, best_res, best = [], None, None
     best_aic = np.inf
-    best_res = None
 
-    rows = []
-    n_fit_error = 0
-    n_nonconverged = 0
-
-    # choix par défaut du trend (optionnel mais économétriquement plus propre)
-    if trend is None:
-        if d_force == 1:
-            trend_use = "n"
-        else:
-            trend_use = "c"
-    else:
-        trend_use = trend
-
-    d_values = [int(d_force)] if d_force is not None else list(range(d_max + 1))
+    trend_use = trend if trend is not None else ("n" if d_force == 1 else "c")
+    d_vals = [d_force] if d_force is not None else range(d_max + 1)
 
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=ConvergenceWarning)
-        warnings.filterwarnings("ignore", message=".*failed to converge.*")
 
         for p in range(p_max + 1):
-            for d in d_values:
+            for d in d_vals:
                 for q in range(q_max + 1):
-                    if p == 0 and d == 0 and q == 0:
+                    if (p, d, q) == (0, 0, 0):
                         continue
                     try:
-                        m = SARIMAX(
+                        res = SARIMAX(
                             y,
                             order=(p, d, q),
                             trend=trend_use,
                             enforce_stationarity=False,
                             enforce_invertibility=False,
-                        )
-                        res = m.fit(disp=False)
+                        ).fit(disp=False)
 
-                        converged = bool(res.mle_retvals.get("converged", False))
-                        if not converged:
-                            n_nonconverged += 1
+                        if not res.mle_retvals.get("converged", False):
                             continue
 
-                        aic = float(res.aic)
-                        bic = float(res.bic)
-                        rows.append({
+                        row = {
                             "p": p, "d": d, "q": q,
-                            "aic": aic, "bic": bic,
-                            "trend": trend_use,
-                        })
+                            "aic": float(res.aic),
+                            "bic": float(res.bic),
+                            **_sig_stats_from_res(res, alpha=alpha_sig),
+                        }
+                        rows.append(row)
 
-                        if aic < best_aic:
-                            best_aic = aic
-                            best_res = res
-                            best = {"order": (p, d, q), "aic": aic, "bic": bic, "trend": trend_use}
-
+                        if res.aic < best_aic:
+                            best_aic, best, best_res = res.aic, row, res
                     except Exception:
-                        n_fit_error += 1
                         continue
 
     grid = pd.DataFrame(rows).sort_values(["aic", "bic"]).reset_index(drop=True)
-
-    if best is None:
-        best = {"order": None, "aic": None, "bic": None, "trend": trend_use, "note": "No converged model found."}
-
-    best["grid_n_ok"] = int(len(grid))
-    best["grid_n_nonconverged"] = int(n_nonconverged)
-    best["grid_n_fit_error"] = int(n_fit_error)
-
     return grid, best, best_res
+
+
+def fit_sarimax_safe(
+    series: pd.Series,
+    order: tuple[int, int, int],
+    *,
+    trend: str = "c",
+) -> Any | None:
+    """Fit SARIMAX et retourne res (ou None si échec/non convergence)."""
+    y = series.dropna().astype(float)
+    if len(y) < 30:
+        return None
+    try:
+        m = SARIMAX(
+            y,
+            order=order,
+            trend=trend,
+            enforce_stationarity=False,
+            enforce_invertibility=False,
+        )
+        res = m.fit(disp=False)
+        if not bool(res.mle_retvals.get("converged", False)):
+            return None
+        return res
+    except Exception:
+        return None
+
 
 def residual_diagnostics(resid: np.ndarray, lags: int = 24) -> pd.DataFrame:
     resid = resid[~np.isnan(resid)]
@@ -227,6 +311,8 @@ def residual_diagnostics(resid: np.ndarray, lags: int = 24) -> pd.DataFrame:
     return out
 
 def figs_fit(series: pd.Series, best_res) -> dict[str, plt.Figure]:
+    if best_res is None:
+        return {}
     y = series.dropna().astype(float)
     pred = best_res.get_prediction()
     mu = pred.predicted_mean

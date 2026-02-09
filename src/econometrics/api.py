@@ -15,7 +15,7 @@ from src.econometrics.diagnostics import (
 from src.econometrics.univariate import (
     ar_grid, ma_grid, arma_grid,
     arima_grid, residual_diagnostics,
-    hurst_exponent, rescaled_range, figs_fit)
+    hurst_exponent, rescaled_range, figs_fit,fit_sarimax_safe)
 
 from src.econometrics.multivariate import var_pack
 from src.econometrics.cointegration import cointegration_pack
@@ -201,136 +201,169 @@ def step3_stationarity_pack(df: pd.DataFrame, *, y: str, lags: int = 24, **param
 
 def step4_univariate_pack(df: pd.DataFrame, *, y: str, **params: Any) -> dict[str, Any]:
     """
-    Étape 4 — Univarié (ARIMA)
-    Règle:
-      - verdict="DS"  => ARIMA avec d=1 sur le niveau (trend='n' par défaut), diagnostics et grilles AR/MA/ARMA sur Δs
-      - verdict="TS"  => détrend linéaire, ARIMA avec d=0 sur série détrendée (trend='c'), grilles sur série détrendée
+    Étape 4 — Analyse univariée (AR / MA / ARMA / ARIMA)
+
+    Pipeline :
+    1) Préparation TS / DS
+    2) Grilles AR / MA / ARMA (stationnaire) + significativité
+    3) Grille ARIMA (niveau) + significativité
+    4) Sélection finale (AIC/BIC parmi modèles significatifs)
+    5) Diagnostics + figures sur le modèle retenu
     """
+
+    # ==========================================================
+    # 0) Paramètres
+    # ==========================================================
+    alpha = float(params.get("alpha_sig", 0.05))
+    criterion = str(params.get("criterion", "bic")).lower()
+    criterion = criterion if criterion in {"aic", "bic"} else "bic"
+    crit_col = "aic" if criterion == "aic" else "bic"
+
     s = _series(df, y)
     verdict = params.get("ts_ds_verdict", "DS")
 
-    # ----------------------------
-    # 1) Préparation cohérente (ADF-only)
-    # ----------------------------
+    # ==========================================================
+    # 1) Préparation cohérente TS / DS
+    # ==========================================================
     if verdict == "DS":
-        d_force = 1
-        trend = "n"
+        d_force, trend = 1, "n"
         s_model = s.dropna()
+        s_stationary = s_model.diff().dropna()
     elif verdict == "TS":
-        d_force = 0
-        trend = "c"
+        d_force, trend = 0, "c"
         t = np.arange(len(s))
         coef = np.polyfit(t, s.values, 1)
-        trend_line = coef[0] * t + coef[1]
-        s_model = (s - trend_line).dropna()
+        s_model = (s - (coef[0] * t + coef[1])).dropna()
+        s_stationary = s_model
     else:
-        d_force = None
-        trend = "c"
+        d_force, trend = None, "c"
         s_model = s.dropna()
+        s_stationary = s_model
 
-    # Série stationnarisée utilisée pour AR/MA/ARMA + métriques mémoire
-    s_for_arma = s_model.diff().dropna() if d_force == 1 else s_model
+    # ==========================================================
+    # 2) Grilles AR / MA / ARMA (stationnaire)
+    # ==========================================================
+    tbl_ar = ar_grid(s_stationary, p_max=6, alpha_sig=alpha)
+    tbl_ma = ma_grid(s_stationary, q_max=6, alpha_sig=alpha)
+    tbl_arma = arma_grid(s_stationary, p_max=6, q_max=6, alpha_sig=alpha)
 
-    # ----------------------------
-    # 2) Grilles AR/MA/ARMA (stationnaire)
-    # ----------------------------
-    tbl_ar = ar_grid(s_for_arma, p_max=8)
-    tbl_ma = ma_grid(s_for_arma, q_max=8)
-    tbl_arma = arma_grid(s_for_arma, p_max=6, q_max=6)
-
-    def _best_from_table(tbl: pd.DataFrame) -> dict | None:
-        if tbl is None or tbl.empty:
+    def _best_sig(tbl: pd.DataFrame) -> dict | None:
+        if tbl is None or tbl.empty or "is_significant" not in tbl.columns:
             return None
-        return tbl.iloc[0].to_dict()
+        t = tbl[tbl["is_significant"]].copy()
+        if t.empty:
+            return None
+        return t.sort_values([crit_col, "aic", "bic"]).iloc[0].to_dict()
 
-    best_ar = _best_from_table(tbl_ar)
-    best_ma = _best_from_table(tbl_ma)
-    best_arma = _best_from_table(tbl_arma)
+    best_ar = _best_sig(tbl_ar)
+    best_ma = _best_sig(tbl_ma)
+    best_arma = _best_sig(tbl_arma)
 
-    # ----------------------------
-    # 3) Grille ARIMA (cohérente avec d_force)
-    # NOTE: nécessite arima_grid(..., d_force=..., trend=...)
-    # ----------------------------
-    grid, best, best_res = arima_grid(
+    # ==========================================================
+    # 3) Grille ARIMA (niveau)
+    # ==========================================================
+    tbl_arima, best_arima_raw, best_arima_res = arima_grid(
         s_model,
-        p_max=int(params.get("p_max", 4)),
+        p_max=int(params.get("p_max", 6)),
         d_max=int(params.get("d_max", 2)),
-        q_max=int(params.get("q_max", 4)),
+        q_max=int(params.get("q_max", 6)),
         d_force=d_force,
         trend=trend,
+        alpha_sig=alpha,
+    )
+    best_arima = _best_sig(tbl_arima)
+
+    # ==========================================================
+    # 4) Tableau de synthèse (modèles significatifs uniquement)
+    # ==========================================================
+    rows = []
+    if best_ar:
+        rows.append({"model": "AR", "aic": best_ar["aic"], "bic": best_ar["bic"], "params": f"p={best_ar['p']}"})
+    if best_ma:
+        rows.append({"model": "MA", "aic": best_ma["aic"], "bic": best_ma["bic"], "params": f"q={best_ma['q']}"})
+    if best_arma:
+        rows.append({
+            "model": "ARMA",
+            "aic": best_arma["aic"],
+            "bic": best_arma["bic"],
+            "params": f"p={best_arma['p']}, q={best_arma['q']}",
+        })
+    if best_arima:
+        rows.append({
+            "model": "ARIMA",
+            "aic": best_arima["aic"],
+            "bic": best_arima["bic"],
+            "params": f"(p,d,q)=({best_arima['p']},{best_arima['d']},{best_arima['q']})",
+        })
+
+    tbl_summary = pd.DataFrame(rows).reset_index(drop=True)
+
+    # ==========================================================
+    # 5) Sélection finale (AIC/BIC parmi modèles significatifs)
+    # ==========================================================
+    if tbl_summary.empty:
+        selected_family = "ARIMA"
+        best_res = best_arima_res
+        order = best_arima_raw.get("order")
+        aic, bic = best_arima_raw.get("aic"), best_arima_raw.get("bic")
+    else:
+        winner = tbl_summary.sort_values(crit_col).iloc[0]  # ✅ FIX 1: tri sur la bonne colonne
+        selected_family = str(winner["model"])
+
+        if selected_family == "AR":
+            order = (int(best_ar["p"]), 0, 0)
+            best_res = fit_sarimax_safe(s_stationary, order, trend="c")
+            aic, bic = float(best_ar["aic"]), float(best_ar["bic"])
+
+        elif selected_family == "MA":
+            order = (0, 0, int(best_ma["q"]))
+            best_res = fit_sarimax_safe(s_stationary, order, trend="c")
+            aic, bic = float(best_ma["aic"]), float(best_ma["bic"])
+
+        elif selected_family == "ARMA":
+            order = (int(best_arma["p"]), 0, int(best_arma["q"]))
+            best_res = fit_sarimax_safe(s_stationary, order, trend="c")
+            aic, bic = float(best_arma["aic"]), float(best_arma["bic"])
+
+        else:  # ARIMA
+            order = (int(best_arima["p"]), int(best_arima["d"]), int(best_arima["q"]))
+            best_res = fit_sarimax_safe(s_model, order, trend=trend)
+            aic, bic = float(best_arima["aic"]), float(best_arima["bic"])
+
+    if best_res is None:  # ✅ FIX 2: sécurité si refit échoue
+        best_res = best_arima_res
+
+    # ==========================================================
+    # 6) Diagnostics & figures
+    # ==========================================================
+    resid = best_res.resid if best_res is not None else None
+    tbl_diag = (
+        residual_diagnostics(resid, lags=24)
+        if resid is not None
+        else pd.DataFrame([{"status": "no_model"}])
     )
 
-    resid = best_res.resid if best_res is not None else None
+    series_for_fig = s_model if selected_family == "ARIMA" else s_stationary
+    figs = figs_fit(series_for_fig, best_res) if best_res is not None else {}
 
-    # ----------------------------
-    # 4) Diagnostics résiduels + figures (sur la même série que l'estimation)
-    # ----------------------------
-    tbl_diag = residual_diagnostics(resid, lags=24) if resid is not None else pd.DataFrame([{"status": "no_model"}])
-    figs = figs_fit(s_model, best_res) if best_res is not None else {}
-
-    # ----------------------------
-    # 5) Mémoire (sur stationnarisée)
-    # ----------------------------
-    mem_series = s_for_arma.values
+    # ==========================================================
+    # 7) Mémoire longue
+    # ==========================================================
     mem = {
-        "rescaled_range": float(rescaled_range(mem_series)),
-        "hurst": float(hurst_exponent(mem_series)),
-        "arfima_status": "non implémenté (hors périmètre de l'analyse)",
+        "hurst": float(hurst_exponent(s_stationary.values)),
+        "rescaled_range": float(rescaled_range(s_stationary.values)),
     }
-    tbl_mem = pd.DataFrame([mem]).set_index(pd.Index(["memory"]))
+    tbl_mem = pd.DataFrame([mem], index=["memory"])
 
-    # ----------------------------
-    # 6) Synthèse tableau
-    # ----------------------------
-    tbl_summary = pd.DataFrame([
-        {
-            "model": "AR",
-            "best_aic": best_ar["aic"] if best_ar else None,
-            "best_bic": best_ar["bic"] if best_ar else None,
-            "params": f"p={best_ar['p']}" if best_ar else None,
-        },
-        {
-            "model": "MA",
-            "best_aic": best_ma["aic"] if best_ma else None,
-            "best_bic": best_ma["bic"] if best_ma else None,
-            "params": f"q={best_ma['q']}" if best_ma else None,
-        },
-        {
-            "model": "ARMA",
-            "best_aic": best_arma["aic"] if best_arma else None,
-            "best_bic": best_arma["bic"] if best_arma else None,
-            "params": f"p={best_arma['p']}, q={best_arma['q']}" if best_arma else None,
-        },
-        {
-            "model": "ARIMA",
-            "best_aic": (best or {}).get("aic"),
-            "best_bic": (best or {}).get("bic"),
-            "params": f"(p,d,q)={(best or {}).get('order')}",
-        },
-    ])
-
-    order = (best or {}).get("order")
-    aic = (best or {}).get("aic")
-    bic = (best or {}).get("bic")
-
-    # Diagnostics p-values
-    lb_p = jb_p = arch_p = None
-    if isinstance(tbl_diag, pd.DataFrame) and "ljungbox_p" in tbl_diag.columns and "diag" in tbl_diag.index:
-        lb_p = float(tbl_diag.loc["diag", "ljungbox_p"])
-        jb_p = float(tbl_diag.loc["diag", "jarque_bera_p"])
-        arch_p = float(tbl_diag.loc["diag", "arch_p"])
-
-    hurst = float(tbl_mem.loc["memory", "hurst"]) if "hurst" in tbl_mem.columns else None
-    rs = float(tbl_mem.loc["memory", "rescaled_range"]) if "rescaled_range" in tbl_mem.columns else None
-
+    # ==========================================================
+    # 8) Note synthèse (compatible LaTeX / markdown)
+    # ==========================================================
     def _fmt2(x: Any) -> str:
-        return f"{x:.2f}" if isinstance(x, (int, float)) else "NA"
+        return f"{x:.2f}" if isinstance(x, (int, float, np.floating)) and np.isfinite(x) else "NA"
 
-    note4 = (
-        f"**Étape 4 — Univarié (ARIMA)** : verdict stationnarité={verdict} ⇒ d={d_force if d_force is not None else 'auto'}. "
-        f"Modèle sélectionné ordre={order}, AIC={_fmt2(aic)}, BIC={_fmt2(bic)}. "
-        + (f"Résidus: Ljung-Box p={lb_p:.3g}, JB p={jb_p:.3g}, ARCH p={arch_p:.3g}. " if lb_p is not None else "")
-        + (f"Mémoire: Hurst≈{hurst:.3f}, R/S≈{rs:.3f}." if hurst is not None and rs is not None else "")
+    note = (
+        f"**Étape 4 — Univarié** : verdict={verdict}, critère={criterion.upper()} ⇒ "
+        f"modèle retenu={selected_family}, ordre={order}, AIC={_fmt2(aic)}, BIC={_fmt2(bic)}."
     )
 
     return {
@@ -338,32 +371,22 @@ def step4_univariate_pack(df: pd.DataFrame, *, y: str, **params: Any) -> dict[st
             "tbl.uni.ar": tbl_ar,
             "tbl.uni.ma": tbl_ma,
             "tbl.uni.arma": tbl_arma,
-            "tbl.uni.arima": grid,
+            "tbl.uni.arima": tbl_arima,
             "tbl.uni.summary": tbl_summary,
             "tbl.uni.resid_diag": tbl_diag,
             "tbl.uni.memory": tbl_mem,
         },
         "metrics": {
+            # ✅ FIX 3: structure plus stable pour tes exports LaTeX/markdown
             "m.uni.best": {
-                "best": best,
-                "key_points": {
-                    "verdict": verdict,
-                    "d_force": d_force,
-                    "trend": trend,
-                    "best_ar": best_ar,
-                    "best_ma": best_ma,
-                    "best_arma": best_arma,
-                    "order": order,
-                    "aic": aic,
-                    "bic": bic,
-                    "lb_p": lb_p,
-                    "jb_p": jb_p,
-                    "arch_p": arch_p,
-                    "hurst": hurst,
-                    "rescaled_range": rs,
-                },
+                "best_sig": {"AR": best_ar, "MA": best_ma, "ARMA": best_arma, "ARIMA": best_arima},
+                "family": selected_family,
+                "order": order,
+                "aic": aic,
+                "bic": bic,
+                "criterion": criterion,
             },
-            "m.note.step4": {"markdown": note4},
+            "m.note.step4": {"markdown": note},
         },
         "models": {"model.uni.best": best_res},
         "figures": figs,
