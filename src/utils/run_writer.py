@@ -223,10 +223,72 @@ Monsieur Paraguette Maurice}
 \end{titlepage}
 
 % =================================================
+% REMERCIEMENTS
+% =================================================
+\clearpage
+\thispagestyle{empty}
+
+\begin{center}
+{\Large \textbf{Remerciements}}
+\end{center}
+
+\vspace{1cm}
+
+Nous souhaitons adresser nos sincères remerciements à Monsieur \textbf{Mestre Roman}
+pour son accompagnement tout au long de nos deux années de Master.
+Ses enseignements en économétrie, sa rigueur méthodologique et ses exigences académiques
+ont joué un rôle central dans la structuration de notre raisonnement empirique
+et dans la conduite de ce projet.
+
+Nous remercions également Monsieur \textbf{Paraguette Maurice}
+pour ses interventions en tant que professionnel sur les thématiques liées à
+l'intelligence artificielle et aux modèles de langage (IA/LLM).
+Ses apports ont permis de mieux comprendre les enjeux actuels de l'automatisation
+de l'analyse économique en fin de cursus universitaire.
+
+Enfin, nous remercions nos camarades de promotion pour les échanges et discussions
+qui ont accompagné ce travail et contribué à enrichir notre réflexion collective.
+
+\clearpage
+
+% =================================================
+% AVANT-PROPOS
+% =================================================
+\thispagestyle{empty}
+
+\begin{center}
+{\Large \textbf{Avant-propos}}
+\end{center}
+
+\vspace{1cm}
+
+Le présent rapport a été généré automatiquement par un automate économétrique public,
+développé sous forme d'une application Streamlit.
+Cet automate produit l'ensemble du document en format \LaTeX,
+permettant une compilation et une lecture optimales via la plateforme Overleaf.
+
+L'intégralité des analyses, tableaux, graphiques et sections textuelles
+est générée de manière automatisée par cet outil,
+reposant sur un pipeline économétrique déterministe
+garantissant la reproductibilité complète des résultats.
+
+L'automate a été intégralement conçu et codé par nos soins en langage Python.
+L'intelligence artificielle a été mobilisée comme outil d'assistance,
+notamment via l'utilisation de ChatGPT (version 5.2),
+afin de faciliter certaines étapes de structuration,
+de rédaction et d'interprétation,
+sans jamais se substituer aux choix méthodologiques et scientifiques.
+
+Ce travail illustre ainsi une articulation maîtrisée entre automatisation,
+intelligence artificielle et rigueur académique,
+conforme aux exigences du Master.
+
+\clearpage
+
+% =================================================
 % DÉBUT DU DOCUMENT PRINCIPAL
 % =================================================
-% IMPORTANT : \maketitle est SUPPRIMÉ volontairement
-% car la page de garde est déjà définie manuellement.
+
 
 \tableofcontents
 \listoffigures
