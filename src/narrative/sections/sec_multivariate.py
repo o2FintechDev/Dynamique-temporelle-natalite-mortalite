@@ -104,12 +104,29 @@ def render_sec_multivariate(
     # ---------------------------
     # Artefacts
     # ---------------------------
+    # Tables (core)
     tbl_lag = lookup(manifest, "tables", "tbl.var.lag_selection")
     tbl_granger = lookup(manifest, "tables", "tbl.var.granger")
     tbl_sims = lookup(manifest, "tables", "tbl.var.sims")
     tbl_fevd = lookup(manifest, "tables", "tbl.var.fevd")
-    fig_irf = lookup(manifest, "figures", "fig.var.irf")
+    tbl_input = lookup(manifest, "tables", "tbl.var.input_window")
+    tbl_stat  = lookup(manifest, "tables", "tbl.var.stationarity")
+    tbl_corr  = lookup(manifest, "tables", "tbl.var.corr")
+    tbl_pvals = lookup(manifest, "tables", "tbl.var.params_pvalues")
 
+    # Tables (annexes)
+    tbl_lag_grid = lookup(manifest, "tables", "tbl.var.lag_grid")
+    tbl_const    = lookup(manifest, "tables", "tbl.var.const")
+    tbl_A1 = lookup(manifest, "tables", "tbl.var.A1")
+    tbl_A2 = lookup(manifest, "tables", "tbl.var.A2")
+    tbl_A3 = lookup(manifest, "tables", "tbl.var.A3")
+    tbl_A4 = lookup(manifest, "tables", "tbl.var.A4")
+    tbl_A5 = lookup(manifest, "tables", "tbl.var.A5")
+    tbl_stationary_data = lookup(manifest, "tables", "tbl.var.stationary_data")
+
+    # Figures
+    fig_corr = lookup(manifest, "figures", "fig.var.corr_heatmap")       
+    fig_irf = lookup(manifest, "figures", "fig.var.irf")
     lines: list[str] = []
 
     # ============================================================
@@ -162,7 +179,7 @@ def render_sec_multivariate(
     vars_txt = ", ".join([str(v) for v in vars_]) if vars_ else "NA"
 
     lines += [
-        r"\section{Résultats empiriques (Step5)}",
+        r"\section{Résultats empiriques}",
         "",
         md_basic_to_tex(
             f"Synthèse : variables={vars_txt}, dimension $k$={k}, ordre $p$={p}, n={nobs}. "
@@ -172,22 +189,62 @@ def render_sec_multivariate(
         narr_call("m.var.audit"),
         "",
     ]
-
-    # Alerte stabilité
-    if stable is False:
+    if tbl_input:
         lines += [
+            r"\paragraph{Tableau 1 — Fenêtre effective et données utilisées}",
             md_basic_to_tex(
-                "Alerte : le VAR n’est pas stable (racines $\geq 1$). "
-                "Les IRF/FEVD ne sont pas interprétables économiquement. "
-                "Priorité à la re-spécification : ordre $p$, transformations, choix des variables, traitement saisonnalité/ruptures."
+                "Lecture : ce tableau fixe l’échantillon effectivement estimé (après dropna/transformations). "
+                "Il conditionne la comparabilité des résultats (tests, stabilité, IRF/FEVD)."
             ),
+            "",
+            include_table_tex(run_root=run_root, tbl_rel=tbl_input, caption="tbl.var.input_window", label="tab:tbl-var-input-window"),
+            narr_call("tbl.var.input_window"),
+            "",
+        ]
+
+    if tbl_stat:
+        lines += [
+            r"\paragraph{Tableau 2 — Stationnarité des variables (pré-requis VAR)}",
+            md_basic_to_tex(
+                "Lecture : un VAR standard suppose des séries stationnaires (ou un traitement approprié). "
+                "Ce tableau valide que les transformations appliquées rendent les composantes/variables exploitables."
+            ),
+            "",
+            include_table_tex(run_root=run_root, tbl_rel=tbl_stat, caption="tbl.var.stationarity", label="tab:tbl-var-stationarity"),
+            narr_call("tbl.var.stationarity"),
+            "",
+        ]
+
+    if fig_corr:
+        lines += [
+            r"\paragraph{Figure 1 — Corrélations (heatmap)}",
+            md_basic_to_tex(
+                "Lecture : repérer colinéarités, blocs de variables, et structure intuitive des interactions. "
+                "Des corrélations très élevées peuvent dégrader l’identification et rendre certains coefficients instables."
+            ),
+            "",
+            include_figure(fig_rel=fig_corr, caption="fig.var.corr_heatmap", label="fig:fig-var-corr-heatmap"),
+            narr_call("fig.var.corr_heatmap"),
+            "",
+        ]
+
+    if tbl_corr:
+        lines += [
+            r"\paragraph{Tableau 3 — Matrice de corrélation (audit)}",
+            md_basic_to_tex(
+                "Lecture : audit numérique des corrélations. "
+                "Utile si la heatmap est insuffisante pour lire certaines paires."
+            ),
+            "",
+            include_table_tex(run_root=run_root, tbl_rel=tbl_corr, caption="tbl.var.corr", label="tab:tbl-var-corr"),
+            narr_call("tbl.var.corr"),
             "",
         ]
 
     # Lag selection
     if tbl_lag:
         lines += [
-            r"\paragraph{Tableau 1 — Sélection du nombre de retards}",
+            r"\paragraph{Tableau 4 — Sélection du nombre de retards}",
             md_basic_to_tex(
                 "Lecture : le choix de $p$ est un arbitrage biais–variance. "
                 "Un $p$ trop faible omet de la dynamique (résidus autocorrélés) ; "
@@ -203,11 +260,34 @@ def render_sec_multivariate(
             narr_call("tbl.var.lag_selection"),
             "",
         ]
+    # Alerte stabilité
+    if stable is False:
+        lines += [
+            md_basic_to_tex(
+                "Alerte : le VAR n’est pas stable (racines $\geq 1$). "
+                "Les IRF/FEVD ne sont pas interprétables économiquement. "
+                "Priorité à la re-spécification : ordre $p$, transformations, choix des variables, traitement saisonnalité/ruptures."
+            ),
+            "",
+        ]
 
+    if tbl_pvals:
+        lines += [
+            r"\paragraph{Tableau 5 — Significativité des coefficients (p-values)}",
+            md_basic_to_tex(
+                "Lecture : ce tableau indique quels retards/relations sont statistiquement robustes dans l’estimation. "
+                "Il ne remplace pas IRF/FEVD, mais il sert de contrôle : un VAR sur-paramétré produit des coefficients non significatifs en masse."
+            ),
+            "",
+            include_table_tex(run_root=run_root, tbl_rel=tbl_pvals, caption="tbl.var.params_pvalues", label="tab:tbl-var-params-pvalues"),
+            narr_call("tbl.var.params_pvalues"),
+            "",
+        ]
+    
     # Granger
     if tbl_granger:
         lines += [
-            r"\paragraph{Tableau 2 — Causalité de Granger (pairwise)}",
+            r"\paragraph{Tableau 6 — Causalité de Granger (pairwise)}",
             md_basic_to_tex(
                 "Lecture : un rejet signifie un gain de prévision conditionnel à $p$. "
                 "Ce résultat est sensible au choix de $p$, à la stationnarité, et aux ruptures. "
@@ -238,7 +318,7 @@ def render_sec_multivariate(
             lines += [md_basic_to_tex(f"Audit Sims : {sims_txt}."), narr_call("m.var.sims"), ""]
 
         lines += [
-            r"\paragraph{Tableau 3 — Causalité à la Sims (leads)}",
+            r"\paragraph{Tableau 7 — Causalité à la Sims (leads)}",
             md_basic_to_tex(
                 "Lecture : la significativité des leads est un signal d’incohérence temporelle (anticipation) "
                 "ou de mauvaise spécification (retards insuffisants, variables inadaptées, effets de calendrier). "
@@ -255,10 +335,11 @@ def render_sec_multivariate(
             "",
         ]
 
+
     # IRF (uniquement si stable)
     if fig_irf and stable is not False:
         lines += [
-            r"\paragraph{Figure 1 — Fonctions de réponse impulsionnelle (IRF)}",
+            r"\paragraph{Figure 2 — Fonctions de réponse impulsionnelle (IRF)}",
             md_basic_to_tex(
                 "Lecture : les IRF décrivent la trajectoire dynamique après un choc unitaire. "
                 "L’interprétation économique requiert un VAR stable. "
@@ -273,7 +354,7 @@ def render_sec_multivariate(
     # FEVD (uniquement si stable)
     if tbl_fevd and stable is not False:
         lines += [
-            r"\paragraph{Tableau 4 — Décomposition de variance des erreurs de prévision (FEVD)}",
+            r"\paragraph{Tableau 8 — Décomposition de variance des erreurs de prévision (FEVD)}",
             md_basic_to_tex(
                 "Lecture : mesure la contribution relative de chaque choc à différents horizons. "
                 "Une part dominante propre suggère une dynamique auto-entretenue ; "
@@ -289,8 +370,26 @@ def render_sec_multivariate(
             narr_call("tbl.var.fevd"),
             "",
         ]
+    
+    # --- Annexes techniques (non insérées dans le corps)
+    if tbl_lag_grid or tbl_const or tbl_A1 or tbl_stationary_data:
+        lines += [
+            md_basic_to_tex(
+                "**Annexes techniques (VAR)** : grilles de sélection, constantes, matrices $A_i$ et données stationnarisées "
+                "sont disponibles dans les artefacts (non insérées dans le corps)."
+            ),
+            "",
+        ]
+        if tbl_lag_grid:        lines += [narr_call("tbl.var.lag_grid"), ""]
+        if tbl_const:           lines += [narr_call("tbl.var.const"), ""]
+        if tbl_A1:              lines += [narr_call("tbl.var.A1"), ""]
+        if tbl_A2:              lines += [narr_call("tbl.var.A2"), ""]
+        if tbl_A3:              lines += [narr_call("tbl.var.A3"), ""]
+        if tbl_A4:              lines += [narr_call("tbl.var.A4"), ""]
+        if tbl_A5:              lines += [narr_call("tbl.var.A5"), ""]
+        if tbl_stationary_data: lines += [narr_call("tbl.var.stationary_data"), ""]
 
-    # Note step5
+    # Note step5 : optionnel
     if note_md.strip():
         lines += [
             md_basic_to_tex("**Note d’interprétation automatisée (Step5)**"),

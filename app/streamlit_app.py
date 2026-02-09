@@ -115,38 +115,35 @@ def fallback_route(user_text: str) -> dict:
 def llm_route(user_text: str) -> dict:
     """
     Retour: {"action": <tool_name|RUN_ALL|export_latex_pdf|HELP|None>, "confidence": float, "reason": str}
-    Si pas de clé API -> fallback.
     """
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         out = fallback_route(user_text)
         out["confidence"] = 0.50 if out["action"] else 0.0
-        out["reason"] = "fallback(no_api_key)"
+        out["reason"] = "fallback(no_GROQ_API_KEY)"
         return out
 
-    # Prompt strict: produire uniquement un JSON
     system = (
-        "Tu es un routeur d'intentions pour une application économétrique. "
-        "Tu dois choisir UNE action parmi la liste autorisée. "
-        "Retourne STRICTEMENT un JSON minifié."
+        "Tu es un routeur d'intentions pour une app économétrique. "
+        "Choisis UNE action autorisée. Réponds STRICTEMENT en JSON minifié, sans texte autour."
     )
-    allowed = [s[0] for s in PLAN_STEPS] + ["RUN_ALL", "export_latex_pdf", "HELP", None]
+
     user = (
         "Actions autorisées:\n"
         "- step1_load_and_profile\n- step2_descriptive\n- step3_stationarity\n- step4_univariate\n"
-        "- step5_var\n- step6_cointegration\n- step7_anthropology\n- RUN_ALL\n- export_latex_pdf\n- HELP\n\n"
+        "- step5_var\n- step6_cointegration\n- step7_anthropology\n- RUN_ALL\n- export_latex_pdf\n- HELP\n- null\n\n"
         f"Texte utilisateur: {user_text}\n\n"
-        "Réponds sous forme JSON minifié: "
-        '{"action":"<...|null>","confidence":0-1,"reason":"..."}'
+        'JSON minifié attendu: {"action":"<...|null>","confidence":0-1,"reason":"..."}'
     )
 
-    # Appel API minimal (chat completions)
+    allowed = {s[0] for s in PLAN_STEPS} | {"RUN_ALL", "export_latex_pdf", "HELP", None, "null"}
+
     try:
         r = requests.post(
-            "https://api.openai.com/v1/chat/completions",
+            "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
-                "model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                "model": os.getenv("GROQ_MODEL_ROUTER", "llama-3.1-8b-instant"),
                 "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
                 "temperature": 0.0,
             },
@@ -157,11 +154,10 @@ def llm_route(user_text: str) -> dict:
         obj = json.loads(content)
 
         action = obj.get("action", None)
-        if action is None:
-            return {"action": None, "confidence": float(obj.get("confidence", 0)), "reason": obj.get("reason", "llm_null")}
+        if action == "null":
+            action = None
 
         if action not in allowed:
-            # sécurité : si LLM hallucine, on fallback
             out = fallback_route(user_text)
             out["confidence"] = 0.40 if out["action"] else 0.0
             out["reason"] = "llm_invalid_action_fallback"
@@ -177,6 +173,57 @@ def llm_route(user_text: str) -> dict:
         out["confidence"] = 0.40 if out["action"] else 0.0
         out["reason"] = "llm_error_fallback"
         return out
+    
+def _collect_run_context(run_id: str | None) -> str:
+    if not run_id:
+        return "Aucun run actif. Réponds en définitions générales."
+    chunks = []
+    for _, note_label, title in PLAN_STEPS:
+        p = RunManager.get_artefact_path(note_label, run_id=run_id)
+        if not p:
+            continue
+        payload = read_metric_json(p) or {}
+        md = payload.get("markdown")
+        if md:
+            chunks.append(f"## {title}\n{md}")
+    return "\n\n".join(chunks) if chunks else "Run actif mais aucune note disponible."
+
+def llm_answer(user_text: str, *, run_id: str | None) -> str:
+    api_key = os.getenv("GROQ_API_KEY")
+    ctx = _collect_run_context(run_id)
+
+    # Si pas de clé, réponse fallback “statique”
+    if not api_key:
+        return (
+            "Mode sans LLM (GROQ_API_KEY absent).\n\n"
+            "Je peux: (1) exécuter des étapes via mots-clés, (2) expliquer concepts (ADF, VAR, cointégration, ARIMA)."
+        )
+
+    system = (
+        "Tu es un assistant économétrie senior pour le projet AnthroDem Lab (Croissance Naturelle 1975-2025). "
+        "Tu réponds de façon professionnelle, structurée, concise. "
+        "Si le contexte run contient des résultats, tu les utilises. "
+        "Si l'utilisateur demande une action (exécuter une étape), dis explicitement quelle commande taper (stepX/export)."
+    )
+
+    user = (
+        f"Contexte (notes du run):\n{ctx}\n\n"
+        f"Question utilisateur:\n{user_text}\n\n"
+        "Réponds en français."
+    )
+
+    r = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={
+            "model": os.getenv("GROQ_MODEL_QA", "llama-3.1-70b-versatile"),
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            "temperature": 0.2,
+        },
+        timeout=60,
+    )
+    r.raise_for_status()
+    return r.json()["choices"][0]["message"]["content"].strip()
 
 def help_text() -> str:
     return (
@@ -245,8 +292,13 @@ if user_msg:
     conf = route.get("confidence", 0.0)
     reason = route.get("reason", "")
 
-    if action in (None, "HELP"):
+    if action == "HELP":
         append_assistant(help_text())
+        st.rerun()
+
+    if action is None:
+        answer = llm_answer(user_msg, run_id=state.selected_run_id)
+        append_assistant(answer)
         st.rerun()
 
     # Exécution
