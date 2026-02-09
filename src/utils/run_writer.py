@@ -340,7 +340,7 @@ O38 (Technological Change – Automation and AI)
 \listoftables
 \clearpage
 
-\chapter{Introduction et Préparation}
+\chapter{Introduction}
 
 % AUTO
 \input{blocks/sec_data.tex}
