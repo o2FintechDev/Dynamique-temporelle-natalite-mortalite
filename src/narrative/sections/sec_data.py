@@ -53,6 +53,9 @@ def render_sec_data(
 
     lines: list[str] = []
 
+    # Chapitre 1
+    # Introduction et Préparation
+
     # ============================================================
     # SECTION : Contexte & construction (texte long)
     # ============================================================
