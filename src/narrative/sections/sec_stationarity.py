@@ -48,6 +48,7 @@ def render_sec_stationarity(
 
     tbl_adf = lookup(manifest, "tables", "tbl.diag.adf")
     tbl_tsds = lookup(manifest, "tables", "tbl.diag.ts_vs_ds_decision")
+    tbl_acfp  = lookup(manifest, "tables", "tbl.diag.acf_pacf")
     tbl_ljung = lookup(manifest, "tables", "tbl.diag.ljungbox_diff")
     tbl_band = lookup(manifest, "tables", "tbl.diag.band_df")
 
@@ -147,7 +148,7 @@ def render_sec_stationarity(
         r"\section{Résultats des diagnostics}",
         "",
         md_basic_to_tex(
-            f"Synthèse quantitative : **verdict ADF-only = {verdict}** "
+            f"Synthèse quantitative : **verdict (diagnostics TS/DS) = {verdict}** "
             f"(ADF(c) p={_fmt_p(p_c)}, ADF(ct) p={_fmt_p(p_ct)}). "
             "Cette décision pilote directement le traitement du niveau et le degré d’intégration pour ARIMA/VAR/VECM."
         ),
@@ -178,6 +179,25 @@ def render_sec_stationarity(
             "",
             include_figure(fig_rel=fig_pacf, caption="fig.diag.pacf_level", label="fig:fig-diag-pacf-level"),
             narr_call("fig.diag.pacf_level"),
+            "",
+        ]
+
+    if tbl_acfp:
+        lines += [
+            r"\paragraph{Tableau — Synthèse ACF/PACF (niveau)}",
+            md_basic_to_tex(
+                "Lecture : ce tableau condense la structure corrélographique (décroissance, pics significatifs, coupures). "
+                "Il sert de validation croisée : une ACF à décroissance lente est cohérente avec non-stationnarité ou mémoire longue ; "
+                "une coupure nette oriente vers un AR(p) stationnaire. La décision finale reste ADF/TS-DS."
+            ),
+            "",
+            include_table_tex(
+                run_root=run_root,
+                tbl_rel=tbl_acfp,
+                caption="tbl.diag.acf_pacf",
+                label="tab:tbl-diag-acf-pacf",
+            ),
+            narr_call("tbl.diag.acf_pacf"),
             "",
         ]
 
@@ -233,6 +253,7 @@ def render_sec_stationarity(
             "",
         ]
 
+    # Optionnel : note d’interprétation automatisée
     if note_md.strip():
         lines += [
             md_basic_to_tex("**Note d’interprétation automatisée**"),
