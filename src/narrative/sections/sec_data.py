@@ -50,6 +50,7 @@ def render_sec_data(
     t_desc = lookup(manifest, "tables", "tbl.data.desc_stats")
     t_miss = lookup(manifest, "tables", "tbl.data.missing_report")
     t_cov = lookup(manifest, "tables", "tbl.data.coverage_report")
+    t_audit = lookup(manifest, "tables", "tbl.data.vars_audit")
 
     lines: list[str] = []
 
@@ -180,19 +181,38 @@ def render_sec_data(
     # ============================================================
     lines += [
         r"\section{Préparation des données}",
-        "",
         md_basic_to_tex(
-            f"Les diagnostics de préparation résument l’échantillon effectivement exploitable : "
-            f"**{start} -> {end}**, fréquence **{freq}**, **n={nobs}**, taux de manquants **{miss_txt}**."
+            f"Les diagnostics de préparation bornent l’échantillon effectivement exploitable : "
+            f"période **{start} -> {end}**, fréquence **{freq}**, "
+            f"taille **n={nobs}**, taux de manquants **{miss_txt}**."
         ),
         narr_call("m.data.dataset_meta"),
         "",
     ]
-
-    # --- Table 1: descriptives + analyse
+     # --- Table 1: audit variables + analyse (clé pour un rapport pro)
+    if t_audit:
+        lines += [
+            r"\paragraph{Tableau 1 — Audit et traçabilité des variables}",
+            md_basic_to_tex(
+                "Lecture : ce tableau verrouille la définition opérationnelle des séries (unités, transformations, sources). "
+                "Il garantit l’interprétabilité économique et la validité des tests (ADF/VAR/VECM). "
+                "Toute incohérence d’unité ou de transformation se traduit mécaniquement par des diagnostics trompeurs "
+                "(fausse non-stationnarité, relations dynamiques artificielles)."
+            ),
+            "",
+            include_table_tex(
+                run_root=run_root,
+                tbl_rel=t_audit,
+                caption="tbl.data.vars_audit",
+                label="tab:tbl-data-vars-audit",
+            ),
+            narr_call("tbl.data.vars_audit"),
+            "",
+        ]
+    # --- Table 2: descriptives + analyse
     if t_desc:
         lines += [
-            r"\paragraph{Tableau 1 — Statistiques descriptives}",
+            r"\paragraph{Tableau 2 — Statistiques descriptives}",
             md_basic_to_tex(
                 "Lecture : contrôler l’ordre de grandeur, l’asymétrie et la dispersion. "
                 "Des extrêmes prononcés ou une distribution très dissymétrique sont cohérents avec des chocs (épidémiques, caniculaires) "
@@ -209,10 +229,10 @@ def render_sec_data(
             "",
         ]
 
-    # --- Table 2: missing report + analyse
+    # --- Table 3: missing report + analyse
     if t_miss:
         lines += [
-            r"\paragraph{Tableau 2 — Valeurs manquantes}",
+            r"\paragraph{Tableau 3 — Valeurs manquantes}",
             md_basic_to_tex(
                 "Lecture : même un faible taux de manquants peut biaiser ADF/Ljung–Box si les trous sont concentrés temporellement "
                 "(rupture de collecte, anomalies de source). La règle est : documenter et éviter de lisser artificiellement."
@@ -228,10 +248,10 @@ def render_sec_data(
             "",
         ]
 
-    # --- Table 3: coverage report + analyse
+    # --- Table 4: coverage report + analyse
     if t_cov:
         lines += [
-            r"\paragraph{Tableau 3 — Couverture temporelle}",
+            r"\paragraph{Tableau 4 — Couverture temporelle}",
             md_basic_to_tex(
                 "Lecture : valider la continuité de l’index, la présence éventuelle de périodes incomplètes, et la cohérence du début/fin d’échantillon. "
                 "Toute discontinuité non traitée se répercute sur la dynamique (ACF/PACF), les résidus et la détection de ruptures."
