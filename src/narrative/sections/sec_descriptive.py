@@ -193,7 +193,7 @@ def render_sec_descriptive(
 
     if fig_decomp:
         lines += [
-            r"\paragraph{Figure 2 — Décomposition (STL)}",
+            r"\paragraph{Figure 1 — Décomposition (STL)}",
             md_basic_to_tex(
                 "Lecture : la tendance isole le mouvement structurel ; la composante saisonnière capture les cycles réguliers ; "
                 "le résidu doit être centré et dépourvu de structure évidente. Un résidu encore autocorrélé signale une dynamique "
@@ -204,7 +204,7 @@ def render_sec_descriptive(
             narr_call("fig.desc.decomp"),
             "",
         ]
-        
+
         lines += [
             md_basic_to_tex(
                 "Contrôle de cohérence : la composante saisonnière visualisée doit être compatible avec la force saisonnière reportée ci-dessus ; "
