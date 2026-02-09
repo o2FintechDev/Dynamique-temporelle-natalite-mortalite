@@ -175,30 +175,59 @@ PAGE_LAYOUTS: Dict[str, List[SectionSpec]] = {
         # STEP 5 — Modélisation VAR
         # ----------------------
         SectionSpec(
-            title="Spécification du modèle VAR",
+            title="Prétraitement multivarié & stationnarisation (VAR)",
             help_md=(
-                "Sélection du nombre optimal de retards du VAR à l'aide des critères "
-                "d'information."
+                "Fenêtre d'estimation, contrôles de stationnarité et jeu de données stationnaire "
+                "utilisé pour l'estimation du VAR. Cette étape conditionne la validité des tests "
+                "de causalité et des IRF."
             ),
             tables=[
+                "tbl.var.input_window",
+                "tbl.var.stationarity",
+                "tbl.var.stationary_data",
+            ],
+        ),
+        SectionSpec(
+            title="Corrélations & sélection des retards (VAR)",
+            help_md=(
+                "Analyse des dépendances contemporaines (corrélations) et sélection du nombre "
+                "optimal de retards à l'aide des critères d'information. Les grilles/critères "
+                "doivent converger vers un ordre parcimonieux."
+            ),
+            figures=[
+                "fig.var.corr_heatmap",
+            ],
+            tables=[
+                "tbl.var.corr",
+                "tbl.var.lag_grid",
                 "tbl.var.lag_selection",
             ],
         ),
         SectionSpec(
-            title="Causalité et dynamique du VAR",
+            title="Estimation, causalité et dynamique (VAR)",
             help_md=(
-                "Analyse des relations dynamiques entre les variables à l'aide "
-                "des tests de causalité et des fonctions de réponse impulsionnelle."
+                "Paramètres estimés, significativité, causalité (Granger + Sims), décomposition "
+                "de variance (FEVD) et réponses impulsionnelles (IRF). Les matrices A1..A5 "
+                "détaillent la structure dynamique par retard."
             ),
             figures=[
                 "fig.var.irf",
             ],
             tables=[
+                "tbl.var.params_pvalues",
+                "tbl.var.lag_significance",
+                "tbl.var.const",
                 "tbl.var.granger",
                 "tbl.var.sims",
                 "tbl.var.fevd",
+                "tbl.var.A1",
+                "tbl.var.A2",
+                "tbl.var.A3",
+                "tbl.var.A4",
+                "tbl.var.A5",
             ],
         ),
+        
     ],
 
     # ======================================================

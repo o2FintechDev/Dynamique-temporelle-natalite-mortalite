@@ -30,12 +30,15 @@ def _render_fig(run_root: Path, it: Dict[str, Any]) -> None:
 
 
 def _render_table(run_id: str, it: Dict[str, Any]) -> None:
+    meta = (it.get("meta") or {})
+    if meta.get("nrows") == 0 and meta.get("ncols") == 0:
+        st.info("Table vide (aucun coefficient significatif selon le filtre appliqué).")
+        return
     try:
         df = read_table_from_artefact(run_id, it)
         st.dataframe(df, width="stretch")
     except Exception as e:
         st.error(f"Lecture table impossible: {it.get('path','')} ({e})")
-
 
 def _render_metric(run_root: Path, it: Dict[str, Any]) -> None:
     rel = it.get("path", "")
