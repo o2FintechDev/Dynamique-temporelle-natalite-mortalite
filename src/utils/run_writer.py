@@ -12,6 +12,16 @@ import uuid
 
 from filelock import FileLock
 
+def sanitize_tex(text: str) -> str:
+    """
+    Nettoie les caractères invisibles et dangereux pour LaTeX.
+    """
+    return (
+        text
+        .replace("\x07", "")  # BEL (^^G)
+        .replace("\x08", "")  # BACKSPACE (^^H)
+    )
+
 
 def _utc_ts() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -100,9 +110,12 @@ class RunWriter:
                 },
             )
 
-        # --- Init master.tex (plan stable) ---
+        # --- Init master.tex ---
         if not latex_master_path.exists():
-            latex_master_path.write_text(self._latex_master_skeleton(), encoding="utf-8")
+            latex_master_path.write_text(
+                sanitize_tex(self._latex_master_skeleton()),
+                encoding="utf-8"
+            )
 
         return RunPaths(
             run_dir=run_dir,
