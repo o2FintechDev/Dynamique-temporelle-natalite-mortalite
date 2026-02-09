@@ -124,6 +124,13 @@ class RunWriter:
 \usepackage{newunicodechar}
 \newunicodechar{−}{-}
 
+% --- Unicode math fallbacks ---
+\DeclareUnicodeCharacter{2248}{\ensuremath{\approx}}
+\DeclareUnicodeCharacter{21D2}{\ensuremath{\Rightarrow}}
+\DeclareUnicodeCharacter{2265}{\ensuremath{\geq}}
+\DeclareUnicodeCharacter{03B1}{\ensuremath{\alpha}}
+\DeclareUnicodeCharacter{03B2}{\ensuremath{\beta}}
+
 \usepackage[T1]{fontenc}
 \usepackage[french]{babel}
 
