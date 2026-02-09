@@ -52,22 +52,16 @@ def _align_endog_exog(
 # -----------------------------
 # Corr Matrix + Heatmap
 # -----------------------------
-def corr_matrix(df_endog: pd.DataFrame, df_exog: Optional[pd.DataFrame] = None) -> pd.DataFrame:
-    """
-    Matrice de corrélation sur (endog + exog) après alignement & dropna.
-    """
-    Y, X = _align_endog_exog(df_endog, df_exog)
-    mat = Y if X is None else pd.concat([Y, X], axis=1)
-    mat = mat.dropna()
+def corr_matrix(df_endog: pd.DataFrame, df_exog: pd.DataFrame | None = None) -> pd.DataFrame:
+    mat = df_endog.copy()
+    if df_exog is not None and not df_exog.empty:
+        mat = pd.concat([mat, df_exog], axis=1)
+    mat = mat.apply(pd.to_numeric, errors="coerce").dropna()
     if mat.empty:
         return pd.DataFrame([])
     return mat.corr()
 
-
-def corr_heatmap_figure(corr: pd.DataFrame, title: str = "Matrice de corrélation (endog + exog)"):
-    """
-    Figure matplotlib (pas seaborn).
-    """
+def corr_heatmap_figure(corr: pd.DataFrame, title: str = "Heatmap corrélation (endog + exog)"):
     fig, ax = plt.subplots(figsize=(8, 6))
     if corr is None or corr.empty:
         ax.text(0.5, 0.5, "Corrélation indisponible (données vides après dropna)", ha="center", va="center")
@@ -81,19 +75,9 @@ def corr_heatmap_figure(corr: pd.DataFrame, title: str = "Matrice de corrélatio
     ax.set_xticklabels(list(corr.columns), rotation=45, ha="right")
     ax.set_yticklabels(list(corr.index))
     fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-
-    # annotations légères (optionnel)
-    try:
-        for i in range(corr.shape[0]):
-            for j in range(corr.shape[1]):
-                ax.text(j, i, f"{corr.values[i, j]:.2f}", ha="center", va="center", fontsize=7)
-    except Exception:
-        pass
-
     fig.suptitle(title)
     fig.tight_layout()
     return fig
-
 
 # -----------------------------
 # Sims causality (unchanged)
@@ -295,44 +279,68 @@ def var_pack(
     df_vars: pd.DataFrame,
     maxlags: int = 12,
     *,
-    df_exog: Optional[pd.DataFrame] = None,
+    df_exog: pd.DataFrame | None = None,
     prefer_ic: str = "bic",
     whiteness_alpha: float = 0.05,
     require_stable: bool = True,
 ) -> dict[str, Any]:
     """
-    Pack VAR / VARX auditable (compat: l'appel existant reste OK).
+    Pack VAR / VARX auditable.
 
-    Ajouts:
-      - Matrice corr (endog + exog) + heatmap
-      - VARX (exog) via param df_exog
-      - Choix p robuste via grid (IC + stabilité + blancheur)
-      - FEVD tableau (déjà) + grid lag table
+    Corrige/renforce:
+      - paramètres manquants (prefer_ic, whiteness_alpha, require_stable)
+      - alignement strict + dropna conjoint endog/exog
+      - robustesse statsmodels (VAR exog selon version)
+      - corr + heatmap renvoyées dans tables/figures
+      - fallback sélection p si grid/IC indisponible
     """
-    # ---- corr au début (endog + exog) ----
-    corr = corr_matrix(df_vars, df_exog=df_exog)
-    fig_corr = corr_heatmap_figure(corr)
+    # -----------------------------
+    # 0) Coercition + alignement
+    # -----------------------------
+    Y0 = df_vars.copy()
+    for c in Y0.columns:
+        Y0[c] = pd.to_numeric(Y0[c], errors="coerce")
 
-    # ---- align + nettoyage ----
-    Y0, X0 = _align_endog_exog(df_vars, df_exog)
+    X0 = None
+    if df_exog is not None and not df_exog.empty:
+        X0 = df_exog.copy()
+        for c in X0.columns:
+            X0[c] = pd.to_numeric(X0[c], errors="coerce")
+
+        # align index intersection
+        idx = Y0.index.intersection(X0.index)
+        Y0 = Y0.loc[idx]
+        X0 = X0.loc[idx]
+
     cols = list(Y0.columns)
     exog_cols = list(X0.columns) if X0 is not None else []
 
+    # -----------------------------
+    # 1) CORR (endog + exog) AVANT dropna (la fonction dropna elle-même)
+    # -----------------------------
+    corr = corr_matrix(Y0, df_exog=X0)
+    fig_corr = corr_heatmap_figure(corr, title="Heatmap corrélation (endog + exog)")
+
+    # -----------------------------
+    # 2) Dropna conjoint (source of truth)
+    # -----------------------------
     if X0 is None:
-        XY = Y0.copy()
+        nobs_raw = int(Y0.shape[0])
+        Y = Y0.dropna().astype(float)
+        X = None
     else:
         XY = pd.concat([Y0, X0], axis=1)
+        nobs_raw = int(XY.shape[0])
+        XY = XY.dropna().astype(float)
+        Y = XY[cols]
+        X = XY[exog_cols]
 
-    nobs_raw = int(XY.shape[0])
-    XY_clean = XY.dropna().astype(float)
-    nobs_used_dropna = int(XY_clean.shape[0])
+    nobs_used_dropna = int(Y.shape[0])
     dropna_rows = int(nobs_raw - nobs_used_dropna)
 
-    # split clean
-    Y = XY_clean[cols]
-    X = XY_clean[exog_cols] if exog_cols else None
-
-    # Protection minimale
+    # -----------------------------
+    # 3) Protection minimale
+    # -----------------------------
     if Y.shape[0] < 10 or Y.shape[1] < 2:
         note5 = (
             "**Étape 5 — VAR/VARX** : données insuffisantes pour estimer un VAR multivarié "
@@ -340,7 +348,7 @@ def var_pack(
         )
         return {
             "tables": {
-                "tbl.multi.corr": corr,
+                "tbl.var.corr": corr,
                 "tbl.var.lag_selection": pd.DataFrame(
                     {
                         "aic": [np.nan],
@@ -349,11 +357,15 @@ def var_pack(
                         "fpe": [np.nan],
                         "maxlags": [int(maxlags)],
                         "selected_p": [np.nan],
-                        "prefer_ic": [prefer_ic],
+                        "prefer_ic": [str(prefer_ic)],
+                        "require_stable": [bool(require_stable)],
+                        "whiteness_alpha": [float(whiteness_alpha)],
                         "has_exog": [bool(exog_cols)],
                         "nobs_raw": [nobs_raw],
                         "nobs_used": [nobs_used_dropna],
                         "rows_dropped_dropna": [dropna_rows],
+                        "endog_vars": [", ".join(cols)],
+                        "exog_vars": [", ".join(exog_cols) if exog_cols else ""],
                     },
                     index=["lag_selection"],
                 ),
@@ -368,7 +380,7 @@ def var_pack(
                     "exog": exog_cols,
                     "k": int(len(cols)),
                     "selected_p": None,
-                    "prefer_ic": prefer_ic,
+                    "prefer_ic": str(prefer_ic),
                     "maxlags": int(maxlags),
                     "nobs_raw": nobs_raw,
                     "nobs_used": nobs_used_dropna,
@@ -380,38 +392,53 @@ def var_pack(
             },
             "models": {},
             "figures": {
-                "fig.multi.corr_heatmap": fig_corr,
+                "fig.var.corr_heatmap": fig_corr,
             },
         }
 
-    # ---- build VAR/VARX model ----
-    model = VAR(Y, exog=X) if X is not None else VAR(Y)
+    # -----------------------------
+    # 4) Build VAR / VARX (robuste selon version statsmodels)
+    # -----------------------------
+    has_exog = X is not None and not X.empty
+    try:
+        model = VAR(Y, exog=X) if has_exog else VAR(Y)
+    except TypeError:
+        # fallback si version statsmodels n'accepte pas exog dans VAR(...)
+        # => on continue en VAR simple (contrôles exog ignorés)
+        has_exog = False
+        model = VAR(Y)
 
-    # ---- lag grid + choix p robuste ----
-    grid, fitted = _lag_grid(model, maxlags=maxlags)
+    # -----------------------------
+    # 5) Lag grid + choix p robuste
+    # -----------------------------
+    grid, fitted = _lag_grid(model, maxlags=int(maxlags))
     p = _choose_p_from_grid(
         grid,
-        prefer=prefer_ic,
-        whiteness_alpha=whiteness_alpha,
-        require_stable=require_stable,
+        prefer=str(prefer_ic),
+        whiteness_alpha=float(whiteness_alpha),
+        require_stable=bool(require_stable),
     )
 
-    # fallback: select_order si grid KO
     if p is None:
-        sel = model.select_order(maxlags=maxlags)
+        # fallback: select_order
         try:
-            p = int(sel.bic) if str(prefer_ic).lower() == "bic" else int(sel.aic)
+            sel = model.select_order(maxlags=int(maxlags))
+            if str(prefer_ic).lower() == "bic":
+                p = int(sel.bic)
+            elif str(prefer_ic).lower() == "hqic":
+                p = int(sel.hqic)
+            else:
+                p = int(sel.aic)
         except Exception:
-            p = int(getattr(sel, "aic", 1) or 1)
+            p = 1
 
     res = fitted.get(int(p))
     if res is None:
         res = model.fit(int(p))
 
     # -----------------------------
-    # Table sélection de lag (résumé)
+    # 6) Table sélection (résumé)
     # -----------------------------
-    # IC du modèle retenu
     tbl_sel = pd.DataFrame(
         {
             "aic": [_safe_float(getattr(res, "aic", None))],
@@ -423,18 +450,19 @@ def var_pack(
             "prefer_ic": [str(prefer_ic)],
             "require_stable": [bool(require_stable)],
             "whiteness_alpha": [float(whiteness_alpha)],
-            "has_exog": [bool(exog_cols)],
+            "has_exog": [bool(exog_cols) and has_exog],
             "nobs_raw": [nobs_raw],
             "nobs_used": [int(getattr(res, "nobs", Y.shape[0]))],
             "rows_dropped_dropna": [dropna_rows],
             "endog_vars": [", ".join(cols)],
             "exog_vars": [", ".join(exog_cols) if exog_cols else ""],
+            "exog_used": [", ".join(exog_cols) if (bool(exog_cols) and has_exog) else ""],
         },
         index=["lag_selection"],
     )
 
     # -----------------------------
-    # Granger (pairwise) sur endog
+    # 7) Granger (pairwise) endog
     # -----------------------------
     granger_rows: list[dict[str, Any]] = []
     for caused in cols:
@@ -465,7 +493,7 @@ def var_pack(
             tbl_granger[c] = pd.to_numeric(tbl_granger[c], errors="coerce")
 
     # -----------------------------
-    # Sims (leads) : q=1..p
+    # 8) Sims (leads) q=1..p sur endog
     # -----------------------------
     sims_rows: list[dict[str, Any]] = []
     sims_errors = 0
@@ -504,7 +532,7 @@ def var_pack(
     tbl_sims = pd.DataFrame(sims_rows)
 
     # -----------------------------
-    # IRF figure
+    # 9) IRF figure
     # -----------------------------
     irf_h = 12
     irf = res.irf(irf_h)
@@ -515,22 +543,20 @@ def var_pack(
         pass
 
     # -----------------------------
-    # FEVD (horizon 12) : endog-only
+    # 10) FEVD (endog-only)
     # -----------------------------
     fevd_h = 12
     fevd = res.fevd(fevd_h)
     fevd_rows: list[dict[str, Any]] = []
     for i, target in enumerate(cols):
-        m = fevd.decomp[:, i, :]  # (h, shocks)
+        m = fevd.decomp[:, i, :]
         for h in range(m.shape[0]):
             for j, shock in enumerate(cols):
-                fevd_rows.append(
-                    {"target": target, "shock": shock, "h": int(h), "share": float(m[h, j])}
-                )
+                fevd_rows.append({"target": target, "shock": shock, "h": int(h), "share": float(m[h, j])})
     tbl_fevd = pd.DataFrame(fevd_rows)
 
     # -----------------------------
-    # Diagnostics
+    # 11) Diagnostics
     # -----------------------------
     stable: Optional[bool] = None
     max_root_modulus: Optional[float] = None
@@ -556,7 +582,6 @@ def var_pack(
 
     whiteness_pvalue: Optional[float] = None
     normality_pvalue: Optional[float] = None
-
     try:
         w = res.test_whiteness(nlags=min(12, max(1, int(p))))
         whiteness_pvalue = _safe_float(getattr(w, "pvalue", None))
@@ -576,7 +601,7 @@ def var_pack(
         sigma_u = None
 
     # -----------------------------
-    # Metrics
+    # 12) Metrics + note
     # -----------------------------
     metrics_meta = {
         "vars": cols,
@@ -592,6 +617,8 @@ def var_pack(
         "fevd_h": int(fevd_h),
         "require_stable": bool(require_stable),
         "whiteness_alpha": float(whiteness_alpha),
+        "has_exog_requested": bool(exog_cols),
+        "has_exog_used": bool(exog_cols) and has_exog,
     }
 
     sims_meta = {
@@ -633,12 +660,17 @@ def var_pack(
             "sims_n": int(len(tbl_sims)) if isinstance(tbl_sims, pd.DataFrame) else None,
             "sims_errors": int(sims_errors),
         },
+        "exog": {
+            "requested": exog_cols,
+            "used": exog_cols if has_exog else [],
+            "note": "VAR exog support dépend de la version statsmodels; si non supporté, exog ignorées (fallback).",
+        },
     }
 
     note5 = (
         f"**Étape 5 — VAR/VARX(p)** : choix p={p} (préférence={prefer_ic}, stable={require_stable}, "
         f"blancheur α={whiteness_alpha}). nobs={int(getattr(res, 'nobs', Y.shape[0]))}, "
-        f"endog={cols}, exog={exog_cols if exog_cols else '∅'}. "
+        f"endog={cols}, exog={'∅' if not exog_cols else exog_cols}. "
         f"Stabilité={stable} (max|root|={max_root_modulus}). "
         f"Whiteness p={whiteness_pvalue}, normalité p={normality_pvalue}. "
         "FEVD/IRF décrivent la dynamique des endogènes; les exogènes sont des contrôles (pas de FEVD par exog)."
@@ -646,9 +678,7 @@ def var_pack(
 
     return {
         "tables": {
-            # NEW (multi start)
-            "tbl.multi.corr": corr,
-            # VAR/VARX
+            "tbl.var.corr": corr,
             "tbl.var.lag_selection": tbl_sel,
             "tbl.var.lag_grid": grid,
             "tbl.var.granger": tbl_granger,
@@ -663,9 +693,74 @@ def var_pack(
         },
         "models": {"model.var.best": res},
         "figures": {
-            # NEW
-            "fig.multi.corr_heatmap": fig_corr,
-            # existing
+            "fig.var.corr_heatmap": fig_corr,
             "fig.var.irf": fig_irf,
         },
     }
+
+def var_pack_dual(
+    df_vars: pd.DataFrame,
+    *,
+    df_exog: pd.DataFrame | None = None,
+    maxlags: int = 12,
+    prefer_ic: str = "bic",
+    whiteness_alpha: float = 0.05,
+    require_stable: bool = True,
+) -> dict[str, Any]:
+    # 1) VAR
+    out_var = var_pack(
+        df_vars,
+        maxlags=maxlags,
+        df_exog=None,
+        prefer_ic=prefer_ic,
+        whiteness_alpha=whiteness_alpha,
+        require_stable=require_stable,
+    )
+
+    # 2) VARX (si exog dispo)
+    out_varx = None
+    if df_exog is not None and not df_exog.empty:
+        out_varx = var_pack(
+            df_vars,
+            maxlags=maxlags,
+            df_exog=df_exog,
+            prefer_ic=prefer_ic,
+            whiteness_alpha=whiteness_alpha,
+            require_stable=require_stable,
+        )
+
+    # 3) Merge avec préfixes pour éviter collisions
+    def _prefix_pack(pack: dict[str, Any], prefix: str) -> dict[str, Any]:
+        out: dict[str, Any] = {"tables": {}, "figures": {}, "metrics": {}, "models": {}}
+        for k in ["tables", "figures", "metrics", "models"]:
+            d = pack.get(k, {}) or {}
+            out[k] = {f"{prefix}.{key}": val for key, val in d.items()}
+        return out
+
+    merged = _prefix_pack(out_var, "var")
+
+    if out_varx is not None:
+        p2 = _prefix_pack(out_varx, "varx")
+        for k in ["tables", "figures", "metrics", "models"]:
+            merged[k].update(p2[k])
+
+        # comparatif simple
+        try:
+            sel_var = (out_var.get("tables", {}) or {}).get("tbl.var.lag_selection")
+            sel_varx = (out_varx.get("tables", {}) or {}).get("tbl.var.lag_selection")
+            if isinstance(sel_var, pd.DataFrame) and isinstance(sel_varx, pd.DataFrame) and not sel_var.empty and not sel_varx.empty:
+                cmp = pd.DataFrame({
+                    "model": ["VAR", "VARX"],
+                    "selected_p": [int(sel_var["selected_p"].iloc[0]), int(sel_varx["selected_p"].iloc[0])],
+                    "aic": [float(sel_var["aic"].iloc[0]), float(sel_varx["aic"].iloc[0])],
+                    "bic": [float(sel_var["bic"].iloc[0]), float(sel_varx["bic"].iloc[0])],
+                    "whiteness_pvalue": [
+                        (out_var.get("metrics", {}) or {}).get("m.var.audit", {}).get("diagnostics", {}).get("whiteness_pvalue"),
+                        (out_varx.get("metrics", {}) or {}).get("m.var.audit", {}).get("diagnostics", {}).get("whiteness_pvalue"),
+                    ],
+                })
+                merged["tables"]["tbl.var.compare_var_varx"] = cmp
+        except Exception:
+            pass
+
+    return merged

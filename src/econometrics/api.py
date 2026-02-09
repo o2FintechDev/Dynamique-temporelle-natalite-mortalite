@@ -1,6 +1,6 @@
 # src/econometrics/api.py
 from __future__ import annotations
-from typing import Any
+from typing import Any, Optional
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,7 +17,7 @@ from src.econometrics.univariate import (
     arima_grid, residual_diagnostics,
     hurst_exponent, rescaled_range, figs_fit)
 
-from src.econometrics.multivariate import var_pack
+from src.econometrics.multivariate import var_pack, var_pack_dual
 from src.econometrics.cointegration import cointegration_pack
 
 Y = "Croissance_Naturelle"
@@ -369,17 +369,76 @@ def step4_univariate_pack(df: pd.DataFrame, *, y: str, **params: Any) -> dict[st
         "figures": figs,
     }
 
-def step5_var_pack(df: pd.DataFrame, *, y: str, vars_mode: str = "decomp", **params: Any) -> dict[str, Any]:
-    # Conformité: uniquement composantes issues de la décomposition du y
+def step5_var_pack(
+    df: pd.DataFrame,
+    *,
+    y: str,
+    vars_mode: str = "decomp",
+    exog_vars: Optional[list[str]] = None,   # NEW
+    exog_lags: int = 0,                      # NEW (0 = contemporains, >0 = lags)
+    maxlags: int = 12,                       # NEW
+    prefer_ic: str = "bic",                  # NEW
+    whiteness_alpha: float = 0.05,           # NEW
+    require_stable: bool = True,             # NEW
+    **params: Any
+) -> dict[str, Any]:
+    """
+    Étape 5 — VAR/VARX
+    - endog = composantes STL du y (level, trend, seasonal)
+    - exog (optionnel) = variables df[exog_vars], alignées temporellement
+      + éventuellement laggées (exog_lags)
+    """
+    # --- Endog: décomposition ---
     s = _series(df, y)
     stl = STL(s.dropna(), period=12, robust=True).fit()
-    X = pd.DataFrame({
-        "level": s.loc[stl.trend.index],
-        "trend": stl.trend,
-        "seasonal": stl.seasonal,
-    }).dropna()
-    return var_pack(X, maxlags=12)
 
+    endog = pd.DataFrame(
+        {
+            "level": s.loc[stl.trend.index],
+            "trend": stl.trend,
+            "seasonal": stl.seasonal,
+        }
+    )
+
+    # --- Exog: optionnel ---
+    exog = None
+    exog_vars = exog_vars or []
+    exog_keep = [c for c in exog_vars if c in df.columns]
+
+    if exog_keep:
+        exog = df[exog_keep].copy()
+
+        # coercition num
+        for c in exog.columns:
+            exog[c] = pd.to_numeric(exog[c], errors="coerce")
+
+        # lags exog (si demandé)
+        if exog_lags and exog_lags > 0:
+            lagged = {}
+            for c in exog.columns:
+                for L in range(0, int(exog_lags) + 1):
+                    # L=0 -> variable contemporaine
+                    name = f"{c}_lag{L}" if L > 0 else c
+                    lagged[name] = exog[c].shift(L)
+            exog = pd.DataFrame(lagged, index=exog.index)
+
+    # --- Align + dropna commun (endog/exog) ---
+    if exog is None:
+        endog = endog.dropna()
+    else:
+        tmp = pd.concat([endog, exog], axis=1).dropna()
+        endog = tmp[endog.columns]
+        exog = tmp[exog.columns]
+
+    # --- Appel VAR/VARX (ton var_pack prend df_exog) ---
+    return var_pack_dual(
+        endog,
+        df_exog=exog,
+        maxlags=maxlags,
+        prefer_ic=prefer_ic,
+        whiteness_alpha=whiteness_alpha,
+        require_stable=require_stable,
+    )
 def step6_cointegration_pack(df: pd.DataFrame, *, y: str, vars_mode: str = "decomp", **params: Any) -> dict[str, Any]:
     s = _series(df, y)
     stl = STL(s.dropna(), period=12, robust=True).fit()
