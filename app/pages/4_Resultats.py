@@ -1,4 +1,4 @@
-# pages/4_Resultats.py
+# app/pages/4_Resultats.py
 from __future__ import annotations
 
 from pathlib import Path

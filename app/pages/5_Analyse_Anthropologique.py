@@ -1,4 +1,4 @@
-# pages/5_Analyse_Anthropologique.py
+# app/pages/5_Analyse_Anthropologique.py
 from __future__ import annotations
 
 from pathlib import Path

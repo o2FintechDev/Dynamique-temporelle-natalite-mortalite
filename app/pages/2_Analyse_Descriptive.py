@@ -1,4 +1,4 @@
-# pages/2_Analyse_Descriptive.py
+# app/pages/2_Analyse_Descriptive.py
 from __future__ import annotations
 
 from pathlib import Path

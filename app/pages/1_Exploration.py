@@ -1,4 +1,4 @@
-# pages/1_Exploration.py
+# app/pages/1_Exploration.py
 from __future__ import annotations
 
 from pathlib import Path

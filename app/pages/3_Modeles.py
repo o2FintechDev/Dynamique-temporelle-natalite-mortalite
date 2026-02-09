@@ -1,4 +1,4 @@
-# pages/3_Modeles.py
+# app/pages/3_Modeles.py
 from __future__ import annotations
 
 from pathlib import Path

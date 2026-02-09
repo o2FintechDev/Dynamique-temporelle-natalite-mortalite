@@ -1,4 +1,4 @@
-# pages/6_Historique_Artefacts.py
+# app/pages/6_Historique_Artefacts.py
 from __future__ import annotations
 
 from pathlib import Path
