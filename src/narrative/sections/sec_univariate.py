@@ -112,11 +112,11 @@ def render_sec_univariate(
         best_label = "Modèle univarié (order indisponible)"
         order_str = "NA"
 
-    aic = _pick(kp.get("aic") or (uni.get("best") or {}).get("aic"))
-    bic = _pick(kp.get("bic") or (uni.get("best") or {}).get("bic"))
+    aic = _pick(kp.get("aic"), (uni.get("best") or {}).get("aic"))
+    bic = _pick(kp.get("bic"), (uni.get("best") or {}).get("bic"))
 
     lb_p = _pick(kp.get("lb_p"), kp.get("ljungbox_p"))
-    jb_p = _pick(kp.get("jb_p") or kp.get("jarque_bera_p"))
+    jb_p = _pick(kp.get("jb_p"), kp.get("jarque_bera_p"))
     arch_p = kp.get("arch_p")
 
     tsds = metrics_cache.get("m.diag.ts_vs_ds") or {}
@@ -143,6 +143,9 @@ def render_sec_univariate(
     tbl_arima = lookup(manifest, "tables", "tbl.uni.arima")
     tbl_resid = lookup(manifest, "tables", "tbl.uni.resid_diag")
     tbl_memory = lookup(manifest, "tables", "tbl.uni.memory")
+    tbl_ar   = lookup(manifest, "tables", "tbl.uni.ar")    # NEW
+    tbl_ma   = lookup(manifest, "tables", "tbl.uni.ma")    # NEW
+    tbl_arma = lookup(manifest, "tables", "tbl.uni.arma")  # NEW
 
     lines: list[str] = []
 
@@ -289,16 +292,27 @@ def render_sec_univariate(
             narr_call("tbl.uni.summary"),
             "",
         ]
+    # --- Grilles de sélection (trop volumineux -> annexe/artefacts)
+    if tbl_ar or tbl_ma or tbl_arma:
+        lines += [
+            md_basic_to_tex(
+                "**Annexe (sélection Box–Jenkins)** : grilles complètes AR/MA/ARMA disponibles dans les artefacts "
+                "(non insérées dans le corps pour préserver la lisibilité)."
+            ),
+            "",
+        ]
+        if tbl_ar:
+            lines += [narr_call("tbl.uni.ar"), ""]
+        if tbl_ma:
+            lines += [narr_call("tbl.uni.ma"), ""]
+        if tbl_arma:
+            lines += [narr_call("tbl.uni.arma"), ""]
 
     if tbl_arima:
         lines += [
-            r"\paragraph{Tableau 2 — Paramètres ARIMA retenus}",
             md_basic_to_tex(
-                "Lecture : contrôler signes, significativité et plausibilité (persistance AR vs correction MA). "
-                "Des coefficients instables ou non significatifs en bloc suggèrent un sur-ajustement."
+                "**Paramètres du modèle retenu (ARIMA)** : table détaillée disponible dans les artefacts (annexe)."
             ),
-            "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_arima, caption="tbl.uni.arima", label="tab:tbl-uni-arima"),
             narr_call("tbl.uni.arima"),
             "",
         ]
@@ -356,7 +370,18 @@ def render_sec_univariate(
             narr_call("tbl.uni.memory"),
             "",
         ]
-
+        
+        lines += [
+            r"\paragraph{Analyse — mémoire longue (lecture empirique)}",
+            md_basic_to_tex(
+                "Lecture : si les indicateurs suggèrent une persistance durable (Hurst > 0.5 ou équivalent), "
+                "la dynamique ne relève pas uniquement d’un ARMA de mémoire courte. "
+                "Conséquence : les modèles ARIMA standard peuvent sous-estimer la persistance et surestimer la vitesse de retour à la moyenne ; "
+                "l’interprétation des chocs doit intégrer des mécanismes lents (inerties démographiques, institutions, structure d’âge). "
+                "En revanche, un signal de mémoire longue peut aussi refléter des ruptures non modélisées : il doit être confronté aux diagnostics TS/DS."
+            ),
+            "",
+        ]
     if note_md.strip():
         lines += [
             md_basic_to_tex("**Note d’interprétation automatisée**"),
