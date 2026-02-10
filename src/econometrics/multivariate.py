@@ -9,6 +9,11 @@ import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from statsmodels.tsa.api import VAR
 
+DISPLAY_NAME_MAP = {
+    "Croissance_Naturelle" : "CN",
+    "Masse_monetaire": "M3",
+    "Nb_mariages": "Mariages",
+}
 
 # ============================================================
 # Utils
@@ -34,6 +39,63 @@ def _coerce_df(df: pd.DataFrame) -> pd.DataFrame:
             pass
     return out
 
+def _disp(name: str) -> str:
+    return DISPLAY_NAME_MAP.get(name, name)
+
+def _rename_df_display(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return df
+    out = df.copy()
+    out.columns = [_disp(c) for c in out.columns]
+    out.index = [_disp(i) if isinstance(i, str) else i for i in out.index]
+    return out
+
+def _rename_cols_in_df(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
+    if df is None or df.empty:
+        return df
+    out = df.copy()
+    for c in cols:
+        if c in out.columns:
+            out[c] = out[c].map(lambda x: _disp(x) if isinstance(x, str) else x)
+    return out
+
+def _apply_display_names_in_fig(fig) -> None:
+    if fig is None:
+        return
+
+    # remplacements texte : "long" -> "court"
+    rep = {k: v for k, v in DISPLAY_NAME_MAP.items() if isinstance(k, str) and isinstance(v, str)}
+
+    for ax in getattr(fig, "axes", []):
+        # titre
+        t = ax.get_title()
+        if t:
+            for k, v in rep.items():
+                t = t.replace(k, v)
+            ax.set_title(t)
+
+        # labels axes
+        xl = ax.get_xlabel()
+        yl = ax.get_ylabel()
+
+        if xl:
+            for k, v in rep.items():
+                xl = xl.replace(k, v)
+            ax.set_xlabel(xl)
+
+        if yl:
+            for k, v in rep.items():
+                yl = yl.replace(k, v)
+            ax.set_ylabel(yl)
+
+        # légende
+        leg = ax.get_legend()
+        if leg:
+            for txt in leg.get_texts():
+                s = txt.get_text()
+                for k, v in rep.items():
+                    s = s.replace(k, v)
+                txt.set_text(s)
 
 # ============================================================
 # Sims causality test (inchangé)
@@ -303,8 +365,10 @@ def var_pack(
     )
 
     # 2) Corr endog-endog (après stationnarisation)
+
     corr = Y.corr() if not Y.empty else pd.DataFrame([])
-    fig_corr = corr_heatmap_figure_square(corr, title="Heatmap corrélation (variables VAR stationnaires)")
+    corr_disp = _rename_df_display(corr)
+    fig_corr = corr_heatmap_figure_square(corr_disp, title="Heatmap corrélation (variables VAR stationnaires)")
 
     # Protection minimale
     if Y.shape[0] < 30 or Y.shape[1] < 2:
@@ -502,6 +566,9 @@ def var_pack(
     irf_h = 12
     irf = res.irf(irf_h)
     fig_irf = irf.plot(orth=False)
+
+    _apply_display_names_in_fig(fig_irf)
+    
     try:
         fig_irf.suptitle("IRF (VAR)")
     except Exception:
@@ -646,6 +713,26 @@ def var_pack(
     # Matrices A1..Ap (une table par matrice)
     for k, mat in A_mats.items():
         out_tables[f"tbl.var.{k}"] = mat
+
+    # --- Display rename (tables)
+    out_tables["tbl.var.stationarity"] = _rename_cols_in_df(out_tables["tbl.var.stationarity"], ["var"])
+    out_tables["tbl.var.stationary_data"] = _rename_df_display(out_tables["tbl.var.stationary_data"])
+    out_tables["tbl.var.corr"] = _rename_df_display(out_tables["tbl.var.corr"])
+    out_tables["tbl.var.const"] = _rename_df_display(out_tables["tbl.var.const"])
+
+    out_tables["tbl.var.granger"] = _rename_cols_in_df(out_tables["tbl.var.granger"], ["caused", "causing"])
+    out_tables["tbl.var.sims"] = _rename_cols_in_df(out_tables["tbl.var.sims"], ["caused", "causing"])
+    out_tables["tbl.var.fevd"] = _rename_cols_in_df(out_tables["tbl.var.fevd"], ["target", "shock"])
+
+    out_tables["tbl.var.params_pvalues"] = _rename_df_display(out_tables["tbl.var.params_pvalues"])
+    out_tables["tbl.var.lag_significance"] = out_tables["tbl.var.lag_significance"]  # pas de noms ici
+    out_tables["tbl.var.lag_grid"] = out_tables["tbl.var.lag_grid"]
+    out_tables["tbl.var.lag_selection"] = out_tables["tbl.var.lag_selection"]
+
+    # Matrices A1..Ap
+    for key in list(out_tables.keys()):
+        if key.startswith("tbl.var.A"):
+            out_tables[key] = _rename_df_display(out_tables[key])
 
     metrics_audit = {
         "data": {

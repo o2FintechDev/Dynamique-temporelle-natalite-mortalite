@@ -177,6 +177,9 @@ PAGE_LAYOUTS: Dict[str, List[SectionSpec]] = {
         SectionSpec(
             title="Prétraitement multivarié & stationnarisation (VAR)",
             help_md=(
+                "Pour la suite de l'analyse, de nouvelles variables ont été introduites.\n\n"
+                "Afin de faciliter l'affichage, les variables sont renommées de la manière suivante :\n\n"
+                "Croissance_Naturelle : CN - Masse_monétaire : M3 - Nb_mariages : mariages.\n\n"
                 "Fenêtre d'estimation, contrôles de stationnarité et jeu de données stationnaire "
                 "utilisé pour l'estimation du VAR. Cette étape conditionne la validité des tests "
                 "de causalité et des IRF."
