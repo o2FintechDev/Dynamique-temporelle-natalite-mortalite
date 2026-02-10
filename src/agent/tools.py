@@ -104,70 +104,77 @@ def step1_load_and_profile(*, variables: list[str], y: str, **params: Any) -> di
     # --------------------------------------------------
     # ÉCRITURE DES TABLES LaTeX + ENREGISTREMENT MANIFEST
     # --------------------------------------------------
-    rw = RunWriter(base_runs_dir=Path("app/outputs/runs"), run_id=None)
+    state = get_state()
+    run_id = state.selected_run_id
 
-    run_root = rw.paths.run_dir
-    tables_dir = rw.paths.tables_dir
+    if run_id:
+        rf = get_run_files(run_id)
+        run_root = Path(rf.root)
+        rw = RunWriter(base_runs_dir=run_root.parent, run_id=run_id)
 
-    # --- Tableau 1 : Statistiques descriptives
-    _, tex_desc = save_table_csv_and_tex(
-        prof.desc,
-        tables_dir / "tbl_data_desc_stats.csv",
-    )
-    rw.register_artefact(
-        kind="tables",
-        lookup_key="tbl.data.desc_stats",
-        rel_path=f"tables/{tex_desc.name}",
-    )
 
-    # --- Tableau 2 : Valeurs manquantes
-    _, tex_miss = save_table_csv_and_tex(
-        prof.missing,
-        tables_dir / "tbl_data_missing_report.csv",
-    )
-    rw.register_artefact(
-        kind="tables",
-        lookup_key="tbl.data.missing_report",
-        rel_path=f"tables/{tex_miss.name}",
-    )
+        run_root = rw.paths.run_dir
+        tables_dir = rw.paths.tables_dir
 
-    # --- Tableau 3 : Couverture temporelle
-    _, tex_cov = save_table_csv_and_tex(
-        cov,
-        tables_dir / "tbl_data_coverage_report.csv",
-    )
-    rw.register_artefact(
-        kind="tables",
-        lookup_key="tbl.data.coverage_report",
-        rel_path=f"tables/{tex_cov.name}",
-    )
+        # --- Tableau 1 : Statistiques descriptives
+        _, tex_desc = save_table_csv_and_tex(
+            prof.desc,
+            tables_dir / "tbl_data_desc_stats.csv",
+        )
+        rw.register_artefact(
+            kind="tables",
+            lookup_key="tbl.data.desc_stats",
+            rel_path=f"tables/{tex_desc.name}",
+        )
 
-    # --- Tableau 4 : Audit des variables
-    _, tex_vars = save_table_csv_and_tex(
-        tbl_vars_audit,
-        tables_dir / "tbl_data_vars_audit.csv",
-    )
-    rw.register_artefact(
-        kind="tables",
-        lookup_key="tbl.data.vars_audit",
-        rel_path=f"tables/{tex_vars.name}",
-    )
+        # --- Tableau 2 : Valeurs manquantes
+        _, tex_miss = save_table_csv_and_tex(
+            prof.missing,
+            tables_dir / "tbl_data_missing_report.csv",
+        )
+        rw.register_artefact(
+            kind="tables",
+            lookup_key="tbl.data.missing_report",
+            rel_path=f"tables/{tex_miss.name}",
+        )
 
-    # --------------------------------------------------
-    # Retour agent (inchangé)
-    # --------------------------------------------------
-    return {
-        "tables": {
-            "tbl.data.desc_stats": prof.desc,
-            "tbl.data.missing_report": prof.missing,
-            "tbl.data.coverage_report": cov,
-            "tbl.data.vars_audit": tbl_vars_audit,
-        },
-        "metrics": {
-            "m.data.dataset_meta": meta,
-            "m.note.step1": {"markdown": note},
-        },
-    }
+        # --- Tableau 3 : Couverture temporelle
+        _, tex_cov = save_table_csv_and_tex(
+            cov,
+            tables_dir / "tbl_data_coverage_report.csv",
+        )
+        rw.register_artefact(
+            kind="tables",
+            lookup_key="tbl.data.coverage_report",
+            rel_path=f"tables/{tex_cov.name}",
+        )
+
+        # --- Tableau 4 : Audit des variables
+        _, tex_vars = save_table_csv_and_tex(
+            tbl_vars_audit,
+            tables_dir / "tbl_data_vars_audit.csv",
+        )
+        rw.register_artefact(
+            kind="tables",
+            lookup_key="tbl.data.vars_audit",
+            rel_path=f"tables/{tex_vars.name}",
+        )
+
+        # --------------------------------------------------
+        # Retour agent (inchangé)
+        # --------------------------------------------------
+        return {
+            "tables": {
+                "tbl.data.desc_stats": prof.desc,
+                "tbl.data.missing_report": prof.missing,
+                "tbl.data.coverage_report": cov,
+                "tbl.data.vars_audit": tbl_vars_audit,
+            },
+            "metrics": {
+                "m.data.dataset_meta": meta,
+                "m.note.step1": {"markdown": note},
+            },
+        }
 
 @register("step2_descriptive")
 def step2_descriptive(*, variables: list[str], y: str, **params: Any) -> dict[str, Any]:
