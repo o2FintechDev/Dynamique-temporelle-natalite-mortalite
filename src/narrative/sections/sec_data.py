@@ -58,82 +58,108 @@ def render_sec_data(
     # Introduction
 
     # ============================================================
-    # SECTION 1 : Coeur de la recherche
+    # SECTION 1 : Cœur de la recherche
     # ============================================================
     lines += [
-    r"\section{Cœur de la recherche}",
-    "",
-    md_basic_to_tex(
-    "Cette recherche s’inscrit dans l’analyse des dynamiques démographiques de long terme et prend pour objet central "
-    "la croissance naturelle de la population française sur la période 1975–2025. "
-    "Au-delà d’un indicateur statistique, la croissance naturelle constitue un révélateur profond des transformations "
-    "sociales, économiques et sanitaires qui traversent une société. "
-    "Définie comme la différence entre le taux de natalité et le taux de mortalité, "
-    "elle permet d’isoler la dynamique interne de la population, indépendamment des mouvements migratoires.\n\n"
+        r"\section{Cœur de la recherche}",
+        "",
+        md_basic_to_tex(
+            "Cette recherche s’inscrit dans l’analyse des dynamiques démographiques de long terme et prend pour objet central "
+            "la croissance naturelle de la population française sur la période 1975–2025. "
+            "Au-delà d’un indicateur statistique, la croissance naturelle constitue un révélateur profond "
+            "des transformations sociales, économiques, sanitaires et institutionnelles qui traversent une société. "
+            "Définie comme la différence entre le taux de natalité et le taux de mortalité, "
+            "elle permet d’isoler la dynamique interne de la population, indépendamment des mouvements migratoires.\n\n"
 
-    "Pendant plusieurs décennies, la France s’est distinguée par une vitalité démographique relative au sein des pays développés, "
-    "souvent présentée comme une exception européenne. "
-    "Toutefois, l’inversion récente entre les courbes de natalité et de mortalité, "
-    "avec un solde naturel mensuel devenu négatif à partir de 2023, "
-    "marque une rupture historique majeure. "
-    "Ce basculement interroge directement la trajectoire démographique française et soulève des enjeux majeurs "
-    "en matière de financement des systèmes sociaux, de marché du travail et de politiques publiques.\n\n"
+            "Pendant plusieurs décennies, la France s’est distinguée par une vitalité démographique relative au sein des pays développés, "
+            "souvent présentée comme une exception européenne. "
+            "Cette singularité reposait sur une fécondité relativement élevée et une dynamique naturelle positive, "
+            "garantissant un renouvellement partiel des générations. "
+            "Toutefois, l’inversion récente entre les courbes de natalité et de mortalité, "
+            "avec un solde naturel mensuel devenu négatif à partir de 2023, "
+            "marque une rupture historique majeure dans la trajectoire démographique française.\n\n"
 
-    "L’enjeu scientifique de ce travail est de dépasser le simple constat statistique pour analyser la nature profonde "
-    "de cette trajectoire démographique. "
-    "Il s’agit de déterminer si la croissance naturelle française suit une dynamique stable ou instable, "
-    "si les chocs démographiques observés ont des effets transitoires ou persistants, "
-    "et si les ruptures récentes traduisent un changement de régime durable. "
-    "Cette analyse mobilise l’économétrie des séries temporelles afin de relier les évolutions observées "
-    "aux mécanismes structurels sous-jacents.\n\n"
+            "Ce basculement ne constitue pas uniquement un fait statistique. "
+            "Il soulève des interrogations fondamentales sur la soutenabilité du modèle social français, "
+            "le financement des systèmes de retraite et de santé, "
+            "l’équilibre du marché du travail, "
+            "ainsi que sur les transformations plus profondes des comportements familiaux et sociaux. "
+            "Dès lors, l’enjeu scientifique de ce travail est de dépasser le simple constat chiffré "
+            "pour interroger la nature profonde de la dynamique observée."
+        ),
+        "",
+        md_basic_to_tex(
+            r"\begin{center}"
+            r"\textbf{La dégradation récente de la croissance naturelle en France relève-t-elle "
+            r"d’un phénomène conjoncturel et transitoire, ou traduit-elle une transformation "
+            r"structurelle profonde et durable des dynamiques démographiques et sociales ?}"
+            r"\end{center}"
+        ),
+        "",
+        md_basic_to_tex(
+            "Cette problématique constitue le fil directeur de l’ensemble du rapport. "
+            "Elle appelle une réponse rigoureuse fondée sur l’analyse des propriétés dynamiques de la série temporelle étudiée : "
+            "stabilité ou instabilité, persistance ou réversibilité des chocs, existence ou non de ruptures durables. "
+            "L’objectif n’est pas de prédire l’évolution future de la population, "
+            "mais de qualifier la nature du processus démographique à l’œuvre.\n\n"
 
-    "L’utilisation de données mensuelles sur un horizon long permet de capter finement les phénomènes de saisonnalité, "
-    "les effets de mémoire et les dynamiques de long terme. "
-    "Cette granularité temporelle est essentielle pour analyser l’impact des chocs exogènes majeurs — "
-    "crises économiques, pandémies ou événements climatiques extrêmes — "
-    "sur la démographie française. "
-    "Elle autorise également l’estimation de modèles économétriques avancés, "
-    "tels que les modèles ARIMA, ARFIMA, VAR et VECM, adaptés à l’étude conjointe du court et du long terme.\n\n"
+            "Pour répondre à cette question, le travail mobilise l’économétrie des séries temporelles "
+            "afin d’analyser la croissance naturelle comme un processus dynamique de long terme. "
+            "L’étude s’appuie sur des données mensuelles couvrant un horizon étendu, "
+            "permettant de capter simultanément les phénomènes de saisonnalité, "
+            "les effets de mémoire et les ruptures structurelles potentielles. "
+            "Cette granularité temporelle est essentielle pour analyser l’impact des chocs exogènes majeurs — "
+            "crises économiques, pandémies ou événements exceptionnels — "
+            "sur la dynamique démographique française."
+        ),
+        "",
+        md_basic_to_tex(
+            "La méthodologie repose sur l’estimation de modèles économétriques adaptés "
+            "à l’étude conjointe du court et du long terme, "
+            "notamment les modèles ARIMA, VAR et VECM. "
+            "Ces outils permettent de distinguer les fluctuations transitoires "
+            "des évolutions structurelles et d’identifier la nature des mécanismes sous-jacents.\n\n"
 
-    "Enfin, ce travail s’inscrit dans une démarche méthodologique innovante reposant sur un automate économétrique déterministe. "
-    "Cet outil permet de produire de manière reproductible l’ensemble des analyses, graphiques et interprétations du rapport. "
-    "L’intelligence artificielle y est mobilisée comme outil d’assistance à la structuration du raisonnement et à l’interprétation, "
-    "sans jamais se substituer aux choix économétriques fondamentaux. "
-    "Cette articulation maîtrisée entre automatisation, rigueur statistique et lecture interprétative "
-    "constitue le cœur scientifique et méthodologique de la recherche."
-    ),
-    "",
+            "Enfin, ce travail s’inscrit dans une démarche méthodologique innovante "
+            "reposant sur un automate économétrique déterministe. "
+            "Cet automate permet de produire de manière reproductible l’ensemble des analyses, "
+            "graphiques et diagnostics du rapport. "
+            "L’intelligence artificielle y est mobilisée comme outil d’assistance au raisonnement "
+            "et à la structuration de l’interprétation, "
+            "sans jamais se substituer aux choix économétriques fondamentaux. "
+            "Cette articulation maîtrisée entre automatisation, rigueur statistique "
+            "et lecture interprétative constitue le cœur scientifique du projet."
+        ),
+        "",
         r"\subsection*{Choix des données}",
         md_basic_to_tex(
-            "Les données utilisées proviennent exclusivement de l’INSEE (Institut national de la statistique et des études économiques), garantissant une homogénéité institutionnelle "
-            "et une comparabilité temporelle sur l’ensemble de la période étudiée. "
-            "Le recours à une source statistique unique permet de limiter les biais liés aux ruptures de méthode ou aux changements de définition. "
+            "Les données utilisées proviennent exclusivement de l’INSEE (Institut national de la statistique et des études économiques), "
+            "garantissant une homogénéité institutionnelle et une comparabilité temporelle sur l’ensemble de la période étudiée. "
+            "Le recours à une source statistique unique permet de limiter les biais liés aux ruptures de méthode ou aux changements de définition.\n\n"
             "Les séries mobilisées sont :\n\n"
             "— le nombre mensuel de naissances,\n"
             "— le nombre mensuel de décès,\n"
             "— la population totale moyenne mensuelle.\n\n"
-            "Le choix d’une fréquence mensuelle s’impose afin de capturer à la fois les dynamiques de long terme "
+            "Le choix d’une fréquence mensuelle s’impose afin de capter à la fois les dynamiques de long terme "
             "et les variations saisonnières propres aux phénomènes démographiques."
         ),
         "",
         r"\subsection*{Problématique de l’échelle et choix des taux}",
         md_basic_to_tex(
-            "Les flux démographiques exprimés en niveau (naissances et décès) sont mécaniquement liés à la taille de la population, "
+            "Les flux démographiques exprimés en niveau sont mécaniquement liés à la taille de la population, "
             "ce qui induit une hétéroscédasticité structurelle et complique l’analyse économétrique. "
-            "Une hausse ou une baisse des flux peut ainsi refléter une simple variation de la population totale, "
+            "Une variation des flux peut ainsi refléter une simple évolution de la population totale, "
             "sans traduire une modification réelle des comportements démographiques.\n\n"
 
             "La normalisation en taux permet de neutraliser cet effet d’échelle, "
             "de stabiliser la variance et de rendre les séries comparables dans le temps. "
-            "Au-delà de cet intérêt statistique, l’analyse en taux offre une lecture plus pertinente sur le plan interprétatif : "
-            "elle permet d’appréhender les comportements démographiques relatifs, "
+            "Au-delà de l’intérêt statistique, cette approche offre une lecture plus pertinente sur le plan interprétatif : "
+            "elle permet d’analyser les comportements démographiques relatifs, "
             "indépendamment de la taille absolue de la population.\n\n"
 
-            "Interpréter les évolutions en taux plutôt qu’en niveau revient ainsi à raisonner en termes d’intensité démographique "
-            "plutôt qu’en volumes bruts. "
-            "Cette approche facilite les comparaisons temporelles et met en évidence des transformations structurelles "
-            "des comportements de fécondité et de mortalité, "
-            "qui pourraient être masquées par une analyse exclusivement fondée sur les niveaux."
+            "Raisonner en taux plutôt qu’en niveau revient ainsi à se focaliser sur l’intensité démographique "
+            "et à mettre en évidence des transformations structurelles "
+            "qui pourraient être masquées par une analyse fondée uniquement sur les volumes."
         ),
         "",
         r"\begin{equation}",
@@ -151,9 +177,9 @@ def render_sec_data(
         "",
         md_basic_to_tex(
             "La croissance naturelle résulte de l’interaction entre deux processus démographiques fondamentaux. "
-            "Cette variable peut présenter des phénomènes de persistance, de saisonnalité et de ruptures structurelles. "
+            "Elle peut présenter des phénomènes de persistance, de saisonnalité et de ruptures structurelles. "
             "Une croissance durablement négative constitue un signal fort de vieillissement démographique, "
-            "susceptible d’affecter en profondeur l’équilibre économique et social."
+            "susceptible d’affecter en profondeur l’équilibre économique, social et institutionnel."
         ),
         "",
 
