@@ -275,7 +275,7 @@ def render_sec_univariate(
                 "Des écarts systématiques signalent une spécification insuffisante ou un changement de régime."
             ),
             "",
-            include_figure(fig_rel=fig_fit, caption="fig.uni.fit", label="fig:fig-uni-fit"),
+            include_figure(fig_rel=fig_fit, caption="Ajustement du modèle ARIMA retenu", label="fig:fig-uni-fit"),
             narr_call("fig.uni.fit"),
             "",
         ]
@@ -326,7 +326,7 @@ def render_sec_univariate(
                 "Des pics persistants indiquent une dynamique non capturée (ordre $p$/$q$ insuffisant, saisonnalité, rupture)."
             ),
             "",
-            include_figure(fig_rel=fig_resid_acf, caption="fig.uni.resid_acf", label="fig:fig-uni-resid-acf"),
+            include_figure(fig_rel=fig_resid_acf, caption="ACF des résidus du modèle ARIMA", label="fig:fig-uni-resid-acf"),
             narr_call("fig.uni.resid_acf"),
             "",
         ]

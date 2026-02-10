@@ -84,7 +84,7 @@ def render_sec_descriptive(
                 "Toute rupture visuelle doit être gardée en mémoire : les tests de racine unitaire y sont sensibles si la rupture n’est pas modélisée."
             ),
             "",
-            include_figure(fig_rel=fig_level, caption="fig.desc.level", label="fig:fig-desc-level"),
+            include_figure(fig_rel=fig_level, caption="Évolution de la croissance naturelle en France (1975--2025)", label="fig:fig-desc-level"),
             narr_call("fig.desc.level"),
             "",
         ]
@@ -200,7 +200,7 @@ def render_sec_descriptive(
                 "non expliquée et impose prudence sur la spécification ultérieure."
             ),
             "",
-            include_figure(fig_rel=fig_decomp, caption="fig.desc.decomp", label="fig:fig-desc-decomp"),
+            include_figure(fig_rel=fig_decomp, caption="Décomposition STL de la croissance naturelle (tendance, saisonnalité, résidu)", label="fig:fig-desc-decomp"),
             narr_call("fig.desc.decomp"),
             "",
         ]

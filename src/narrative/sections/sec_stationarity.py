@@ -164,7 +164,7 @@ def render_sec_stationarity(
                 "L’interprétation doit être corroborée par ADF et la robustesse (bande)."
             ),
             "",
-            include_figure(fig_rel=fig_acf, caption="fig.diag.acf_level", label="fig:fig-diag-acf-level"),
+            include_figure(fig_rel=fig_acf, caption="Fonction d’autocorrélation", label="fig:fig-diag-acf-level"),
             narr_call("fig.diag.acf_level"),
             "",
         ]
@@ -177,7 +177,7 @@ def render_sec_stationarity(
                 "Elle sert ici de repérage qualitatif, pas de décision."
             ),
             "",
-            include_figure(fig_rel=fig_pacf, caption="fig.diag.pacf_level", label="fig:fig-diag-pacf-level"),
+            include_figure(fig_rel=fig_pacf, caption="Fonction d’autocorrélation partielle", label="fig:fig-diag-pacf-level"),
             narr_call("fig.diag.pacf_level"),
             "",
         ]

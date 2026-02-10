@@ -223,7 +223,7 @@ def render_sec_multivariate(
                 "Des corrélations très élevées peuvent dégrader l’identification et rendre certains coefficients instables."
             ),
             "",
-            include_figure(fig_rel=fig_corr, caption="fig.var.corr_heatmap", label="fig:fig-var-corr-heatmap"),
+            include_figure(fig_rel=fig_corr, caption="Corrélations entre variables du modèle VAR", label="fig:fig-var-corr-heatmap"),
             narr_call("fig.var.corr_heatmap"),
             "",
         ]
@@ -346,7 +346,7 @@ def render_sec_multivariate(
                 "Si une orthogonalisation impose un ordre causal, cet ordre doit être justifié."
             ),
             "",
-            include_figure(fig_rel=fig_irf, caption="fig.var.irf", label="fig:fig-var-irf"),
+            include_figure(fig_rel=fig_irf, caption="Fonctions de réponse impulsionnelle (IRF)", label="fig:fig-var-irf"),
             narr_call("fig.var.irf"),
             "",
         ]
