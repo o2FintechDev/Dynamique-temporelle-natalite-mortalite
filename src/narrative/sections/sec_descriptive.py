@@ -51,11 +51,11 @@ def render_sec_descriptive(
 
     lines: list[str] = []
 
-    # ============================================================
-    # SECTION : Analyse descriptive (texte structurant)
-    # ============================================================
+    # ===============================
+    # SECTION 1 : Analyse descriptive
+    # ===============================
     lines += [
-        r"\section{Analyse descriptive et décomposition de la série}",
+        r"\section{Analyse descriptive de la croissance naturelle}",
         "",
         md_basic_to_tex(
             "Avant toute modélisation stochastique formelle, l’analyse descriptive constitue une étape économétrique fondamentale. "
@@ -78,21 +78,38 @@ def render_sec_descriptive(
 
     if fig_level:
         lines += [
-            r"\paragraph{Figure 1 — Série en niveau}",
-            md_basic_to_tex(
-                "Lecture : repérer pente de long terme, phases de retournement, et épisodes de volatilité atypique. "
-                "Toute rupture visuelle doit être gardée en mémoire : les tests de racine unitaire y sont sensibles si la rupture n’est pas modélisée."
-            ),
             "",
-            include_figure(fig_rel=fig_level, caption="Évolution de la croissance naturelle en France (1975--2025)", label="fig:fig-desc-level"),
+            include_figure(
+                fig_rel=fig_level,
+                caption="Évolution de la croissance naturelle en France (1975--2025)",
+                label="fig:desc-level"
+            ),
             narr_call("fig.desc.level"),
             "",
+            md_basic_to_tex(
+                "La figure met en évidence une dynamique de long terme marquée par une tendance globalement décroissante "
+                "de la croissance naturelle sur l’ensemble de la période étudiée. "
+                "Jusqu’au milieu des années 2010, la série oscille autour de valeurs positives, "
+                "avec une saisonnalité prononcée et relativement stable.\n\n"
+
+                "À partir de la fin des années 2010, une inflexion nette apparaît, "
+                "conduisant à des valeurs de plus en plus faibles, puis négatives. "
+                "Cette évolution suggère l’existence d’une rupture structurelle récente, "
+                "cohérente avec l’inversion observée entre les taux de natalité et de mortalité.\n\n"
+
+                "D’un point de vue économétrique, cette lecture visuelle oriente vers une possible "
+                "non-stationnarité en niveau et justifie le recours à des tests formels de racine unitaire "
+                "dans la section suivante."
+            ),
+            "",
         ]
+
 
     lines += [
         r"\subsection*{Décomposition formelle de la série temporelle}",
         md_basic_to_tex(
-            "Afin de structurer l’analyse, la série est décomposée selon un schéma additif classique :"
+            "Afin de structurer l’analyse et de distinguer les différentes composantes de la dynamique observée, "
+            "la série de croissance naturelle est décomposée selon un schéma additif classique."
         ),
         "",
         r"\begin{equation}",
@@ -100,192 +117,181 @@ def render_sec_descriptive(
         r"\end{equation}",
         "",
         md_basic_to_tex(
-            "où $T_t$ représente la tendance, $S_t$ la composante saisonnière, et $\\varepsilon_t$ le résidu supposé de moyenne nulle. "
-            "Cette décomposition suppose une séparation raisonnable des composantes ; elle doit être explicitée car une saisonnalité mal traitée "
-            "déforme ACF/PACF et les diagnostics ultérieurs."
+            "où $T_t$ désigne la composante de tendance de long terme, $S_t$ la composante saisonnière, "
+            "et $\\varepsilon_t$ un terme résiduel supposé de moyenne nulle.\n\n"
+
+            "Le choix d’une décomposition additive est justifié par l’observation graphique préalable : "
+            "l’amplitude des fluctuations saisonnières demeure globalement stable dans le temps "
+            "et ne semble pas proportionnelle au niveau de la série. "
+            "De plus, la croissance naturelle prenant des valeurs négatives sur la période récente, "
+            "une décomposition multiplicative serait économétriquement inappropriée.\n\n"
+
+            "Cette hypothèse additive constitue un cadre de travail initial. "
+            "Elle permet d’isoler les composantes structurelles de la série et prépare l’analyse formelle "
+            "de la stationnarité et des propriétés dynamiques étudiées dans les sections suivantes."
         ),
         "",
-        r"\subsection*{Analyse de la tendance}",
+
+        r"\subsection*{Synthèse descriptive et implications pour l’analyse économétrique}",
         md_basic_to_tex(
-            "La tendance traduit l’évolution structurelle de long terme. Elle peut être déterministe (fonction explicite du temps) "
-            "ou stochastique (accumulation de chocs permanents). Cette distinction est critique : elle conditionne TS/DS et le traitement "
-            "requis pour stationnariser la série. Une mauvaise identification de la tendance entraîne des erreurs sévères de spécification, "
-            "notamment dans les tests de racine unitaire."
-        ),
-        "",
-        r"\subsection*{Analyse de la saisonnalité : cadre théorique}",
-        md_basic_to_tex(
-            "Une saisonnalité mal spécifiée a des conséquences directes : distorsion des autocorrélations, perte de puissance des tests de "
-            "stationnarité, et identification erronée des ordres AR/MA. Quatre configurations doivent être envisagées : "
-            "absence de saisonnalité, saisonnalité déterministe (stable), saisonnalité stochastique (affectée par chocs), "
-            "et saisonnalité évolutive (amplitude/forme variable)."
-        ),
-        "",
-        r"\subsection*{Conséquences économétriques de la saisonnalité}",
-        md_basic_to_tex(
-            "Conclusion opérationnelle : l’analyse de la saisonnalité doit précéder toute estimation ARMA/ARIMA. "
-            "C’est un prérequis pour interpréter correctement ACF/PACF et calibrer les différenciations éventuelles."
-        ),
-        "",
-        r"\subsection*{Analyse descriptive de la volatilité}",
-        md_basic_to_tex(
-            "La volatilité descriptive correspond à l’étude de la dispersion dans le temps. En démographie, une variance relativement stable "
-            "est attendue hors chocs exceptionnels (crises sanitaires, épisodes extrêmes). Une hausse persistante de variance peut signaler "
-            "une rupture, un changement de régime, ou une transformation du DGP, et prépare la discussion sur les diagnostics résiduels."
-        ),
-        "",
-        r"\subsection*{Détection visuelle des ruptures structurelles}",
-        md_basic_to_tex(
-            "L’analyse graphique permet d’identifier des dates candidates de rupture, potentiellement liées à politiques familiales, chocs "
-            "macro-économiques, ou événements sanitaires. Toute rupture repérée ici doit être considérée lors de l’interprétation des tests "
-            "de stationnarité et des modèles, car les ruptures non modélisées biaisent les inférences."
-        ),
-        "",
-        r"\subsection*{Rôle de l’analyse descriptive dans la stratégie globale}",
-        md_basic_to_tex(
-            "Cette étape joue un rôle structurant : elle formalise des hypothèses plausibles sur la stationnarité, oriente les tests, "
-            "et limite les erreurs de spécification dans les modèles dynamiques. Elle sert de pont entre la construction des données "
-            "et la stationnarité, traitée dans la section suivante."
+            "L’analyse descriptive met en évidence plusieurs faits stylisés majeurs. "
+            "La série de croissance naturelle présente une dynamique de long terme marquée, "
+            "une saisonnalité régulière et persistante, ainsi que des phases de rupture visuelle "
+            "associées à des chocs macro-sociaux majeurs.\n\n"
+
+            "Ces éléments suggèrent que la série ne peut être assimilée à un simple processus aléatoire stationnaire. "
+            "La présence conjointe d’une tendance apparente, d’une composante saisonnière structurée "
+            "et de fluctuations résiduelles hétérogènes impose une analyse économétrique rigoureuse "
+            "des propriétés de stationnarité et de persistance.\n\n"
+
+            "L’analyse descriptive ne permet pas, à elle seule, de trancher sur la nature exacte "
+            "du processus générateur des données. "
+            "Elle fournit toutefois un cadre interprétatif indispensable pour guider "
+            "les tests formels de racine unitaire, le traitement de la saisonnalité "
+            "et la spécification des modèles dynamiques.\n\n"
+
+            "La section suivante est ainsi consacrée à l’étude formelle de la stationnarité "
+            "et à l’identification de la nature temporelle de la croissance naturelle française."
         ),
         "",
     ]
 
-    # ============================================================
-    # SECTION 2 : Résultats STL / artefacts (figures + tables + analyses)
-    # ============================================================
+    # =============================
+    # SECTION 2 : Décomposition STL
+    # =============================
+
     lines += [
-        r"\section{Résultats de la décomposition et diagnostics}",
+        r"\section{Décomposition STL de la croissance naturelle}",
         "",
         md_basic_to_tex(
-            f"Synthèse quantitative : **force saisonnière (STL) = {_fmt2(m_strength)}** ; "
-            f"**qualification = {m_type}**. Ces sorties doivent être cohérentes avec la figure de décomposition et les tableaux associés."
+            "Afin d’analyser finement la dynamique temporelle de la croissance naturelle, "
+            "la série est décomposée à l’aide de la méthode STL (Seasonal and Trend decomposition using Loess). "
+            "Cette méthode permet de séparer explicitement trois composantes : "
+            "une tendance de long terme, une saisonnalité potentiellement évolutive, "
+            "et un résidu capturant les chocs irréguliers.\n\n"
+
+            "Contrairement aux décompositions classiques, la STL autorise une saisonnalité non strictement stable dans le temps, "
+            "ce qui est particulièrement adapté aux données démographiques mensuelles. "
+            "Les comportements de fécondité et de mortalité peuvent en effet conserver une structure saisonnière "
+            "tout en voyant leur amplitude ou leur régularité évoluer sous l’effet de facteurs sociaux, sanitaires ou institutionnels."
+        ),
+        "",
+    ]
+
+    # ----------------------------
+    # Figure STL (sans paragraphe avant)
+    # ----------------------------
+    if fig_decomp:
+        lines += [
+            include_figure(
+                fig_rel=fig_decomp,
+                caption="Décomposition STL de la croissance naturelle en France (tendance, saisonnalité, résidu)",
+                label="fig:fig-desc-decomp",
+            ),
+            narr_call("fig.desc.decomp"),
+            "",
+        ]
+
+    # ----------------------------
+    # Interprétation de la figure
+    # ----------------------------
+    lines += [
+        md_basic_to_tex(
+            "La décomposition met en évidence plusieurs faits stylisés majeurs.\n\n"
+
+            "La composante de tendance révèle une dynamique de long terme marquée par un infléchissement progressif "
+            "de la croissance naturelle, cohérent avec le vieillissement démographique et la baisse structurelle de la fécondité. "
+            "Cette évolution suggère que les chocs observés ne sont pas purement transitoires, mais s’inscrivent dans une trajectoire durable.\n\n"
+
+            "La composante saisonnière présente une structure régulière, traduisant la persistance de comportements saisonniers "
+            "dans les naissances et les décès. Toutefois, son amplitude n’est pas strictement constante dans le temps, "
+            "ce qui indique une saisonnalité évolutive plutôt que parfaitement déterministe.\n\n"
+
+            "Enfin, le résidu est globalement centré autour de zéro, mais laisse apparaître des épisodes de chocs marqués, "
+            "notamment lors d’événements sanitaires ou climatiques exceptionnels. "
+            "Ces chocs ponctuels n’altèrent pas la structure globale mais doivent être pris en compte "
+            "dans les diagnostics économétriques ultérieurs."
+        ),
+        "",
+    ]
+
+    # ----------------------------
+    # Métriques STL : force et qualification
+    # ----------------------------
+    strength_txt = _fmt2(m_strength)
+    qual_txt = str(m_type or "NA")
+
+    lines += [
+        md_basic_to_tex(
+            f"D’un point de vue quantitatif, la STL fournit deux indicateurs synthétiques essentiels. "
+            f"La **force saisonnière** est estimée à **{strength_txt}**, indiquant que la saisonnalité explique "
+            "une part substantielle de la variance totale de la série. "
+            f"La **qualification** de la saisonnalité est **{qual_txt}**, ce qui confirme "
+            "que son intensité n’est pas strictement stable dans le temps.\n\n"
+
+            "Ces résultats sont particulièrement cohérents avec une lecture démographique : "
+            "les cycles saisonniers liés aux comportements reproductifs persistent, "
+            "mais leur intensité peut être modifiée par des changements sociaux profonds "
+            "(évolution des normes familiales, politiques publiques, crises sanitaires)."
         ),
         narr_call("m.desc.seasonal_strength"),
         narr_call("m.desc.seasonality_type"),
         "",
     ]
-    # --- Analyse économétrique guidée par les métriques STL
-    strength_txt = _fmt2(m_strength)
-    qual_txt = str(m_type or "NA")
 
-    lines += [
-        r"\paragraph{Analyse — saisonnalité et implications de spécification}",
-        md_basic_to_tex(
-            "La force saisonnière issue de la STL synthétise le poids de la composante saisonnière relativement à la variance totale. "
-            "Elle sert de critère opérationnel pour décider si la saisonnalité doit être traitée explicitement (différence saisonnière, "
-            "dummies mensuelles, ou composante saisonnière dans un modèle)."
-        ),
-        "",
-        md_basic_to_tex(
-            f"Dans les résultats présents : **force = {strength_txt}** et **qualification = {qual_txt}**. "
-            "Interprétation : si la saisonnalité est faible/absente, la dynamique est dominée par la tendance et/ou des ruptures ; "
-            "si elle est forte et stable, un traitement saisonnier explicite est requis avant l’identification ARMA/ARIMA afin d’éviter "
-            "des autocorrélations artificielles et un mauvais choix d’ordres."
-        ),
-        "",
-        md_basic_to_tex(
-            "Conséquence directe pour la section suivante (stationnarité) : une saisonnalité non traitée peut faire rejeter à tort "
-            "une hypothèse de stationnarité, ou dégrader la puissance des tests (ADF/PP), car les corrélations périodiques contaminent "
-            "les résidus des régressions de test."
-        ),
-        "",
-    ]
-
-    if fig_decomp:
-        lines += [
-            r"\paragraph{Figure 1 — Décomposition (STL)}",
-            md_basic_to_tex(
-                "Lecture : la tendance isole le mouvement structurel ; la composante saisonnière capture les cycles réguliers ; "
-                "le résidu doit être centré et dépourvu de structure évidente. Un résidu encore autocorrélé signale une dynamique "
-                "non expliquée et impose prudence sur la spécification ultérieure."
-            ),
-            "",
-            include_figure(fig_rel=fig_decomp, caption="Décomposition STL de la croissance naturelle (tendance, saisonnalité, résidu)", label="fig:fig-desc-decomp"),
-            narr_call("fig.desc.decomp"),
-            "",
-        ]
-
-        lines += [
-            md_basic_to_tex(
-                "Contrôle de cohérence : la composante saisonnière visualisée doit être compatible avec la force saisonnière reportée ci-dessus ; "
-                "si divergence apparente, cela suggère une hétérogénéité temporelle de la saisonnalité (amplitude variable) et impose prudence."
-            ),
-            "",
-        ]
+    # ----------------------------
+    # Tables associées
+    # ----------------------------
     if tbl_summary:
         lines += [
-            r"\paragraph{Tableau 1 — Synthèse descriptive}",
+            r"\paragraph{Tableau — Synthèse statistique}",
             md_basic_to_tex(
-                "Lecture : valider l’ordre de grandeur, dispersion, et asymétrie. Ce tableau sert de contrôle de cohérence "
-                "avec la figure de niveau et les diagnostics de tendance."
+                "Ce tableau fournit un contrôle de cohérence numérique des ordres de grandeur, "
+                "de la dispersion et de l’asymétrie de la croissance naturelle."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_summary, caption="Résumé statistique de la croissance naturelle", label="tab:tbl-desc-summary"),
+            include_table_tex(
+                run_root=run_root,
+                tbl_rel=tbl_summary,
+                caption="Résumé statistique de la croissance naturelle",
+                label="tab:tbl-desc-summary",
+            ),
             narr_call("tbl.desc.summary"),
             "",
         ]
 
     if tbl_season:
         lines += [
-            r"\paragraph{Tableau 2 — Indicateurs de saisonnalité}",
+            r"\paragraph{Tableau — Indicateurs de saisonnalité}",
             md_basic_to_tex(
-                "Lecture : vérifier si l’amplitude et la stabilité saisonnière justifient un traitement explicite. "
-                "Si la saisonnalité est qualifiée de faible/absente, la priorité se déplace vers la tendance et les ruptures ; "
-                "si elle est forte, elle doit être traitée avant toute identification ARMA/ARIMA."
+                "Ces indicateurs complètent la lecture graphique en quantifiant la présence "
+                "et la nature de la saisonnalité."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_season, caption="Indicateurs de saisonnalité de la croissance naturelle", label="tab:tbl-desc-seasonality"),
+            include_table_tex(
+                run_root=run_root,
+                tbl_rel=tbl_season,
+                caption="Indicateurs de saisonnalité de la croissance naturelle",
+                label="tab:tbl-desc-seasonality",
+            ),
             narr_call("tbl.desc.seasonality"),
             "",
         ]
 
-    # --- Table détaillée des composantes (trop volumineuse -> annexe contrôlée)
-    if tbl_decomp:
-        if _looks_too_large_table(tbl_decomp):
-            lines += [
-                md_basic_to_tex(
-                    "**Table détaillée des composantes (STL)** : disponible en annexe/artefacts (non insérée dans le corps du rapport "
-                    "pour préserver la lisibilité)."
-                ),
-                narr_call("tbl.desc.decomp_components"),
-                "",
-            ]
-        else:
-            lines += [
-                r"\paragraph{Tableau — Détail des composantes (STL)}",
-                md_basic_to_tex(
-                    "Lecture : contrôle fin des composantes (tendance, saisonnalité, résidu) au niveau observationnel. "
-                    "Cette table sert d’audit, pas de synthèse."
-                ),
-                "",
-                include_table_tex(
-                    run_root=run_root,
-                    tbl_rel=tbl_decomp,
-                    caption="Composantes de la décomposition STL (tendance, saisonnalité, résidu)",
-                    label="tab:tbl-desc-decomp-components",
-                ),
-                narr_call("tbl.desc.decomp_components"),
-                "",
-            ]
-
-    if note_md.strip():
-        lines += [
-            md_basic_to_tex("**Note d’interprétation automatisée**"),
-            md_basic_to_tex(
-                "La table détaillée des composantes est disponible dans les artefacts (tables) ; le rapport présente une synthèse et les graphiques. "
-                "Toute affirmation sur tendance/saisonnalité doit être justifiée par les artefacts ci-dessus."
-            ),
-            "",
-            md_basic_to_tex(note_md),
-            narr_call("m.note.step2"),
-            "",
-        ]
-
+    # ----------------------------
+    # Implications pour la suite
+    # ----------------------------
     lines += [
-        md_basic_to_tex("**Conclusion**"),
+        md_basic_to_tex("**Implications économétriques**"),
         md_basic_to_tex(
-            "La décomposition et les diagnostics descriptifs cadrent la stationnarité et la spécification. "
-            "Ils déterminent si la série doit être traitée (tendance/saisonnalité) avant l’identification des modèles dynamiques."
+            "La présence d’une saisonnalité forte et évolutive implique que les tests de stationnarité "
+            "et l’identification des modèles dynamiques doivent être conduits avec prudence. "
+            "Une saisonnalité non traitée peut biaiser les tests de racine unitaire "
+            "et fausser l’identification des ordres ARMA/ARIMA.\n\n"
+
+            "La décomposition STL constitue ainsi une étape structurante : "
+            "elle justifie le traitement explicite de la saisonnalité et prépare l’analyse formelle "
+            "de la stationnarité développée dans la section suivante."
         ),
         "",
     ]
