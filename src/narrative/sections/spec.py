@@ -73,4 +73,12 @@ def default_spec() -> List[SectionSpec]:
             table_keys=[],
             metric_keys=["m.anthro.todd_analysis"],
         ),
+        SectionSpec(
+            key="sec_conclusion",
+            title="Conclusion",
+            intro_md="Cette section synthétise l’ensemble des résultats économétriques obtenus au cours de l’analyse. Elle met en perspective les dynamiques temporelles identifiées, la robustesse des modèles estimés ainsi que les relations structurelles mises en évidence entre les variables étudiées. L’objectif est de dégager une lecture cohérente et intégrée des faits stylisés afin d’éclairer leur signification économique et démographique.",
+            figure_keys=[],
+            table_keys=[],
+            metric_keys=[],
+        ),
     ]
