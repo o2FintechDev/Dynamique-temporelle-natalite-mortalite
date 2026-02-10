@@ -288,7 +288,7 @@ def render_sec_univariate(
                 "Un gain marginal d’AIC au prix d’une explosion de paramètres est une mauvaise décision."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_summary, caption="tbl.uni.summary", label="tab:tbl-uni-summary"),
+            include_table_tex(run_root=run_root, tbl_rel=tbl_summary, caption="Synthèse des modèles ARIMA estimés", label="tab:tbl-uni-summary"),
             narr_call("tbl.uni.summary"),
             "",
         ]
@@ -353,7 +353,7 @@ def render_sec_univariate(
                 "un signal ARCH indique variance conditionnelle non constante."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_resid, caption="tbl.uni.resid_diag", label="tab:tbl-uni-resid-diag"),
+            include_table_tex(run_root=run_root, tbl_rel=tbl_resid, caption="Diagnostics des résidus du modèle univarié retenu", label="tab:tbl-uni-resid-diag"),
             narr_call("tbl.uni.resid_diag"),
             "",
         ]
@@ -367,7 +367,7 @@ def render_sec_univariate(
                 "ou des ruptures non modélisées."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_memory, caption="tbl.uni.memory", label="tab:tbl-uni-memory"),
+            include_table_tex(run_root=run_root, tbl_rel=tbl_memory, caption="Indicateurs de persistance et de mémoire de la série", label="tab:tbl-uni-memory"),
             narr_call("tbl.uni.memory"),
             "",
         ]

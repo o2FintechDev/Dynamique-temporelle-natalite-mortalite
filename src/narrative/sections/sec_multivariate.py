@@ -197,7 +197,7 @@ def render_sec_multivariate(
                 "Il conditionne la comparabilité des résultats (tests, stabilité, IRF/FEVD)."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_input, caption="tbl.var.input_window", label="tab:tbl-var-input-window"),
+            include_table_tex(run_root=run_root, tbl_rel=tbl_input, caption="Fenêtre d’estimation et variables retenues pour le VAR", label="tab:tbl-var-input-window"),
             narr_call("tbl.var.input_window"),
             "",
         ]
@@ -210,7 +210,7 @@ def render_sec_multivariate(
                 "Ce tableau valide que les transformations appliquées rendent les composantes/variables exploitables."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_stat, caption="tbl.var.stationarity", label="tab:tbl-var-stationarity"),
+            include_table_tex(run_root=run_root, tbl_rel=tbl_stat, caption="Stationnarité des variables avant estimation du VAR", label="tab:tbl-var-stationarity"),
             narr_call("tbl.var.stationarity"),
             "",
         ]
@@ -236,7 +236,7 @@ def render_sec_multivariate(
                 "Utile si la heatmap est insuffisante pour lire certaines paires."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_corr, caption="tbl.var.corr", label="tab:tbl-var-corr"),
+            include_table_tex(run_root=run_root, tbl_rel=tbl_corr, caption="Matrice de corrélation des variables du VAR", label="tab:tbl-var-corr"),
             narr_call("tbl.var.corr"),
             "",
         ]
@@ -254,7 +254,7 @@ def render_sec_multivariate(
             include_table_tex(
                 run_root=run_root,
                 tbl_rel=tbl_lag,
-                caption="tbl.var.lag_selection",
+                caption="Sélection du nombre de retards du VAR",
                 label="tab:tbl-var-lag-selection",
             ),
             narr_call("tbl.var.lag_selection"),
@@ -279,7 +279,7 @@ def render_sec_multivariate(
                 "Il ne remplace pas IRF/FEVD, mais il sert de contrôle : un VAR sur-paramétré produit des coefficients non significatifs en masse."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_pvals, caption="tbl.var.params_pvalues", label="tab:tbl-var-params-pvalues"),
+            include_table_tex(run_root=run_root, tbl_rel=tbl_pvals, caption="Paramètres estimés du VAR et significativité statistique", label="tab:tbl-var-params-pvalues"),
             narr_call("tbl.var.params_pvalues"),
             "",
         ]
@@ -297,7 +297,7 @@ def render_sec_multivariate(
             include_table_tex(
                 run_root=run_root,
                 tbl_rel=tbl_granger,
-                caption="tbl.var.granger",
+                caption="Tests de causalité de Granger",
                 label="tab:tbl-var-granger",
             ),
             narr_call("tbl.var.granger"),
@@ -328,7 +328,7 @@ def render_sec_multivariate(
             include_table_tex(
                 run_root=run_root,
                 tbl_rel=tbl_sims,
-                caption="tbl.var.sims",
+                caption="Tests de causalité instantanée (Sims)",
                 label="tab:tbl-var-sims",
             ),
             narr_call("tbl.var.sims"),
@@ -364,7 +364,7 @@ def render_sec_multivariate(
             include_table_tex(
                 run_root=run_root,
                 tbl_rel=tbl_fevd,
-                caption="tbl.var.fevd",
+                caption="Décomposition de la variance des erreurs de prévision (FEVD)",
                 label="tab:tbl-var-fevd",
             ),
             narr_call("tbl.var.fevd"),

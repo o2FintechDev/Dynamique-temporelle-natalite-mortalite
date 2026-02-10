@@ -182,7 +182,7 @@ def render_sec_cointegration(
                 "Ce résultat doit être cohérent avec Johansen (méthode système) et le choix déterministe."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_eg, caption="tbl.coint.eg", label="tab:tbl-coint-eg"),
+            include_table_tex(run_root=run_root, tbl_rel=tbl_eg, caption="Test de cointégration d’Engle–Granger", label="tab:tbl-coint-eg"),
             narr_call("tbl.coint.eg"),
             "",
         ]
@@ -197,7 +197,7 @@ def render_sec_cointegration(
                 "pas comme un fait robuste."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_joh, caption="tbl.coint.johansen", label="tab:tbl-coint-johansen"),
+            include_table_tex(run_root=run_root, tbl_rel=tbl_joh, caption="Tests de cointégration de Johansen", label="tab:tbl-coint-johansen"),
             narr_call("tbl.coint.johansen"),
             "",
         ]
@@ -211,7 +211,7 @@ def render_sec_cointegration(
                 "La décision finale doit intégrer la stabilité, la parcimonie et la cohérence économique."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_choice, caption="tbl.coint.var_vs_vecm_choice", label="tab:tbl-coint-choice"),
+            include_table_tex(run_root=run_root, tbl_rel=tbl_choice, caption="Choix du modèle : VAR en différences ou VECM", label="tab:tbl-coint-choice"),
             narr_call("tbl.coint.var_vs_vecm_choice"),
             "",
         ]
@@ -226,7 +226,7 @@ def render_sec_cointegration(
                 "ou une spécification inadéquate (rang, retards, déterministes)."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_vecm, caption="tbl.vecm.params", label="tab:tbl-vecm-params"),
+            include_table_tex(run_root=run_root, tbl_rel=tbl_vecm, caption="Paramètres estimés du modèle VECM", label="tab:tbl-vecm-params"),
             narr_call("tbl.vecm.params"),
             "",
         ]

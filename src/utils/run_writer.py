@@ -308,7 +308,7 @@ conforme aux exigences du Master.
 {\large \textit{Analyse automatisée par pipeline économétrique déterministe}}\\[1cm]
 \end{center}
 
-{\small
+{\footnotesize
 Aude Bernier, Clara Pierreuse, Justine Reiter--Guerville\\
 Master Monnaie Banque Finance Assurance -- Parcours Systèmes d’Information Économiques et Financiers (SIEF)\\
 Université de Montpellier

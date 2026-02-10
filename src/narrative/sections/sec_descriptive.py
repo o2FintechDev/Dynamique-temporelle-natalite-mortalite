@@ -220,7 +220,7 @@ def render_sec_descriptive(
                 "avec la figure de niveau et les diagnostics de tendance."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_summary, caption="tbl.desc.summary", label="tab:tbl-desc-summary"),
+            include_table_tex(run_root=run_root, tbl_rel=tbl_summary, caption="Résumé statistique de la croissance naturelle", label="tab:tbl-desc-summary"),
             narr_call("tbl.desc.summary"),
             "",
         ]
@@ -234,7 +234,7 @@ def render_sec_descriptive(
                 "si elle est forte, elle doit être traitée avant toute identification ARMA/ARIMA."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_season, caption="tbl.desc.seasonality", label="tab:tbl-desc-seasonality"),
+            include_table_tex(run_root=run_root, tbl_rel=tbl_season, caption="Indicateurs de saisonnalité de la croissance naturelle", label="tab:tbl-desc-seasonality"),
             narr_call("tbl.desc.seasonality"),
             "",
         ]
@@ -261,7 +261,7 @@ def render_sec_descriptive(
                 include_table_tex(
                     run_root=run_root,
                     tbl_rel=tbl_decomp,
-                    caption="tbl.desc.decomp_components",
+                    caption="Composantes de la décomposition STL (tendance, saisonnalité, résidu)",
                     label="tab:tbl-desc-decomp-components",
                 ),
                 narr_call("tbl.desc.decomp_components"),

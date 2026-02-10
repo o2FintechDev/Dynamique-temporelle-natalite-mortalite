@@ -194,7 +194,7 @@ def render_sec_stationarity(
             include_table_tex(
                 run_root=run_root,
                 tbl_rel=tbl_acfp,
-                caption="tbl.diag.acf_pacf",
+                caption="Autocorrélations et autocorrélations partielles de la série",
                 label="tab:tbl-diag-acf-pacf",
             ),
             narr_call("tbl.diag.acf_pacf"),
@@ -209,7 +209,7 @@ def render_sec_stationarity(
                 "Une conclusion instable selon la spécification signale une frontière TS/DS, une rupture non modélisée, ou une persistance élevée."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_adf, caption="tbl.diag.adf", label="tab:tbl-diag-adf"),
+            include_table_tex(run_root=run_root, tbl_rel=tbl_adf, caption="Résultats du test de racine unitaire ADF", label="tab:tbl-diag-adf"),
             narr_call("tbl.diag.adf"),
             "",
         ]
@@ -222,7 +222,7 @@ def render_sec_stationarity(
                 "Une conclusion fragile impose prudence : la transformation retenue doit privilégier la robustesse plutôt que l’optimisme."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_band, caption="tbl.diag.band_df", label="tab:tbl-diag-band-df"),
+            include_table_tex(run_root=run_root, tbl_rel=tbl_band, caption="Bande critique du test de Dickey–Fuller", label="tab:tbl-diag-band-df"),
             narr_call("tbl.diag.band_df"),
             "",
         ]
@@ -235,7 +235,7 @@ def render_sec_stationarity(
                 "Il verrouille le traitement de la série : différenciation si DS, détrendage si TS, et aucun traitement si stationnaire en niveau."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_tsds, caption="tbl.diag.ts_vs_ds_decision", label="tab:tbl-diag-ts-vs-ds-decision"),
+            include_table_tex(run_root=run_root, tbl_rel=tbl_tsds, caption="Décision de stationnarité : processus TS ou DS", label="tab:tbl-diag-ts-vs-ds-decision"),
             narr_call("tbl.diag.ts_vs_ds_decision"),
             "",
         ]
@@ -248,7 +248,7 @@ def render_sec_stationarity(
                 "Si l’autocorrélation persiste fortement, l’identification ARMA/ARIMA devra être plus structurée (retards, composantes)."
             ),
             "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_ljung, caption="tbl.diag.ljungbox_diff", label="tab:tbl-diag-ljungbox-diff"),
+            include_table_tex(run_root=run_root, tbl_rel=tbl_ljung, caption="Test de Ljung–Box sur la série différenciée", label="tab:tbl-diag-ljungbox-diff"),
             narr_call("tbl.diag.ljungbox_diff"),
             "",
         ]
