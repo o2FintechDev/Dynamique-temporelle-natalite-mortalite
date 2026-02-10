@@ -339,7 +339,7 @@ def render_sec_univariate(
                 "Des queues épaisses sont cohérentes avec des chocs rares mais extrêmes et justifient une prudence sur l’inférence classique."
             ),
             "",
-            include_figure(fig_rel=fig_qq, caption="fig.uni.qq", label="fig:fig-uni-qq"),
+            include_figure(fig_rel=fig_qq, caption="QQ-plot des résidus du modèle univarié", label="fig:fig-uni-qq"),
             narr_call("fig.uni.qq"),
             "",
         ]

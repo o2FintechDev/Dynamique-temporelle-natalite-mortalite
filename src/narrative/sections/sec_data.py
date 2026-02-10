@@ -270,13 +270,14 @@ def render_sec_data(
 
     # Conclusion
     lines += [
-        r"\textbf{Conclusion}",
-        md_basic_to_tex(
-            "Les tables de préparation déterminent la qualité du signal exploitable. "
-            "Elles bornent les choix méthodologiques des sections suivantes (stationnarité, ARIMA, VAR/VECM) "
-            "et cadrent l’interprétation des ruptures et chocs."
-        ),
-        "",
-    ]
+    r"\textbf{Conclusion}",
+    "",  # ← saut de ligne LaTeX
+    md_basic_to_tex(
+        "Les tables de préparation déterminent la qualité du signal exploitable. "
+        "Elles bornent les choix méthodologiques des sections suivantes (stationnarité, ARIMA, VAR/VECM) "
+        "et cadrent l’interprétation des ruptures et chocs."
+    ),
+    "",
+]
 
     return "\n".join(lines).strip() + "\n"
