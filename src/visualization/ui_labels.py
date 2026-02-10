@@ -8,6 +8,7 @@ UI_LABELS: dict[str, str] = {
     "tbl.data.desc_stats": "Statistiques descriptives des variables",
     "tbl.data.missing_report": "Analyse des valeurs manquantes",
     "tbl.data.coverage_report": "Couverture temporelle des données",
+    "tbl.data.vars_audit": "Audit des variables",
 
     "m.data.dataset_meta": "Métadonnées du jeu de données",
     "m.note.step1": "Note d'interprétation (Étape 1)",
@@ -56,18 +57,36 @@ UI_LABELS: dict[str, str] = {
     "m.note.step4": "Note d'interprétation (Étape 4)",
 
     # --- Page 3 : Modèles — Step 5 (VAR) ---
+    "tbl.var.input_window": "Fenêtre temporelle d'estimation du VAR",
+    "tbl.var.stationarity": "Tests de stationnarité et transformations (ADF)",
+    "tbl.var.stationary_data": "Données stationnarisées utilisées pour le VAR",
+    "fig.var.corr_heatmap": "Matrice de corrélation des variables stationnaires (VAR)",
+    "tbl.var.corr": "Corrélations entre variables stationnaires",
+    "tbl.var.lag_grid": "Grille de sélection de l'ordre du VAR",
     "tbl.var.lag_selection": "Sélection du lag du VAR (AIC/BIC/HQIC/FPE)",
+    "fig.var.irf": "Fonctions de réponse impulsionnelle (IRF)",
+    "tbl.var.params_pvalues": "P-values des coefficients du VAR",
+    "tbl.var.lag_significance": "Significativité globale par retard",
+    "tbl.var.const": "Constantes des équations du VAR",
+
     "tbl.var.granger": "Causalité de Granger",
     "tbl.var.sims": "Causalité de Sims",
     "tbl.var.fevd": "Décomposition de la variance (FEVD)",
 
-    "fig.var.irf": "Fonctions de réponse impulsionnelle (IRF)",
+    "tbl.var.A1": "Matrice A₁ (effets à 1 retard)",
+    "tbl.var.A2": "Matrice A₂ (effets à 2 retards)",
+    "tbl.var.A3": "Matrice A₃ (effets à 3 retards)",
+    "tbl.var.A4": "Matrice A₄ (effets à 4 retards)",
+    "tbl.var.A5": "Matrice A₅ (effets à 5 retards)",
+
 
     "m.var.meta": "Résumé du VAR",
     "m.var.sims": "Paramètres et couverture des tests de Sims",
+    
+    "m.var.stationarity_meta": "Métadonnées de stationnarisation des variables (VAR)",
     "m.var.audit": "Audit de reproductibilité (VAR)",
     "m.note.step5": "Note d'interprétation (Étape 5)",
-
+    
     "model.var.best": "Modèle VAR estimé (résultats)",
 
         # --- Page 4 : Résultats — Step 6 (Cointégration) ---
