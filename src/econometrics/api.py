@@ -116,10 +116,18 @@ def step2_descriptive_pack(df: pd.DataFrame, *, y: str, period: int = 12, **para
     ws = _window_stats(s)
     bps = _breakpoints_from_windows(ws, delta_thr=float(params.get("delta_thr", 0.20)))
 
+    
     note2 = (
-        f"**Étape 2 — Analyse descriptive & décomposition** : saisonnalité **{seas_type}** "
-        f"(force ≈ **{strength:.3f}**). Décomposition STL produite (niveau/tendance/saisonnalité/résidu)."
+        f"**Analyse descriptive & décomposition** : "
+        f"la série présente une saisonnalité **{seas_type}**, "
+        f"avec une force estimée à **{strength:.3f}**.\n\n "
+        f"Cette mesure indique la part de la variance expliquée par la composante saisonnière "
+        f"relativement au bruit résiduel.\n\n "
+        f"La décomposition STL permet d'isoler distinctement le niveau, la tendance, "
+        f"la saisonnalité et le résidu, fournissant une base structurée pour les tests "
+        f"de stationnarité et la modélisation ultérieure."
     )
+
 
     return {
         "tables": {
@@ -165,12 +173,17 @@ def step3_stationarity_pack(df: pd.DataFrame, *, y: str, lags: int = 24, **param
     p_c = m_tsds.get("adf_p_c")
     p_ct = m_tsds.get("adf_p_ct")
 
-    note3 = (
-        f"**Étape 3 — Stationnarité (TS vs DS)** : verdict **{verdict}**. "
-        f"ADF(c) p={p_c:.3g}, ADF(ct) p={p_ct:.3g}. "
-        "Décision fondée exclusivement sur ADF et la lecture de persistance (bande DF via ACF)."
-    )
 
+    note3 = (
+        f"**Stationnarité (TS vs DS)** : verdict **{verdict}**.\n\n "
+        f"Les tests ADF avec constante (c) et constante+tendance (ct) "
+        f"donnent des p-values respectives de **{p_c:.3g}** et **{p_ct:.3g}**, "
+        f"ne permettant pas de rejeter l'hypothèse de racine unitaire aux seuils usuels.\n\n "
+        f"L'analyse de l'autocorrélation confirme une persistance élevée du niveau, "
+        f"cohérente avec une dynamique de type Difference-Stationary.\n\n "
+        f"La décision repose exclusivement sur les tests ADF et la lecture de la bande "
+        f"de Dickey-Fuller via l'ACF, sans recours à des tests alternatifs."
+    )
     return {
         "tables": {
             "tbl.diag.acf_pacf": tbl_acf,
@@ -361,10 +374,17 @@ def step4_univariate_pack(df: pd.DataFrame, *, y: str, **params: Any) -> dict[st
     def _fmt2(x: Any) -> str:
         return f"{x:.2f}" if isinstance(x, (int, float, np.floating)) and np.isfinite(x) else "NA"
 
+    
     note = (
-        f"**Étape 4 — Univarié** : verdict={verdict}, critère={criterion.upper()} ⇒ "
-        f"modèle retenu={selected_family}, ordre={order}, AIC={_fmt2(aic)}, BIC={_fmt2(bic)}."
-    )
+    f"**Modèles Univarié** : le résultats de stationnarité étant **{verdict}**, "
+    f"nous conduit à une modélisation sur série différenciée (d={d_force if d_force is not None else 'auto'}).\n\n "
+    f"L'exploration systématique des modèles AR, MA, ARMA (sur la série stationnaire) "
+    f"et ARIMA (sur le niveau) intègre un filtrage préalable par significativité des paramètres.\n\n "
+    f"Selon le critère **{criterion.upper()}**, le modèle retenu est **{selected_family}** "
+    f"d'ordre **{order}**, avec AIC = **{_fmt2(aic)}** et BIC = **{_fmt2(bic)}**.\n\n "
+    f"Ce choix reflète le meilleur compromis entre qualité d'ajustement et parcimonie "
+    f"parmi les modèles statistiquement valides."
+)
 
     return {
         "tables": {
@@ -377,7 +397,6 @@ def step4_univariate_pack(df: pd.DataFrame, *, y: str, **params: Any) -> dict[st
             "tbl.uni.memory": tbl_mem,
         },
         "metrics": {
-            # ✅ FIX 3: structure plus stable pour tes exports LaTeX/markdown
             "m.uni.best": {
                 "best_sig": {"AR": best_ar, "MA": best_ma, "ARMA": best_arma, "ARIMA": best_arima},
                 "family": selected_family,

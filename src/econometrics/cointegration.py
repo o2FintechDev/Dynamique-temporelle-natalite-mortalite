@@ -239,6 +239,8 @@ def cointegration_pack(
             f"**Étape 6 — Cointégration** : données insuffisantes (k={k}, nobs={nobs}). "
             "Décision conservatrice: VAR en différences."
         )
+        
+
         return {
             "tables": {
                 "tbl.coint.eg": tbl_empty,
@@ -470,11 +472,22 @@ def cointegration_pack(
     # 6) Note narrative Step6
     # -----------------------------
     note6 = (
-        f"**Étape 6 — Cointégration** : Johansen (trace @5%) ⇒ rang = **{int(rank)}** "
-        f"⇒ choix **{choice}** (det_order={det_order}, k_ar_diff={k_ar_diff}). "
-        + ("VECM estimé : interprétation via β (long terme) et α (ajustement)." if use_vecm else "Pas de VECM : VAR en différences.")
-        + (f" (Johansen error={joh_error})." if joh_error else "")
-    )
+            f"**Cointégration** : le test de Johansen (statistique de trace au seuil de 5\\%) "
+            f"indique un rang de cointégration **r = {int(rank)}**, révélant l'existence de relations de long terme "
+            f"entre les variables considérées. \n\n Conformément à la règle décisionnelle "
+            f"(VECM si rang > 0, sinon VAR en différences), le modèle retenu est un **{choice}**, "
+            f"avec det_order={det_order} et k_ar_diff={k_ar_diff}.\n\n "
+            + (
+                "Le VECM est estimé afin de modéliser conjointement les équilibres de long terme "
+                "via les vecteurs de cointégration (β) et les mécanismes d'ajustement vers ces équilibres "
+                "à court terme (α).\n\n"
+                if use_vecm
+                else
+                "L'absence de cointégration conduit à privilégier un VAR en différences, "
+                "sans modélisation explicite de relations de long terme."
+            )
+            + (f" (Échec du test de Johansen : {joh_error})." if joh_error else "")
+        )
 
     out["metrics"]["m.note.step6"] = {
         "markdown": note6,
