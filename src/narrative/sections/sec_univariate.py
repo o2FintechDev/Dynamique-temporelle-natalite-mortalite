@@ -149,110 +149,134 @@ def render_sec_univariate(
 
     lines: list[str] = []
 
-    # ============================================================
+    # =========================================
     # SECTION 1 : Cadre théorique (Box–Jenkins)
-    # ============================================================
+    # =========================================
     lines += [
-        r"\section{Analyse univariée : modèles AR, MA, ARMA et ARIMA}",
+        r"\section{Modèles AR, MA, ARMA et ARIMA}",
         "",
         md_basic_to_tex(
-            "L’analyse univariée vise à modéliser la dynamique propre de la croissance naturelle, indépendamment de toute variable explicative. "
-            "Elle repose sur l’hypothèse que l’information contenue dans l’historique de la série suffit à expliquer sa dynamique présente, "
-            "une fois la stationnarité assurée. Cette étape constitue un préalable indispensable avant toute extension multivariée. "
-            "La méthodologie de Box–Jenkins fournit un cadre systématique fondé sur : identification, estimation et validation."
+            "L’analyse univariée constitue le fondement méthodologique pour caractériser la dynamique intrinsèque "
+            "d’une série temporelle, indépendamment de toute variable explicative. Sous l’hypothèse que "
+            "l’information pertinente est contenue dans l’histoire passée de la série, ce cadre permet de capturer "
+            "structure autorégressive, chocs transitoires et dynamiques mixtes. La méthodologie de Box–Jenkins "
+            "organise cette analyse en trois étapes interdépendantes : identification, estimation puis validation."
         ),
         "",
         r"\subsection*{Cadre probabiliste général}",
         md_basic_to_tex(
-            "On considère une série stationnaire au second ordre : espérance constante, variance finie, autocovariance ne dépendant que du retard. "
-            "Le terme d’erreur est supposé bruit blanc, non autocorrélé et de variance constante."
+            "Soit $(Y_t)_{t\in\mathbb{Z}}$ un processus stationnaire au second ordre, c'est-à-dire à espérance constante, "
+            "variance finie et autocovariances ne dépendant que du retard. Sous cette hypothèse, les opérateurs "
+            "linéaires jouent un rôle central dans la représentation et la décomposition des structures dynamiques. "
+            "Le terme d’$\varepsilon_t$ est supposé être un bruit blanc : $\mathbb{E}[\varepsilon_t]=0$, "
+            "$\mathrm{Var}(\varepsilon_t)=\sigma^2$ et $\mathrm{Cov}(\varepsilon_t,\varepsilon_{t-k})=0$ pour $k\neq 0$. "
+            "Ce cadre garantit la validité des théorèmes d’inversion et des représentations Wold."
         ),
         "",
         r"\subsection*{Modèles autorégressifs AR(p)}",
         "",
         r"\begin{equation}",
-        r"Y_t = c + \sum_{i=1}^{p}\phi_i Y_{t-i} + \varepsilon_t",
+        r"Y_t = c + \sum_{i=1}^{p}\phi_i Y_{t-i} + \varepsilon_t,",
         r"\end{equation}",
         "",
         md_basic_to_tex(
-            "Interprétation : chaque observation dépend linéairement des valeurs passées ; les coefficients mesurent la persistance. "
-            "Condition de stationnarité : les racines du polynôme caractéristique doivent être hors cercle unité. "
-            "Identification : ACF décroît progressivement, PACF coupure au retard $p$. "
-            "Lecture économique : un $p$ élevé traduit une inertie démographique importante."
+            "Dans un AR(p), chaque observation est une combinaison linéaire des $p$ valeurs passées et d’un bruit blanc. "
+            "Les coefficients $\phi_i$ mesurent la persistance structurée. La condition de stationnarité impose que les "
+            "racines du polynôme caractéristique $\Phi(L)=1-\sum_{i=1}^p\phi_iL^i$ soient strictement à l’extérieur du "
+            "cercle unité. Sur le plan corrélographique, une ACF décroissante progressivement et une PACF coupant après "
+            "le retard $p$ constituent des critères heuristiques classiques d’identification."
         ),
         "",
         r"\subsection*{Modèles à moyenne mobile MA(q)}",
         "",
         r"\begin{equation}",
-        r"Y_t = c + \varepsilon_t + \sum_{j=1}^{q}\theta_j \varepsilon_{t-j}",
+        r"Y_t = c + \varepsilon_t + \sum_{j=1}^{q}\theta_j \varepsilon_{t-j},",
         r"\end{equation}",
         "",
         md_basic_to_tex(
-            "Interprétation : la série dépend des chocs présents et passés (effets transitoires). "
-            "Condition d’inversibilité : racines hors cercle unité. "
-            "Identification : ACF coupure au retard $q$, PACF décroît progressivement. "
-            "Lecture économique : capte des chocs ponctuels (ex. crises sanitaires temporaires)."
+            "Dans un modèle MA(q), l’observation dépend des chocs présents et des $q$ chocs passés. Cette formulation "
+            "capture des effets transitoires qui ne se traduisent pas par une persistance infinie. La condition "
+            "d’inversibilité exige que les racines du polynôme $\Theta(L)=1+\sum_{j=1}^q\theta_jL^j$ soient hors du "
+            "cercle unité, ce qui garantit une représentation AR($\infty$) et l’unicité de l’estimation. Corrélographiquement, "
+            "une ACF coupant après le retard $q$ et une PACF décroissante constituent des repères."
         ),
         "",
-        r"\subsection*{Modèles ARMA(p,q)}",
+        r"\subsection*{Modèles mixtes ARMA(p,q)}",
         "",
         r"\begin{equation}",
-        r"Y_t = c + \sum_{i=1}^{p}\phi_i Y_{t-i} + \varepsilon_t + \sum_{j=1}^{q}\theta_j \varepsilon_{t-j}",
+        r"Y_t = c + \sum_{i=1}^{p}\phi_i Y_{t-i} + \varepsilon_t + \sum_{j=1}^{q}\theta_j \varepsilon_{t-j},",
         r"\end{equation}",
         "",
         md_basic_to_tex(
-            "Intérêt : modéliser simultanément la persistance structurelle (AR) et les effets transitoires (MA). "
-            "L’identification ACF/PACF est souvent ambiguë : la sélection finale repose sur des critères d’information."
+            "Les modèles ARMA(p,q) combinent simultanément persistance structurelle et effets transitoires. Ils "
+            "sont particulièrement utiles lorsque ni une structure purement AR, ni une structure purement MA ne "
+            "suffisent à rendre compte des dynamiques observées. L’identification pure par ACF/PACF peut s’avérer "
+            "ambigüe ; l’usage de critères d’information tels que AIC ou BIC devient indispensable pour éviter "
+            "la surparamétrisation."
         ),
         "",
-        r"\subsection*{Modèles ARIMA(p,d,q)}",
+        r"\subsection*{Modèles intégrés ARIMA(p,d,q)}",
+        "",
         md_basic_to_tex(
-            "Lorsque la série est intégrée d’ordre $d$, on estime un ARMA sur la série transformée. "
-            "Un $d=1$ traduit l’existence de chocs permanents."
+            "Lorsque la série n’est pas stationnaire en niveau mais intégrée d’ordre $d$, on applique une différenciation "
+            "d’ordre $d$ pour récupérer la stationnarité avant d’estimer un ARMA(p,q) sur la série transformée. "
+            "Un $d=1$ suggère que les chocs ont un effet permanent sur le niveau de la série, ce qui est fréquent dans "
+            "les séries macroéconomiques et démographiques."
         ),
         "",
         r"\begin{equation}",
-        r"\Delta Y_t = c + \sum_{i=1}^{p}\phi_i \Delta Y_{t-i} + \varepsilon_t + \sum_{j=1}^{q}\theta_j \varepsilon_{t-j}",
+        r"\Delta^d Y_t = c + \sum_{i=1}^{p}\phi_i \Delta^d Y_{t-i} + \varepsilon_t + \sum_{j=1}^{q}\theta_j \varepsilon_{t-j},",
         r"\end{equation}",
         "",
-        r"\subsection*{4.6 Sélection du modèle optimal}",
+        r"\subsection*{Sélection du modèle optimal}",
+        "",
         md_basic_to_tex(
-            "Le choix repose sur un arbitrage biais–variance. "
-            "AIC pénalise faiblement la complexité ; BIC pénalise plus fortement et limite la surparamétrisation, "
-            "souvent préférable en démographie."
+            "La sélection du modèle repose sur un arbitrage entre biais et variance, évitant l’over‐fitting tout en capturant "
+            "la dynamique essentielle. Les critères d’information AIC et BIC s’écrivent :"
         ),
         "",
         r"\begin{equation}",
-        r"AIC = -2\ell + 2k",
+        r"AIC = -2\ell + 2k,",
         r"\end{equation}",
         r"\begin{equation}",
-        r"BIC = -2\ell + k\ln(T)",
+        r"BIC = -2\ell + k\ln(T),",
         r"\end{equation}",
+        "",
+
+        md_basic_to_tex(
+            "où $\ell$ est la log‐vraisemblance, $k$ le nombre de paramètres et $T$ la taille de l’échantillon. BIC pénalise "
+            "plus fortement la complexité et est souvent préférable dans des contextes où la parsimony prime."
+        ),
         "",
         r"\subsection*{Diagnostics des résidus}",
+        "",
         md_basic_to_tex(
-            "Un modèle correctement spécifié produit des résidus assimilables à un bruit blanc : "
-            "absence d’autocorrélation (Ljung–Box), normalité raisonnable, variance stable. "
-            "Toute autocorrélation résiduelle signale une mauvaise spécification de $p$ ou $q$."
+            "Un modèle correctement spécifié doit produire des résidus assimilables à un bruit blanc : absence d’autocorrélation "
+            "(test de Ljung–Box), distribution raisonnablement symétrique et variance stable. Toute autocorrélation résiduelle "
+            "signale une spécification incomplète des retards ou des dynamiques structurelles non capturées."
         ),
         "",
         r"\subsection*{Limites des modèles univariés}",
+        "",
         md_basic_to_tex(
-            "Limites : absence de déterminants explicites, confusion possible entre mémoire longue et racine unitaire, "
-            "interprétation économique parfois restreinte. Ces limites justifient l’analyse de la mémoire et l’extension multivariée."
+            "Les modèles univariés présentent des limites. Ils n’incorporent pas de déterminants explicites et peuvent confondre "
+            "mémoire longue et racines unitaires. Leur interprétation économique peut être restreinte, ce qui justifie des "
+            "analyses complémentaires (tests de mémoire longue, modèles multivariés ou non linéaires)."
         ),
         "",
         r"\subsection*{Rôle dans la stratégie globale}",
+        "",
         md_basic_to_tex(
-            "Cette étape fournit un benchmark, stabilise l’identification, et sert de contrôle de cohérence "
-            "avant les modèles multivariés."
+            "Dans la stratégie globale, cette étape sert de benchmark interne, stabilise l’identification des dynamiques "
+            "temporelles et constitue un préalable méthodologique impératif avant toute extension vers des modèles VAR, VECM "
+            "ou des approches causales plus élaborées."
         ),
         "",
     ]
 
-    # ============================================================
-    # SECTION : Résultats empiriques
-    # ============================================================
+    # =================================
+    # SECTION 2 : Résultats modèles Uni
+    # =================================
     lines += [
         r"\section{Résultats de la modélisation univariée}",
         "",
