@@ -36,68 +36,79 @@ def render_sec_conclusion(
     # CONCLUSION GÉNÉRALE
     # ============================================================
     lines += [
-        r"\section*{Conclusion}",
-        "",
+        
         md_basic_to_tex(
-            "Ce rapport a proposé une analyse économétrique approfondie de la croissance naturelle de la population française "
-            "sur la période 1975–2025, en mobilisant un cadre méthodologique entièrement automatisé. "
-            "L’objectif principal était double : caractériser rigoureusement la dynamique démographique de long terme "
-            "et démontrer l’intérêt d’un automate économétrique déterministe pour la production de résultats reproductibles."
+            "Ce travail avait pour objectif d’analyser la dynamique de la croissance naturelle de la population française "
+            "sur la période 1975–2025, en mobilisant un cadre économétrique rigoureux, reproductible et automatisé. "
+            "L’ambition n’était pas de produire une prévision démographique, "
+            "mais de qualifier la nature du processus démographique observé et d’en apprécier la profondeur temporelle."
         ),
         "",
         md_basic_to_tex(
-            "L’analyse descriptive et les diagnostics statistiques ont mis en évidence une trajectoire marquée par des tendances persistantes, "
-            "une saisonnalité significative et des ruptures potentielles, incompatibles avec une lecture purement conjoncturelle. "
-            "Les tests de stationnarité et les modèles dynamiques ont confirmé que la croissance naturelle française "
-            "est gouvernée par des mécanismes structurels de long terme, sensibles aux chocs mais dotés d’une inertie élevée."
+            "La problématique centrale posée en introduction était la suivante : "
+            "la dégradation récente de la croissance naturelle en France relève-t-elle "
+            "d’un phénomène conjoncturel et transitoire, ou traduit-elle une transformation "
+            "structurelle profonde et durable des dynamiques démographiques et sociales ? "
+            "L’ensemble des analyses conduites permet désormais d’apporter une réponse argumentée à cette question."
         ),
         "",
         md_basic_to_tex(
-            "La modélisation univariée et multivariée a permis d’évaluer la persistance des chocs démographiques "
-            "et d’explorer les relations dynamiques entre les composantes du système. "
-            "Ces résultats suggèrent que les évolutions récentes observées — notamment l’inversion du solde naturel — "
-            "ne relèvent pas de fluctuations transitoires, mais traduisent un changement profond du processus générateur des données."
+            "Les résultats obtenus montrent que l’évolution récente de la croissance naturelle "
+            "ne peut pas être interprétée comme une simple fluctuation de court terme. "
+            "La dynamique observée s’inscrit dans un mouvement de long terme, "
+            "caractérisé par une forte inertie et par des ruptures persistantes. "
+            "Les chocs démographiques identifiés ne disparaissent pas rapidement, "
+            "mais s’intègrent durablement dans la trajectoire de la série."
         ),
         "",
         md_basic_to_tex(
-            "Sur le plan méthodologique, ce travail illustre l’apport d’un pipeline économétrique automatisé, "
-            "capable de structurer l’ensemble de la chaîne d’analyse : préparation des données, diagnostics, modélisation, "
-            "production d’artefacts et interprétation. "
-            "L’automatisation renforce la traçabilité des choix, limite les erreurs manuelles "
-            "et garantit la reproductibilité complète des résultats."
+            "Autrement dit, la dégradation de la croissance naturelle apparaît moins comme un accident ponctuel "
+            "que comme l’expression d’une transformation plus profonde du processus démographique français. "
+            "Cette transformation ne signifie pas une rupture brutale ou irréversible, "
+            "mais elle indique que les mécanismes sous-jacents à la dynamique démographique "
+            "ont évolué de manière durable au cours de la période étudiée."
         ),
         "",
         md_basic_to_tex(
-            "L’intégration contrôlée de l’intelligence artificielle s’est limitée à un rôle d’assistance à l’interprétation "
-            "et à la structuration du raisonnement, sans jamais se substituer aux décisions économétriques fondamentales. "
-            "Cette approche permet de concilier innovation technologique et rigueur scientifique."
+            "Sur le plan méthodologique, ce travail met en évidence l’intérêt d’un automate économétrique déterministe "
+            "pour structurer l’analyse des séries temporelles de long terme. "
+            "L’automatisation n’a pas pour fonction de remplacer l’analyse économique, "
+            "mais de garantir la cohérence des diagnostics, la traçabilité des choix méthodologiques "
+            "et la reproductibilité complète des résultats."
         ),
         "",
         md_basic_to_tex(
-            "Enfin, la mise en perspective anthropologique a montré que les résultats économétriques peuvent être éclairés "
-            "par une lecture qualitative des transformations sociales et institutionnelles, "
-            "à condition de maintenir une séparation stricte entre faits statistiques et interprétation."
+            "L’intelligence artificielle a été mobilisée de manière encadrée et prudente, "
+            "exclusivement comme outil d’assistance à la structuration du raisonnement "
+            "et à la mise en cohérence des interprétations. "
+            "Elle n’a joué aucun rôle décisionnel et n’a introduit ni hypothèse ni résultat "
+            "qui ne soit déjà fondé sur l’analyse économétrique."
         ),
         "",
         md_basic_to_tex(
-            "Les limites du travail tiennent principalement au périmètre des variables explicatives retenues "
-            "et à l’analyse centrée sur un seul pays. "
-            "Des prolongements naturels consisteraient à intégrer davantage de déterminants économiques et sociaux, "
-            "ou à étendre l’approche à une comparaison internationale."
+            "La lecture anthropologique proposée en fin de rapport ne constitue pas une explication alternative, "
+            "mais un prolongement interprétatif des résultats obtenus. "
+            "Elle permet de replacer la dynamique de la croissance naturelle "
+            "dans un cadre plus large, en lien avec des transformations sociales, "
+            "institutionnelles et culturelles de long terme, "
+            "tout en respectant strictement les faits établis par l’analyse statistique."
         ),
         "",
         md_basic_to_tex(
-            "En définitive, ce projet démontre que l’automatisation raisonnée de l’économétrie "
-            "constitue un outil puissant pour l’analyse des dynamiques démographiques de long terme, "
-            "à condition qu’elle reste guidée par une réflexion méthodologique explicite et une interprétation critique des résultats."
+            "Les limites de ce travail tiennent principalement au périmètre retenu : "
+            "l’analyse est centrée sur un seul pays et sur un nombre restreint de variables explicatives. "
+            "Des prolongements naturels consisteraient à enrichir le cadre multivarié "
+            "ou à étendre l’approche à une comparaison internationale, "
+            "afin de mieux situer la trajectoire française dans un contexte plus large."
         ),
         "",
         md_basic_to_tex(
-            f"**Repères de cohérence (issus des métriques)** : "
-            f"stationnarité **{verdict}**, "
-            f"modèle univarié de référence **ARIMA{uni_order}**, "
-            f"analyse de long terme **{coint_choice}** (rang = {coint_rank}). "
-            "Ces éléments synthétisent les résultats sans en constituer une nouvelle analyse."
+            "En définitive, ce rapport montre que la croissance naturelle constitue un indicateur central "
+            "pour comprendre les dynamiques démographiques de long terme. "
+            "L’approche proposée, combinant économétrie des séries temporelles, automatisation raisonnée "
+            "et lecture interprétative encadrée, "
+            "offre un cadre robuste pour analyser des phénomènes démographiques complexes "
+            "sans céder ni au déterminisme statistique ni à la sur-interprétation."
         ),
         "",
     ]

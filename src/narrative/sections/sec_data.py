@@ -91,10 +91,11 @@ def render_sec_data(
         
         # --- Problématique centrale
         r"\par\bigskip",
-        r"\centering",
+        r"\begin{center}",
         r"\textbf{La dégradation récente de la croissance naturelle en France relève-t-elle "
         r"d’un phénomène conjoncturel et transitoire, ou traduit-elle une transformation "
         r"structurelle profonde et durable des dynamiques démographiques et sociales ?}",
+        r"\end{center}",
         r"\par\bigskip",
         "",
 
