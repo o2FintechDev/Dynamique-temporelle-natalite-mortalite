@@ -370,7 +370,7 @@ O38 (Technological Change – Automation and AI)
 % AUTO
 \input{blocks/sec_descriptive.tex}
 
-\chapter{Diagnostics Statistiques}
+\chapter{Diagnostics de stationnarité}
 % AUTO
 \input{blocks/sec_stationarity.tex}
 

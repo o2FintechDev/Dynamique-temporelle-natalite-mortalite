@@ -54,33 +54,40 @@ def render_sec_stationarity(
 
     lines: list[str] = []
 
-    # ============================================================
-    # SECTION : Cadre théorique (texte structurant)
-    # ============================================================
+    # ===========================
+    # SECTION 1 : Cadre théorique
+    # ===========================
     lines += [
-        r"\section{Diagnostics statistiques et stationnarité}",
+        r"\section{Tests de racine unitaire et propriétés temporelles}",
         "",
         md_basic_to_tex(
-            "La stationnarité constitue une condition centrale de l’économétrie des séries temporelles. "
-            "Une série non stationnaire utilisée sans précaution conduit à des régressions fallacieuses, "
-            "avec des coefficients apparemment significatifs mais dénués d’interprétation économique. "
-            "Cette section vise à caractériser la nature stochastique de la croissance naturelle et à déterminer "
-            "les transformations nécessaires avant toute modélisation dynamique."
+            "L’analyse des séries temporelles repose sur une condition fondamentale : la stationnarité. "
+            "L’utilisation de séries non stationnaires sans transformation appropriée conduit à des régressions fallacieuses, "
+            "dans lesquelles des relations statistiques apparemment significatives ne correspondent à aucun lien économique réel. "
+            "Cette section vise à caractériser la nature stochastique de la croissance naturelle française "
+            "et à déterminer les transformations nécessaires avant toute modélisation dynamique."
         ),
         "",
-        r"\subsection*{Notion formelle de stationnarité}",
+        r"\subsection*{Stationnarité : définition et portée économétrique}",
         md_basic_to_tex(
-            "En pratique, on retient la stationnarité au second ordre : (i) une espérance constante, "
-            "(ii) une variance finie et constante, et (iii) une autocovariance dépendant uniquement du décalage. "
-            "La non-stationnarité viole ces conditions et empêche l’utilisation directe des outils ARMA classiques."
+            "En pratique, une série est dite stationnaire au second ordre si son espérance est constante dans le temps, "
+            "si sa variance est finie et stable, et si sa structure de dépendance temporelle dépend uniquement du décalage "
+            "entre observations et non du temps calendaire. "
+            "Ces propriétés garantissent la validité des outils classiques de l’économétrie des séries temporelles "
+            "(ARMA, VAR, tests statistiques usuels).\n\n"
+            "Dans le cas de la croissance naturelle, la stationnarité ne peut être supposée a priori. "
+            "Les évolutions de long terme liées au vieillissement de la population, aux transitions démographiques "
+            "ou aux chocs sanitaires majeurs sont susceptibles d’introduire des composantes persistantes "
+            "incompatibles avec une stationnarité stricte en niveau."
         ),
         "",
-        r"\subsection*{Processus TS versus DS : enjeu conceptuel}",
+        r"\subsection*{Tendance déterministe versus tendance stochastique}",
         md_basic_to_tex(
-            "Deux familles doivent être distinguées. "
-            "Processus à tendance déterministe (TS) : les chocs sont transitoires et la série revient vers une tendance. "
-            "Processus à tendance stochastique (DS) : les chocs sont permanents et la série ne revient pas vers un niveau déterminé. "
-            "La conséquence est opérationnelle : un TS se détrend, un DS se différencie."
+            "Une distinction conceptuelle essentielle oppose deux types de dynamiques de long terme. "
+            "Dans un processus à tendance déterministe (TS), la série fluctue autour d’une trajectoire prévisible : "
+            "les chocs sont transitoires et la série tend à revenir vers sa tendance. "
+            "À l’inverse, dans un processus à tendance stochastique (DS), les chocs ont des effets permanents "
+            "et modifient durablement le niveau de la série."
         ),
         "",
         r"\begin{equation}",
@@ -90,62 +97,89 @@ def render_sec_stationarity(
         r"Y_t = Y_{t-1} + \varepsilon_t",
         r"\end{equation}",
         "",
-        r"\subsection*{Analyse corrélographique : ACF et PACF}",
         md_basic_to_tex(
-            "Avant tout test formel, ACF/PACF fournissent une information qualitative sur la persistance. "
-            "Une décroissance lente de l’ACF est typique d’une non-stationnarité, alors qu’une coupure rapide suggère une stationnarité. "
-            "Ces outils restent indicatifs : la décision doit être statistique."
+            "La distinction est économétriquement décisive : un processus TS doit être détrendé, "
+            "tandis qu’un processus DS requiert une différenciation. "
+            "Dans un contexte démographique, une dynamique DS signifie que certains chocs "
+            "(politiques familiales, crises sanitaires, changements de comportements de fécondité) "
+            "laissent des traces durables sur la trajectoire de la population."
         ),
         "",
-        r"\subsection*{Test de Dickey-Fuller augmenté (ADF)}",
+        r"\subsection*{Premiers diagnostics : corrélogrammes ACF et PACF}",
         md_basic_to_tex(
-            "Le test ADF est l’outil central de détection de racine unitaire. Il estime une régression en différence "
-            "incluant des retards pour purger l’autocorrélation des résidus. Trois spécifications sont à considérer : "
-            "sans constante, avec constante, et avec constante + tendance. "
-            "Hypothèses : $H_0$ racine unitaire, $H_1$ stationnarité. "
-            "Le choix du nombre de retards est critique : trop faible biaise le test, trop élevé réduit la puissance."
+            "Avant toute procédure formelle, l’analyse des fonctions d’autocorrélation (ACF) "
+            "et d’autocorrélation partielle (PACF) fournit une lecture qualitative de la persistance. "
+            "Une décroissance lente de l’ACF est typiquement associée à une non-stationnarité, "
+            "alors qu’une coupure rapide suggère un processus stationnaire.\n\n"
+            "Ces outils ne permettent pas de trancher définitivement, "
+            "mais ils orientent l’interprétation des tests de racine unitaire "
+            "et aident à détecter des structures de dépendance incompatibles "
+            "avec une stationnarité en niveau."
+        ),
+        "",
+        r"\subsection*{Test de Dickey--Fuller augmenté (ADF)}",
+        md_basic_to_tex(
+            "Le test de Dickey--Fuller augmenté constitue l’outil central de détection de racine unitaire. "
+            "Il repose sur l’estimation d’une régression en différence incluant des retards "
+            "afin de corriger l’autocorrélation des résidus. "
+            "L’hypothèse nulle correspond à la présence d’une racine unitaire, "
+            "tandis que l’hypothèse alternative indique la stationnarité."
         ),
         "",
         r"\begin{equation}",
-        r"\Delta Y_t = \phi Y_{t-1} + \sum_{i=1}^{k}\gamma_i \Delta Y_{t-i} + \varepsilon_t",
+        r"\Delta Y_t = \phi Y_{t-1} + \sum_{i=1}^{k} \gamma_i \Delta Y_{t-i} + \varepsilon_t",
         r"\end{equation}",
         "",
-        r"\subsection*{3.6 Test de la bande de Dickey-Fuller (robustesse)}",
+
         md_basic_to_tex(
-            "Le test de bande examine la stabilité de la conclusion sur un intervalle de retards/spécifications. "
-            "Il détecte les cas fragiles où le rejet/non-rejet de $H_0$ dépend fortement de la paramétrisation."
+            "Le choix du nombre de retards est crucial : un nombre insuffisant biaise le test, "
+            "tandis qu’un nombre excessif réduit sa puissance. "
+            "Dans le cas de séries démographiques mensuelles, "
+            "ce choix doit tenir compte à la fois de la saisonnalité "
+            "et de la persistance structurelle liée aux évolutions de long terme."
         ),
         "",
-        r"\subsection*{Limites des tests de racine unitaire}",
+        r"\subsection*{Robustesse et limites des tests de racine unitaire}",
         md_basic_to_tex(
-            "Limites classiques : faible puissance, sensibilité aux ruptures structurelles, confusion entre mémoire longue et racine unitaire. "
-            "Un non-rejet de $H_0$ n’est pas une preuve définitive de non-stationnarité."
+            "Les tests de racine unitaire présentent plusieurs limites bien documentées : "
+            "faible puissance en échantillon fini, sensibilité aux ruptures structurelles, "
+            "et confusion possible entre mémoire longue et racine unitaire véritable. "
+            "Un non-rejet de l’hypothèse nulle ne constitue donc pas une preuve définitive "
+            "de non-stationnarité.\n\n"
+            "Dans un contexte démographique, ces limites sont particulièrement importantes, "
+            "car les ruptures observées peuvent résulter de transformations sociales profondes "
+            "plutôt que d’une dynamique purement stochastique."
         ),
         "",
-        r"\subsection*{Décision finale et transformation de la série}",
+        r"\subsection*{Décision économétrique et implications pour la modélisation}",
         md_basic_to_tex(
-            "La décision économétrique synthétise les diagnostics. Trois cas : stationnarité en niveau (rien), "
-            "stationnarité autour d’une tendance (détrendage), stationnarité en différence (différenciation). "
-            "En DS, la transformation opérationnelle est :"
+            "La décision finale repose sur une synthèse des diagnostics graphiques et statistiques. "
+            "Trois configurations sont envisagées : stationnarité en niveau, stationnarité autour d’une tendance, "
+            "ou stationnarité en différence. "
+            "Dans le cas d’un processus à tendance stochastique, "
+            "la transformation opérationnelle retenue est la différenciation :"
         ),
-        "",
+       "",
         r"\begin{equation}",
         r"\Delta Y_t = Y_t - Y_{t-1}",
         r"\end{equation}",
         "",
-        r"\subsection*{Implications pour la suite de l’analyse}",
+
         md_basic_to_tex(
-            "La stationnarité pilote l’identification AR/MA, l’estimation univariée, la validité multivariée et la cointégration. "
-            "Une erreur ici se propage mécaniquement à toutes les étapes suivantes."
+            "Cette décision conditionne l’ensemble des étapes ultérieures : "
+            "identification des modèles ARIMA, validité des diagnostics résiduels, "
+            "et pertinence des analyses multivariées et de cointégration. "
+            "Une erreur à ce stade se propage mécaniquement à toute la chaîne économétrique, "
+            "ce qui justifie le soin particulier apporté à cette étape."
         ),
         "",
     ]
 
-    # ============================================================
-    # SECTION 2 : Résultats empiriques (artefacts + analyses)
-    # ============================================================
+    # ================================
+    # SECTION 2 : Résultats empiriques
+    # ================================
     lines += [
-        r"\section{Résultats des diagnostics}",
+        r"\section{Résultats de la stationnarité}",
         "",
         md_basic_to_tex(
             f"Synthèse quantitative : **verdict (diagnostics TS/DS) = {verdict}** "
@@ -158,39 +192,45 @@ def render_sec_stationarity(
 
     if fig_acf:
         lines += [
-            r"\paragraph{Figure 1 — ACF (niveau)}",
-            md_basic_to_tex(
-                "Lecture : une persistance élevée et une décroissance lente sont compatibles avec non-stationnarité ou mémoire longue. "
-                "L’interprétation doit être corroborée par ADF et la robustesse (bande)."
+            include_figure(
+                fig_rel=fig_acf,
+                caption="Fonction d’autocorrélation",
+                label="fig:fig-diag-acf-level",
             ),
-            "",
-            include_figure(fig_rel=fig_acf, caption="Fonction d’autocorrélation", label="fig:fig-diag-acf-level"),
             narr_call("fig.diag.acf_level"),
+            "",
+
+            md_basic_to_tex(
+                "**Lecture — ACF (niveau).** "
+                "La persistance élevée des autocorrélations et leur décroissance lente indiquent une dynamique fortement persistante. "
+                "Ce comportement est compatible avec une non-stationnarité de type DS ou, alternativement, avec une mémoire longue. "
+                "Cette lecture corrélographique ne constitue pas un critère de décision autonome et doit être systématiquement "
+                "corroborée par les tests de racine unitaire (ADF) et l’analyse de robustesse via la bande de Dickey–Fuller."
+            ),
             "",
         ]
 
     if fig_pacf:
         lines += [
-            r"\paragraph{Figure 2 — PACF (niveau)}",
-            md_basic_to_tex(
-                "Lecture : la PACF informe sur la structure autorégressive potentielle, mais elle devient trompeuse en présence de non-stationnarité. "
-                "Elle sert ici de repérage qualitatif, pas de décision."
+            include_figure(
+                fig_rel=fig_pacf,
+                caption="Fonction d’autocorrélation partielle",
+                label="fig:fig-diag-pacf-level",
             ),
-            "",
-            include_figure(fig_rel=fig_pacf, caption="Fonction d’autocorrélation partielle", label="fig:fig-diag-pacf-level"),
             narr_call("fig.diag.pacf_level"),
+            "",
+            md_basic_to_tex(
+                "**Lecture — PACF (niveau).** "
+                "La PACF fournit des indications sur une éventuelle structure autorégressive sous-jacente. "
+                "Cependant, en présence de non-stationnarité, son interprétation devient instable et potentiellement trompeuse. "
+                "Elle est donc mobilisée ici uniquement à des fins exploratoires et qualitatives, sans rôle décisionnel."
+            ),
             "",
         ]
 
     if tbl_acfp:
         lines += [
-            r"\paragraph{Tableau 1— Synthèse ACF/PACF (niveau)}",
-            md_basic_to_tex(
-                "Lecture : ce tableau condense la structure corrélographique (décroissance, pics significatifs, coupures). "
-                "Il sert de validation croisée : une ACF à décroissance lente est cohérente avec non-stationnarité ou mémoire longue ; "
-                "une coupure nette oriente vers un AR(p) stationnaire. La décision finale reste ADF/TS-DS."
-            ),
-            "",
+            
             include_table_tex(
                 run_root=run_root,
                 tbl_rel=tbl_acfp,
@@ -199,67 +239,103 @@ def render_sec_stationarity(
             ),
             narr_call("tbl.diag.acf_pacf"),
             "",
+            md_basic_to_tex(
+                "**Lecture — Synthèse ACF/PACF (niveau).** "
+                "Ce tableau condense la structure corrélographique observée. "
+                "Une ACF à décroissance lente est cohérente avec une non-stationnarité ou une mémoire longue, "
+                "tandis qu’une coupure nette orienterait vers un processus autorégressif stationnaire. "
+                "Il s’agit d’un outil de validation croisée ; la décision finale repose exclusivement sur les tests ADF "
+                "et le diagnostic TS/DS."
+            ),
+            "",
         ]
 
     if tbl_adf:
         lines += [
-            r"\paragraph{Tableau 2 — Test ADF (diagnostic principal)}",
-            md_basic_to_tex(
-                "Lecture : comparer les p-values et la cohérence entre spécifications (avec/sans tendance). "
-                "Une conclusion instable selon la spécification signale une frontière TS/DS, une rupture non modélisée, ou une persistance élevée."
+            include_table_tex(
+                run_root=run_root,
+                tbl_rel=tbl_adf,
+                caption="Résultats du test de racine unitaire ADF",
+                label="tab:tbl-diag-adf",
             ),
-            "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_adf, caption="Résultats du test de racine unitaire ADF", label="tab:tbl-diag-adf"),
             narr_call("tbl.diag.adf"),
+            "",
+            md_basic_to_tex(
+                "**Lecture — Test ADF (diagnostic principal).** "
+                "Les p-values issues des spécifications avec constante et avec constante–tendance ne permettent pas "
+                "de rejeter l’hypothèse de racine unitaire. "
+                "Une éventuelle sensibilité à la spécification signalerait une frontière TS/DS ou une rupture non modélisée, "
+                "ce qui justifie le recours à des outils de robustesse complémentaires."
+            ),
             "",
         ]
 
     if tbl_band:
         lines += [
-            r"\paragraph{Tableau 3 — Bande Dickey-Fuller (robustesse)}",
-            md_basic_to_tex(
-                "Lecture : vérifier la stabilité de la conclusion sur un intervalle de retards. "
-                "Une conclusion fragile impose prudence : la transformation retenue doit privilégier la robustesse plutôt que l’optimisme."
+            include_table_tex(
+                run_root=run_root,
+                tbl_rel=tbl_band,
+                caption="Bande critique du test de Dickey–Fuller",
+                label="tab:tbl-diag-band-df",
             ),
-            "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_band, caption="Bande critique du test de Dickey–Fuller", label="tab:tbl-diag-band-df"),
             narr_call("tbl.diag.band_df"),
+            "",
+            md_basic_to_tex(
+                "**Lecture — Bande de Dickey–Fuller (robustesse).** "
+                "La bande permet de vérifier la stabilité du verdict sur un ensemble de retards. "
+                "Une conclusion robuste sur l’ensemble de l’intervalle renforce la décision TS/DS, "
+                "tandis qu’une instabilité imposerait une approche prudente privilégiant la robustesse "
+                "plutôt que l’optimisme économétrique."
+            ),
             "",
         ]
 
     if tbl_tsds:
         lines += [
-            r"\paragraph{Tableau 4 — Décision TS vs DS (audit)}",
-            md_basic_to_tex(
-                "Lecture : ce tableau formalise la règle de décision opérationnelle. "
-                "Il verrouille le traitement de la série : différenciation si DS, détrendage si TS, et aucun traitement si stationnaire en niveau."
+            include_table_tex(
+                run_root=run_root,
+                tbl_rel=tbl_tsds,
+                caption="Décision de stationnarité : processus TS ou DS",
+                label="tab:tbl-diag-ts-vs-ds-decision",
             ),
-            "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_tsds, caption="Décision de stationnarité : processus TS ou DS", label="tab:tbl-diag-ts-vs-ds-decision"),
             narr_call("tbl.diag.ts_vs_ds_decision"),
+            "",
+
+            md_basic_to_tex(
+                "**Lecture — Décision TS vs DS (audit).** "
+                "Ce tableau formalise la règle de décision opérationnelle et verrouille le traitement de la série. "
+                "En cas de processus DS, une différenciation est requise ; en cas de processus TS, un détrendage est approprié ; "
+                "enfin, aucune transformation n’est appliquée si la série est stationnaire en niveau."
+            ),
             "",
         ]
 
     if tbl_ljung:
         lines += [
-            r"\paragraph{Tableau 5 — Ljung–Box sur différence (contrôle)}",
-            md_basic_to_tex(
-                "Lecture : vérifier qu’après transformation (notamment différenciation), une autocorrélation résiduelle massive ne subsiste pas. "
-                "Si l’autocorrélation persiste fortement, l’identification ARMA/ARIMA devra être plus structurée (retards, composantes)."
+            include_table_tex(
+                run_root=run_root,
+                tbl_rel=tbl_ljung,
+                caption="Test de Ljung–Box sur la série différenciée",
+                label="tab:tbl-diag-ljungbox-diff",
             ),
-            "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_ljung, caption="Test de Ljung–Box sur la série différenciée", label="tab:tbl-diag-ljungbox-diff"),
             narr_call("tbl.diag.ljungbox_diff"),
+            "",
+            md_basic_to_tex(
+                "**Lecture — Ljung–Box après transformation.** "
+                "Ce test vérifie qu’après différenciation, aucune autocorrélation résiduelle massive ne subsiste. "
+                "Une persistance significative signalerait une structure dynamique non capturée et imposerait "
+                "une identification ARMA/ARIMA plus structurée."
+            ),
             "",
         ]
 
-    # Optionnel : note d’interprétation automatisée
     if note_md.strip():
         lines += [
             md_basic_to_tex("**Note d’interprétation automatisée**"),
             md_basic_to_tex(
-                "Cette note doit être strictement cohérente avec ADF, bande et tableau TS/DS. "
-                "Toute mention de transformation retenue doit reprendre explicitement le verdict et les p-values clés."
+                "Cette note est strictement contrainte par les résultats ADF, la bande de Dickey–Fuller "
+                "et la décision TS/DS. Toute transformation retenue doit être explicitement justifiée "
+                "par le verdict et les p-values associées."
             ),
             "",
             md_basic_to_tex(note_md),
@@ -270,9 +346,11 @@ def render_sec_stationarity(
     lines += [
         md_basic_to_tex("**Conclusion**"),
         md_basic_to_tex(
-            f"La décision opérationnelle est **{verdict}**. "
-            "Elle fixe le traitement (niveau/détrendage/différenciation) et conditionne l’identification AR/MA, "
-            "la stabilité des résidus et la validité des modèles ARIMA/VAR/VECM."
+            f"La décision opérationnelle retenue est **{verdict}**. "
+            "Les tests ADF et l’analyse corrélographique indiquent une persistance élevée compatible "
+            "avec une dynamique intégrée. "
+            "Cette décision impose la transformation appropriée de la série et conditionne "
+            "l’identification AR/MA, la stabilité des résidus et la validité des modèles ARIMA/VAR/VECM."
         ),
         narr_call("m.diag.ts_vs_ds"),
         "",
