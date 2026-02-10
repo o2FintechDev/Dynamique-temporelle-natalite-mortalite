@@ -88,14 +88,16 @@ def render_sec_data(
             "pour interroger la nature profonde de la dynamique observée."
         ),
         "",
-        md_basic_to_tex(
-            r"\begin{center}"
-            r"\textbf{La dégradation récente de la croissance naturelle en France relève-t-elle "
-            r"d’un phénomène conjoncturel et transitoire, ou traduit-elle une transformation "
-            r"structurelle profonde et durable des dynamiques démographiques et sociales ?}"
-            r"\end{center}"
-        ),
+        
+        # --- Problématique centrale
+        r"\par\bigskip",
+        r"\centering",
+        r"\textbf{La dégradation récente de la croissance naturelle en France relève-t-elle "
+        r"d’un phénomène conjoncturel et transitoire, ou traduit-elle une transformation "
+        r"structurelle profonde et durable des dynamiques démographiques et sociales ?}",
+        r"\par\bigskip",
         "",
+
         md_basic_to_tex(
             "Cette problématique constitue le fil directeur de l’ensemble du rapport. "
             "Elle appelle une réponse rigoureuse fondée sur l’analyse des propriétés dynamiques de la série temporelle étudiée : "
