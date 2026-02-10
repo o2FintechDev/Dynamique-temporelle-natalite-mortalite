@@ -371,7 +371,7 @@ O38 (Technological Change – Automation and AI)
 % AUTO
 \input{blocks/sec_stationarity.tex}
 
-\chapter{Modélisation Univariée}
+\chapter{Analyse Univariée}
 % AUTO
 \input{blocks/sec_univariate.tex}
 
@@ -383,6 +383,15 @@ O38 (Technological Change – Automation and AI)
 \chapter{Synthèse Historique et Anthropologique}
 % AUTO
 \input{blocks/sec_anthropology.tex}
+
+% -----------------------------
+% CONCLUSION (non numérotée)
+% -----------------------------
+\clearpage
+\chapter*{Conclusion}
+\addcontentsline{toc}{chapter}{Conclusion}
+
+\input{blocks/sec_conclusion.tex}
 
 \end{document}
 """
