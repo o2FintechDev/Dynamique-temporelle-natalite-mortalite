@@ -186,20 +186,7 @@ class RunWriter:
 \begin{titlepage}
 \thispagestyle{empty}
 
-% -------------------------------------------------
-% LOGOS (haut de page)
-% -------------------------------------------------
-\begin{minipage}{0.48\textwidth}
-    \raggedright
-    \includegraphics[width=0.70\textwidth]{image1.png}
-\end{minipage}
-\hfill
-\begin{minipage}{0.48\textwidth}
-    \raggedleft
-    \includegraphics[width=0.40\textwidth]{image2.png}
-\end{minipage}
 
-\vspace*{3cm}
 
 % -------------------------------------------------
 % BLOC CENTRAL (centrage visuel)
