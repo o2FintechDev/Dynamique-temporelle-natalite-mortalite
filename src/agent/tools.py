@@ -325,7 +325,10 @@ def export_latex_pdf(*, variables: list[str], run_id: str, **params: Any) -> dic
         }}}
 
     t0 = time.time()
-    pdf_path, log_text = build_pdf(run_root=run_root / "latex", tex_path=tex_master, runs=1)
+    pdf_path, log_text = build_pdf(tex_master, runs=2)
+    elapsed_s = round(time.time() - t0, 3)
+    # normaliser Path
+    pdf_path = Path(pdf_path) if pdf_path else None
     elapsed_s = round(time.time() - t0, 3)
 
     export_audit: dict[str, Any] = {
@@ -339,15 +342,18 @@ def export_latex_pdf(*, variables: list[str], run_id: str, **params: Any) -> dic
         "snippets_written": snippets_audit,
         "blocks": blocks_audit,
         "note": "Compilation sur latex/master.tex (blocks + snippets artefacts/text).",
-
-        # NEW: mail audit
         "mail_requested": mail_requested,
         "mail_sent": False,
         "to_email": to_email or None,
     }
+    tail = "\n".join(log_text.splitlines()[-120:])
+    export_audit["pdflatex_log_tail"] = tail
+    export_audit["pdf_path"] = str(pdf_path) if pdf_path else None
+    export_audit["compile_ok"] = bool(pdf_path)
+    export_audit["compile_elapsed_s"] = elapsed_s
     if log_text:
         export_audit["pdflatex_log_head"] = log_text[:2000]
-
+        export_audit["pdflatex_log_tail"] = "\n".join(log_text.splitlines()[-120:])
     # 4) Envoi mail (si demandé et PDF OK)
     if mail_requested:
         if not pdf_path:
@@ -358,12 +364,11 @@ def export_latex_pdf(*, variables: list[str], run_id: str, **params: Any) -> dic
                     to=to_email,
                     subject=mail_subject,
                     body=mail_body,
-                    pdf_path=Path(pdf_path),
+                    pdf_path=pdf_path,   # <-- déjà Path
                 )
                 export_audit["mail_sent"] = True
             except Exception as e:
                 export_audit["mail_error"] = f"{type(e).__name__}: {e}"
-
     # 5) Persist audit dans manifest
     base_runs_dir = run_root.parent
     try:

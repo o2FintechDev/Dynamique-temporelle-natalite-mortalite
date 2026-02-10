@@ -358,23 +358,46 @@ def export_report_tex_from_manifest(
     return tex_path
 
 
-def build_pdf(tex_path: Path) -> Path:
-    """
-    Compile un .tex en PDF (pdflatex x2).
-    Retourne le chemin du PDF.
-    """
+def build_pdf(tex_path: Path, runs: int = 2) -> Tuple[Optional[Path], str]:
     workdir = tex_path.parent
-    cmd = [
-        "pdflatex",
-        "-interaction=nonstopmode",
-        tex_path.name,
-    ]
 
-    subprocess.run(cmd, cwd=workdir, check=True)
-    subprocess.run(cmd, cwd=workdir, check=True)
+    # 1) résolution binaire (PATH)
+    pdflatex_bin = shutil.which("pdflatex")
+
+    # 2) fallback Windows user-install MiKTeX (ton cas)
+    if not pdflatex_bin:
+        fallback = Path(r"C:\Users\audeb\AppData\Local\Programs\MiKTeX\miktex\bin\x64\pdflatex.exe")
+        if fallback.exists():
+            pdflatex_bin = str(fallback)
+
+    if not pdflatex_bin:
+        return None, "pdflatex introuvable. Ajoute MiKTeX au PATH ou configure un chemin explicite."
+
+    cmd = [pdflatex_bin, "-interaction=nonstopmode", tex_path.name]
+
+    logs: list[str] = []
+    rc = 0
+
+    for _ in range(max(1, int(runs))):
+        p = subprocess.run(cmd, cwd=workdir, capture_output=True, text=True)
+        rc = p.returncode
+        if p.stdout:
+            logs.append(p.stdout)
+        if p.stderr:
+            logs.append(p.stderr)
+        # on continue même si rc != 0 (LaTeX peut produire un PDF malgré des erreurs)
+        # break uniquement si tu veux stop immédiat:
+        # if rc != 0: break
 
     pdf_path = tex_path.with_suffix(".pdf")
-    if not pdf_path.exists():
-        raise RuntimeError("PDF non généré")
+    ok = pdf_path.exists()
 
-    return pdf_path
+    # IMPORTANT: OK si le PDF existe (même si rc != 0)
+    if ok:
+        if rc != 0:
+            logs.append(f"pdflatex returncode={rc} (PDF généré malgré erreurs)")
+        return pdf_path, "\n\n".join(logs)
+
+    logs.append(f"pdflatex returncode={rc}")
+    logs.append("PDF non généré (fichier absent).")
+    return None, "\n\n".join(logs)

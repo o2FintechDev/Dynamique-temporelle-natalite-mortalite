@@ -5,11 +5,19 @@ import smtplib
 from email.message import EmailMessage
 from pathlib import Path
 
+
+def _env_required(key: str) -> str:
+    v = os.getenv(key)
+    if not v:
+        raise RuntimeError(f"Missing env var: {key}")
+    return v
+
+
 def send_pdf_mail(*, to: str, subject: str, body: str, pdf_path: Path) -> None:
-    host = os.environ["EMAIL_HOST"]
-    port = int(os.environ.get("EMAIL_PORT", "587"))
-    user = os.environ["EMAIL_USER"]
-    pwd = os.environ["EMAIL_PASS"]
+    host = _env_required("EMAIL_HOST")
+    port = int(os.getenv("EMAIL_PORT", "587"))
+    user = _env_required("EMAIL_USER")
+    pwd = _env_required("EMAIL_PASSWORD")  # <-- standard
 
     msg = EmailMessage()
     msg["From"] = user

@@ -69,6 +69,23 @@ def show_note(run_id: str, note_label: str) -> None:
         if md:
             append_assistant(md)
 
+def _truncate(s: str, max_chars: int) -> str:
+    s = "" if s is None else str(s)
+    if len(s) <= max_chars:
+        return s
+    return s[:max_chars] + "\n[...TRONQUÉ...]"
+
+def _groq_post(api_key: str, payload: dict, *, timeout: int):
+    r = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json=payload,
+        timeout=timeout,
+    )
+    if r.status_code != 200:
+        # DEBUG CRITIQUE: tu veux voir r.text, pas juste raise_for_status()
+        raise RuntimeError(f"Groq {r.status_code}: {r.text}")
+    return r.json()
 
 # ---------------------------
 # LLM Router (API) + fallback
@@ -138,29 +155,43 @@ def llm_route(user_text: str) -> dict:
         "Choisis UNE action autorisée. Réponds STRICTEMENT en JSON minifié, sans texte autour."
     )
 
+    # éviter une entrée trop longue qui casse le router
+    user_text_small = _truncate(user_text, int(os.getenv("GROQ_ROUTER_USER_MAX_CHARS", "2000")))
+
     user = (
         "Actions autorisées:\n"
         "- step1_load_and_profile\n- step2_descriptive\n- step3_stationarity\n- step4_univariate\n"
         "- step5_var\n- step6_cointegration\n- step7_anthropology\n- RUN_ALL\n- export_latex_pdf\n- HELP\n- null\n\n"
-        f"Texte utilisateur: {user_text}\n\n"
+        f"Texte utilisateur: {user_text_small}\n\n"
         'JSON minifié attendu: {"action":"<...|null>","confidence":0-1,"reason":"..."}'
     )
 
-    allowed = {s[0] for s in PLAN_STEPS} | {"RUN_ALL", "export_latex_pdf", "HELP", None, "null"}
+    allowed = {s[0] for s in PLAN_STEPS} | {"RUN_ALL", "export_latex_pdf", "HELP", None}
+
+    # modèle router “safe”
+    model = os.getenv("GROQ_MODEL_ROUTER") or "llama3-8b-8192"
 
     try:
-        r = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={
-                "model": os.getenv("GROQ_MODEL_ROUTER", "llama-3.1-8b-instant"),
+        data = _groq_post(
+            api_key,
+            {
+                "model": model,
                 "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
                 "temperature": 0.0,
+                "max_tokens": int(os.getenv("GROQ_ROUTER_MAX_TOKENS", "120")),
+                # optionnel mais stabilise la conformité JSON si supporté
+                # "response_format": {"type": "json_object"},
             },
             timeout=30,
         )
-        r.raise_for_status()
-        content = r.json()["choices"][0]["message"]["content"].strip()
+
+        content = (data["choices"][0]["message"]["content"] or "").strip()
+
+        # Réparation légère: extrait le premier objet JSON si le modèle “bave”
+        m = re.search(r"\{.*\}", content, flags=re.S)
+        if m:
+            content = m.group(0)
+
         obj = json.loads(content)
 
         action = obj.get("action", None)
@@ -173,11 +204,14 @@ def llm_route(user_text: str) -> dict:
             out["reason"] = "llm_invalid_action_fallback"
             return out
 
-        return {
-            "action": action,
-            "confidence": float(obj.get("confidence", 0.7)),
-            "reason": obj.get("reason", "llm"),
-        }
+        conf = obj.get("confidence", 0.7)
+        try:
+            conf = float(conf)
+        except Exception:
+            conf = 0.7
+
+        return {"action": action, "confidence": conf, "reason": obj.get("reason", "llm")}
+
     except Exception:
         out = fallback_route(user_text)
         out["confidence"] = 0.40 if out["action"] else 0.0
@@ -187,6 +221,9 @@ def llm_route(user_text: str) -> dict:
 def _collect_run_context(run_id: str | None) -> str:
     if not run_id:
         return "Aucun run actif. Réponds en définitions générales."
+
+    per_section_max = int(os.getenv("GROQ_CTX_SECTION_MAX_CHARS", "3500"))
+
     chunks = []
     for _, note_label, title in PLAN_STEPS:
         p = RunManager.get_artefact_path(note_label, run_id=run_id)
@@ -195,19 +232,27 @@ def _collect_run_context(run_id: str | None) -> str:
         payload = read_metric_json(p) or {}
         md = payload.get("markdown")
         if md:
+            md = _truncate(md, per_section_max)
             chunks.append(f"## {title}\n{md}")
+
     return "\n\n".join(chunks) if chunks else "Run actif mais aucune note disponible."
 
 def llm_answer(user_text: str, *, run_id: str | None) -> str:
     api_key = os.getenv("GROQ_API_KEY")
     ctx = _collect_run_context(run_id)
 
-    # Si pas de clé, réponse fallback “statique”
     if not api_key:
         return (
             "Mode sans LLM (GROQ_API_KEY absent).\n\n"
             "Je peux: (1) exécuter des étapes via mots-clés, (2) expliquer concepts (ADF, VAR, cointégration, ARIMA)."
         )
+
+    # modèle QA “safe”
+    model = os.getenv("GROQ_MODEL_QA") or "llama3-70b-8192"
+
+    # troncature agressive du contexte (c’est LE point critique)
+    ctx_small = _truncate(ctx, int(os.getenv("GROQ_QA_CTX_MAX_CHARS", "20000")))
+    user_small = _truncate(user_text, int(os.getenv("GROQ_QA_USER_MAX_CHARS", "6000")))
 
     system = (
         "Tu es un assistant économétrie senior pour le projet AnthroDem Lab (Croissance Naturelle 1975-2025). "
@@ -217,23 +262,23 @@ def llm_answer(user_text: str, *, run_id: str | None) -> str:
     )
 
     user = (
-        f"Contexte (notes du run):\n{ctx}\n\n"
-        f"Question utilisateur:\n{user_text}\n\n"
+        f"Contexte (notes du run):\n{ctx_small}\n\n"
+        f"Question utilisateur:\n{user_small}\n\n"
         "Réponds en français."
     )
 
-    r = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json={
-            "model": os.getenv("GROQ_MODEL_QA", "llama-3.1-70b-versatile"),
+    data = _groq_post(
+        api_key,
+        {
+            "model": model,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "temperature": 0.2,
+            "max_tokens": int(os.getenv("GROQ_QA_MAX_TOKENS", "900")),
         },
         timeout=60,
     )
-    r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"].strip()
+
+    return data["choices"][0]["message"]["content"].strip()
 
 def help_text() -> str:
     return (

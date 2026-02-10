@@ -14,7 +14,7 @@ from src.narrative.sections.sec_univariate import render_sec_univariate
 from src.narrative.sections.sec_multivariate import render_sec_multivariate
 from src.narrative.sections.sec_cointegration import render_sec_cointegration
 from src.narrative.sections.sec_anthropology import render_sec_anthropology
-
+import re
 
 SECTION_RENDERERS = {
     "sec_data": render_sec_data,
@@ -26,6 +26,18 @@ SECTION_RENDERERS = {
     "sec_anthropology": render_sec_anthropology,
 }
 
+
+_CTRL = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
+
+def _sanitize_tex(s: str) -> str:
+    if s is None:
+        return ""
+    # supprime BOM + contrôles invisibles
+    s = s.replace("\ufeff", "")
+    s = _CTRL.sub("", s)
+    # normalise grecs unicode fréquents -> LaTeX
+    s = s.replace("α", r"\alpha").replace("β", r"\beta")
+    return s
 
 def render_all_section_blocks(
     run_root: Path,
@@ -73,10 +85,32 @@ def render_all_section_blocks(
 
 
 def build_section_blocks_from_manifest(run_root: Path, manifest: Dict[str, Any]) -> Dict[str, Any]:
+    # Génère les blocks (fichiers latex/blocks/sec_*.tex)
     out_map = render_all_section_blocks(run_root, manifest)
+
+    # --- NEW: sanitation post-write des fichiers générés ---
+    sanitized = []
+    sanitize_errors = {}
+
+    for key, rel_path in (out_map or {}).items():
+        try:
+            p = (run_root / rel_path).resolve()
+            if not p.exists():
+                continue
+            raw = p.read_text(encoding="utf-8", errors="replace")
+            clean = _sanitize_tex(raw)
+            if clean != raw:
+                p.write_text(clean, encoding="utf-8")
+                sanitized.append(rel_path)
+        except Exception as e:
+            sanitize_errors[key] = f"{type(e).__name__}: {e}"
+
     audit = {
         "blocks_written": sorted(out_map.keys()),
         "blocks_paths": out_map,
         "blocks_dir": "latex/blocks",
+        "sanitized_blocks": sanitized,
+        "sanitize_errors": sanitize_errors,
+        "sanitize_note": "Suppression des caractères de contrôle (U+0000..U+001F hors \\t\\n\\r) + α/β -> \\alpha/\\beta.",
     }
     return {"metrics": {"m.report.blocks": audit}}
