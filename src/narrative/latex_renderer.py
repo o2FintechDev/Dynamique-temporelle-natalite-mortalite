@@ -14,6 +14,7 @@ from src.narrative.sections.sec_univariate import render_sec_univariate
 from src.narrative.sections.sec_multivariate import render_sec_multivariate
 from src.narrative.sections.sec_cointegration import render_sec_cointegration
 from src.narrative.sections.sec_anthropology import render_sec_anthropology
+from src.narrative.sections.sec_conclusion import render_sec_conclusion
 import re
 
 SECTION_RENDERERS = {
@@ -24,6 +25,7 @@ SECTION_RENDERERS = {
     "sec_multivariate": render_sec_multivariate,
     "sec_cointegration": render_sec_cointegration,
     "sec_anthropology": render_sec_anthropology,
+    "sec_conclusion": render_sec_conclusion,
 }
 
 
