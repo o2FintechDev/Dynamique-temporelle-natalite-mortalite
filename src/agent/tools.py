@@ -124,7 +124,7 @@ def step1_load_and_profile(*, variables: list[str], y: str, **params: Any) -> di
         rw.register_artefact(
             kind="tables",
             lookup_key="tbl.data.desc_stats",
-            rel_path=f"tables/{tex_desc.name}",
+            rel_path=f"artefacts/tables/{tex_desc.name}",
         )
 
         # --- Tableau 2 : Valeurs manquantes
@@ -135,7 +135,7 @@ def step1_load_and_profile(*, variables: list[str], y: str, **params: Any) -> di
         rw.register_artefact(
             kind="tables",
             lookup_key="tbl.data.missing_report",
-            rel_path=f"tables/{tex_miss.name}",
+            rel_path=f"artefacts/tables/{tex_miss.name}",
         )
 
         # --- Tableau 3 : Couverture temporelle
@@ -146,7 +146,7 @@ def step1_load_and_profile(*, variables: list[str], y: str, **params: Any) -> di
         rw.register_artefact(
             kind="tables",
             lookup_key="tbl.data.coverage_report",
-            rel_path=f"tables/{tex_cov.name}",
+            rel_path=f"artefacts/tables/{tex_cov.name}",
         )
 
         # --- Tableau 4 : Audit des variables
@@ -157,7 +157,7 @@ def step1_load_and_profile(*, variables: list[str], y: str, **params: Any) -> di
         rw.register_artefact(
             kind="tables",
             lookup_key="tbl.data.vars_audit",
-            rel_path=f"tables/{tex_vars.name}",
+            rel_path=f"artefacts/tables/{tex_vars.name}",
         )
 
         # --------------------------------------------------

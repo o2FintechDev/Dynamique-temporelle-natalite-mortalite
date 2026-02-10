@@ -13,7 +13,7 @@ def default_spec() -> List[SectionSpec]:
                 "la couverture temporelle, et les diagnostics de qualité (manquants, cohérence, métadonnées)."
             ),
             figure_keys=[],
-            table_keys=["tbl.data.desc_stats", "tbl.data.missing_report", "tbl.data.coverage_report"],
+            table_keys=["tbl.data.desc_stats", "tbl.data.missing_report", "tbl.data.coverage_report", "tbl.data.vars_audit"],
             metric_keys=["m.data.dataset_meta", "m.note.step1"],
         ),
         SectionSpec(

@@ -50,6 +50,7 @@ def render_sec_data(
     t_desc = lookup(manifest, "tables", "tbl.data.desc_stats")
     t_miss = lookup(manifest, "tables", "tbl.data.missing_report")
     t_cov = lookup(manifest, "tables", "tbl.data.coverage_report")
+    t_vars = lookup(manifest, "tables", "tbl.data.vars_audit")
 
     lines: list[str] = []
 
@@ -253,7 +254,24 @@ def render_sec_data(
             narr_call("tbl.data.coverage_report"),
             "",
         ]
-
+        # --- Table 4: vars audit + analyse
+    if t_vars:
+        lines += [
+            r"\paragraph{Tableau 4 — Audit des variables (présentes / manquantes)}",
+            md_basic_to_tex(
+                "Lecture : ce tableau documente la disponibilité effective des variables demandées. "
+                "Toute variable manquante doit être soit retirée du plan VAR/VECM, soit remplacée par un proxy cohérent."
+            ),
+            "",
+            include_table_tex(
+                run_root=run_root,
+                tbl_rel=t_vars,
+                caption="tbl.data.vars_audit",
+                label="tab:tbl-data-vars-audit",
+            ),
+            narr_call("tbl.data.vars_audit"),
+            "",
+        ]
     # --- Note Step1 (optionnelle)
     if note_md.strip():
         lines += [
