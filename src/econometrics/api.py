@@ -128,7 +128,6 @@ def step2_descriptive_pack(df: pd.DataFrame, *, y: str, period: int = 12, **para
         f"de stationnarité et la modélisation ultérieure."
     )
 
-
     return {
         "tables": {
             "tbl.desc.summary": tbl_summary,

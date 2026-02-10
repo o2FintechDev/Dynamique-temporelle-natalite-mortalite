@@ -302,7 +302,7 @@ def residual_diagnostics(resid: np.ndarray, lags: int = 24) -> pd.DataFrame:
 
     out = pd.DataFrame([{
         "ljungbox_stat": float(lb["lb_stat"].iloc[0]),
-        "ljungbox_p": float(lb["lb_pvalue"].iloc[0]),
+        "ljungbox_p": round(float(lb["lb_pvalue"].iloc[0]), 2),
         "jarque_bera_stat": jb_stat,
         "jarque_bera_p": jb_p,
         "arch_stat": float(arch_stat),

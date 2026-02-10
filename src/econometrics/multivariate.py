@@ -308,9 +308,12 @@ def var_pack(
 
     # Protection minimale
     if Y.shape[0] < 30 or Y.shape[1] < 2:
+        
         note5 = (
-            "**Étape 5 — VAR(p)** : données insuffisantes après stationnarisation "
-            f"(nobs={Y.shape[0]}, k={Y.shape[1]})."
+            f"**VAR(p)** : l'échantillon exploitable est insuffisant pour estimer un VAR multivarié.\n\n"
+            f"Données disponibles : **nobs={int(Y.shape[0])}** observations, **k={int(Y.shape[1])}** variables.\n\n"
+            "Conséquence : la sélection de l'ordre p et les diagnostics (stabilité, blancheur, normalité, IRF/FEVD) "
+            "ne sont pas réalisés à cette étape."
         )
         return {
             "tables": {
@@ -611,10 +614,19 @@ def var_pack(
     }
 
     note5 = (
-        f"**Étape 5 — VAR(p)** : VAR estimé sur variables stationnarisées (ADF alpha={alpha_stationarity}). "
-        f"Sélection p={p_selected} (IC={ic_col}, p_cap={p_cap}, stable={require_stable}, whiteness α={whiteness_alpha}). "
-        f"nobs={int(Y.shape[0])}, période={m_stat.get('start')}→{m_stat.get('end')}. "
-        f"Stabilité={stable} (max|root|={max_root_modulus}), whiteness p={whiteness_pvalue}, normalité p={normality_pvalue}."
+        f"**VAR(p)** : estimation d'un VAR sur les variables rendues stationnaires "
+        f"(stationnarité via ADF, α={alpha_stationarity}).\n\n"
+
+        f"La sélection de l'ordre retient **p={p_selected}** (IC utilisé : **{ic_col}**, "
+        f"p_cap={p_cap}, contrainte de stabilité={require_stable}, test de blancheur des résidus au seuil α={whiteness_alpha}).\n\n"
+
+        f"L'estimation est réalisée sur **{int(Y.shape[0])}** observations, "
+        f"sur la période **{m_stat.get('start')} → {m_stat.get('end')}**.\n\n"
+
+        f"Diagnostics : stabilité={stable}"
+        + (f" (max|root|={max_root_modulus})." if max_root_modulus is not None else ".")
+        + (f" Blancheur (whiteness) : p={whiteness_pvalue}." if whiteness_pvalue is not None else " Blancheur (whiteness) : p indisponible.")
+        + (f" Normalité : p={normality_pvalue}." if normality_pvalue is not None else " Normalité : p indisponible.")
     )
 
     out_tables: dict[str, Any] = {

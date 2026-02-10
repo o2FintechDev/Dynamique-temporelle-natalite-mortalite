@@ -235,11 +235,15 @@ def cointegration_pack(
             },
             "decision": {"rank": 0, "choice": "VAR_diff", "rule": meta["rule"]},
         }
-        note6 = (
-            f"**Étape 6 — Cointégration** : données insuffisantes (k={k}, nobs={nobs}). "
-            "Décision conservatrice: VAR en différences."
-        )
         
+        note6 = (
+            f"**Cointégration** : données insuffisantes pour tester la cointégration multivariée "
+            f"(k={int(k)} variables, nobs={int(nobs)} observations).\n\n"
+            "Les tests de cointégration (Engle-Granger et Johansen) ne peuvent pas être appliqués de manière fiable "
+            "dans ces conditions.\n\n"
+            "Décision conservatrice : modélisation en **VAR sur séries différenciées**, sans estimation de VECM."
+        )
+
 
         return {
             "tables": {
@@ -303,7 +307,7 @@ def cointegration_pack(
         trace_crit5 = np.asarray(joh.cvt[:, 1], dtype=float)   # 5%
         reject5 = trace_stat > trace_crit5
 
-        # rank via trace @5% = nb de rejets successifs
+        # rank via trace au seuil de 5% = nb de rejets successifs
         rank = int(np.sum(reject5))
         rank = max(0, min(rank, k - 1))
 
@@ -380,7 +384,7 @@ def cointegration_pack(
                 "choice": choice,
                 "det_order": det_order,
                 "k_ar_diff": k_ar_diff,
-                "rule": "VECM si rang Johansen (trace @5%) > 0, sinon VAR en différences",
+                "rule": "VECM si rang Johansen (trace au seuil de 5%) > 0, sinon VAR en différences",
             }
         ],
         index=pd.Index(["choice"]),
@@ -397,7 +401,7 @@ def cointegration_pack(
         "k_ar_diff": k_ar_diff,
         "rank": int(rank),
         "choice": choice,
-        "rule": "VECM si rank>0 (trace@5%), sinon VAR_diff",
+        "rule": "VECM si rank>0 (trace au seuil 5%), sinon VAR_diff",
         "eg_n_pairs": int(eg_n),
         "eg_n_fail": int(eg_fail),
         "eg_p_min": eg_p_min,
@@ -419,7 +423,7 @@ def cointegration_pack(
         "decision": {
             "rank": int(rank),
             "choice": choice,
-            "rule": "VECM si rank>0 (trace@5%), sinon VAR_diff",
+            "rule": "VECM si rank>0 (trace au seuil de 5%), sinon VAR_diff",
         },
     }
 

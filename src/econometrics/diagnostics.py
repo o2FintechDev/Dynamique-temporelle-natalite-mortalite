@@ -143,6 +143,8 @@ def ljungbox_diff(series: pd.Series, lags: int = 24) -> pd.DataFrame:
     x = pd.to_numeric(series, errors="coerce").dropna().astype(float)
     dx = x.diff().dropna()
     lb = acorr_ljungbox(dx, lags=[lags], return_df=True)
+    lb = lb.rename(columns={"lb_pvalue": "ljungbox_p", "lb_stat": "ljungbox_stat"})
+    lb["ljungbox_p"] = lb["ljungbox_p"].astype(float).round(2)
     lb.index = ["diff"]
     return lb
 
