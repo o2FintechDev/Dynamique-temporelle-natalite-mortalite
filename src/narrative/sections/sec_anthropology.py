@@ -37,90 +37,146 @@ def render_sec_anthropology(
 
     lines: list[str] = []
 
-    # ============================================================
+    # =======================================================
     # SECTION 1 : Cadre (hors-économétrie, lecture augmentée)
-    # ============================================================
+    # =======================================================
     lines += [
         r"\section{Analyse anthropologique augmentée par l’IA}",
         "",
         md_basic_to_tex(
-            "L’économétrie fournit un cadre rigoureux d’identification des régularités statistiques et des relations dynamiques entre variables. "
-            "Toutefois, elle demeure volontairement silencieuse sur les mécanismes sociaux profonds qui sous-tendent ces dynamiques. "
-            "L’analyse anthropologique vise à combler cet espace interprétatif en proposant une lecture qualitative, non quantifiable, "
-            "des résultats économétriques obtenus, sans jamais s’y substituer. "
-            "Cette section s’inscrit explicitement hors du champ économétrique : aucun test, aucun modèle supplémentaire n’y est introduit. "
-            "Elle repose sur l’exploitation raisonnée des résultats précédents, éclairés par les travaux d’Emmanuel Todd et par l’usage d’un agent IA "
-            "comme outil d’exploration conceptuelle."
+            "L’économétrie permet d’identifier avec rigueur des régularités statistiques, des ruptures "
+            "et des dynamiques de long terme à partir de données observables. "
+            "Elle ne vise cependant pas à épuiser l’interprétation des phénomènes sociaux sous-jacents. "
+            "La présente section s’inscrit volontairement hors du champ économétrique et propose "
+            "une lecture anthropologique augmentée des résultats obtenus, sans jamais s’y substituer. "
+            "Aucun test supplémentaire n’est introduit, aucun paramètre n’est estimé, "
+        "et aucune causalité n’est postulée."
+        ),
+        "",
+        r"\subsection*{Définition du cadre anthropologique}",
+        md_basic_to_tex(
+            "Le terme « anthropologique » est employé ici au sens des sciences sociales, "
+            "désignant l’étude des structures profondes et relativement stables "
+            "qui organisent les comportements collectifs : normes familiales, "
+            "rapport à la reproduction, projection intergénérationnelle, "
+            "relation au temps long et aux institutions. "
+            "L’anthropologie, dans ce cadre, ne cherche pas à mesurer directement, "
+            "mais à interpréter des régularités sociales durables."
+        ),
+        "",
+
+        md_basic_to_tex(
+            "Appliquée à ce projet, l’anthropologie ne constitue pas une discipline concurrente "
+            "de l’économétrie, mais un niveau de lecture complémentaire. "
+            "Elle vise à donner sens aux dynamiques démographiques observées "
+            "en les replaçant dans un contexte social, culturel et institutionnel "
+            "qui dépasse la seule logique économique de court terme."
+        ),
+        "",
+        r"\subsection*{Inspiration méthodologique des travaux d’Emmanuel Todd}",
+        md_basic_to_tex(
+            "Cette démarche s’inspire méthodologiquement des travaux d’Emmanuel Todd, "
+            "notamment de ses analyses démographiques menées à partir de la fin des années 1970. "
+            "L’apport central de ces travaux réside dans l’utilisation d’indicateurs démographiques "
+            "comme signaux sociaux latents, révélateurs de déséquilibres profonds "
+            "avant leur expression politique ou économique. "
+            "Il ne s’agit pas de transposer des contextes historiques, "
+            "mais d’adopter une logique d’analyse fondée sur la démographie comme révélateur structurel."
         ),
         "",
         r"\subsection*{Exploitation raisonnée des résultats économétriques}",
         md_basic_to_tex(
-            "Les sections précédentes produisent des faits stylisés (inertie, persistance, relations de long terme, mécanismes d’ajustement). "
-            "D’un point de vue strictement économétrique, ces éléments indiquent une dynamique structurée dans le temps long, "
-            "et non une simple réaction conjoncturelle. "
-            "La lecture anthropologique part de ces résultats (et seulement d’eux) pour proposer des hypothèses interprétatives."
+            "Les résultats économétriques précédents mettent en évidence "
+            "une persistance temporelle élevée, des ruptures durables "
+            "et une dynamique de long terme structurée de la croissance naturelle. "
+            "Ces faits stylisés indiquent que la série ne réagit pas uniquement "
+            "à des chocs conjoncturels, mais s’inscrit dans une trajectoire profonde. "
+            "La lecture anthropologique prend ces résultats comme point de départ exclusif "
+            "et ne mobilise aucune information incompatible avec les diagnostics établis."
         ),
         "",
-        r"\subsection*{Identification des ruptures démographiques majeures}",
+        r"\subsection*{Variables non quantifiables et signaux sociaux latents}",
         md_basic_to_tex(
-            "Les ruptures détectées (chocs persistants, changements de pente, modifications de trajectoire) ne sont pas uniquement des événements statistiques. "
-            "Leur persistance peut refléter des facteurs sociaux et institutionnels profonds : transformations du modèle familial, normes de fécondité, "
-            "politiques publiques, conditions sanitaires. "
-            "L’économétrie identifie quand et comment ces ruptures se manifestent ; elle n’explique pas, à elle seule, leur nature sociologique."
+            "L’analyse anthropologique introduit explicitement des dimensions "
+            "non quantifiables au sens économétrique : confiance collective dans l’avenir, "
+            "stabilité perçue du modèle familial, normes de fécondité, "
+            "rapport à la transmission intergénérationnelle, "
+            "ou encore légitimité ressentie des institutions. "
+            "Ces variables ne sont pas observables directement, "
+            "mais peuvent se manifester indirectement à travers "
+            "des évolutions démographiques persistantes."
         ),
         "",
-        r"\subsection*{Mise en perspective avec les travaux d’Emmanuel Todd}",
+
         md_basic_to_tex(
-            "Les travaux d’Emmanuel Todd soutiennent que certains indicateurs démographiques (ex. mortalité infantile) jouent le rôle de signaux sociaux latents, "
-            "révélant des tensions profondes avant leur expression politique ou économique. "
-            "Dans cette perspective, la démographie n’est pas un simple sous-produit de la conjoncture : elle devient un miroir anthropologique de l’état social."
+            "Dans cette perspective, la croissance naturelle est interprétée "
+            "comme un indicateur synthétique de l’état anthropologique d’une société. "
+            "Une dégradation durable peut signaler une fragilisation latente, "
+            "indépendante de la performance économique immédiate, "
+            "tandis qu’une inertie relative peut refléter "
+            "la stabilité de structures sociales profondes."
         ),
         "",
-        r"\subsection*{Application au cas français}",
+        r"\subsection*{Rôle et encadrement méthodologique de l’agent IA (ChatGPT 5.2)}",
         md_basic_to_tex(
-            "Transposée au cas français, cette grille invite à interpréter la persistance de la croissance naturelle comme un reflet de structures sociales stables "
-            "(modèle familial, inertie institutionnelle, État-providence). "
-            "Inversement, une dégradation durable pourrait signaler une fragilisation latente du contrat social, même en l’absence de signaux macroéconomiques immédiats."
+            "Le terme d’« agent IA » est employé au sens fonctionnel et non autonome. "
+            "ChatGPT 5.2 est utilisé comme un agent d’assistance interprétative, "
+            "destiné à structurer et enrichir la réflexion anthropologique "
+            "à partir des résultats économétriques produits en amont."
         ),
         "",
-        r"\subsection*{Rôle de l’IA dans l’analyse anthropologique}",
+
         md_basic_to_tex(
-            "L’agent IA n’est pas un producteur de vérité sociologique. Il sert d’outil d’exploration : mise en relation des résultats économétriques "
-            "avec un corpus de connaissances, repérage de coïncidences temporelles entre ruptures et événements, formulation d’hypothèses non testables économétriquement. "
-            "L’IA amplifie la réflexion ; elle ne remplace ni l’analyse scientifique ni la critique méthodologique."
+            "Afin de limiter tout biais ou hallucination, son utilisation est strictement encadrée "
+            "par une méthode scientifique explicite : "
+            "les entrées de l’agent sont exclusivement constituées de résultats économétriques validés, "
+            "les sorties sont systématiquement contraintes par ces résultats, "
+            "et toute interprétation proposée est évaluée au regard de sa compatibilité "
+            "avec les faits stylisés observés. "
+            "Aucune information non corroborée par le cadre du projet n’est intégrée."
         ),
         "",
-        r"\subsection*{Hypothèses interprétatives non quantifiables}",
+
         md_basic_to_tex(
-            "À partir de cette lecture croisée, on peut formuler des hypothèses : stabilité anthropologique relativement élevée, "
-            "transmission des chocs économiques avec retard, rôle de politiques publiques durables, ou encore caractère précoce de certaines ruptures démographiques "
-            "comme signaux sociaux. Ces hypothèses relèvent d’une démarche interprétative assumée."
+            "L’agent IA agit ainsi comme un amplificateur cognitif contrôlé : "
+            "il facilite l’exploration conceptuelle des liens possibles "
+            "entre dynamiques démographiques et structures sociales, "
+            "sans jamais produire de validation empirique ni d’assertion causale."
         ),
         "",
-        r"\subsection*{Séparation explicite entre économétrie et anthropologie}",
+        r"\subsection*{Séparation épistémologique et limites assumées}",
         md_basic_to_tex(
-            "Les résultats économétriques sont falsifiables et reproductibles ; l’analyse anthropologique est qualitative et non falsifiable. "
-            "Cette séparation garantit la rigueur : la lecture anthropologique n’a pas le droit de contredire les artefacts économétriques."
-        ),
-        "",
-        r"\subsection*{Apport de l’approche augmentée}",
-        md_basic_to_tex(
-            "L’articulation économétrie–anthropologie évite une lecture techniciste, donne un sens social aux dynamiques de long terme, "
-            "et justifie une intégration raisonnée de l’IA dans un projet académique."
+            "Une séparation stricte est maintenue entre résultats économétriques et lecture anthropologique. "
+            "Les premiers sont falsifiables, reproductibles et quantifiables ; "
+            "la seconde est interprétative, qualitative et non falsifiable. "
+            "Cette distinction garantit la rigueur scientifique du projet "
+            "et interdit toute contradiction entre interprétation anthropologique "
+            "et faits économétriques établis."
         ),
         "",
     ]
 
-    # ============================================================
-    # SECTION: Synthèse produite (métrique IA)
-    # ============================================================
+    # ===========================================
+    # SECTION 2 : Synthèse produite (métrique IA)
+    # ===========================================
     lines += [
-        r"\section{Synthèse anthropologique}",
+        r"\section{Interprétation anthropologique des dynamiques démographiques}",
         "",
         md_basic_to_tex(
-            f"Repères de cohérence (issus des métriques) : verdict stationnarité **{verdict}** ; "
-            f"benchmark univarié **ARIMA{uni_order}** ; module long terme **{coint_choice}** (rang={coint_rank}). "
-            "Ces repères ne sont pas des conclusions anthropologiques : ils cadrent la compatibilité avec les résultats économétriques."
+            f"Les repères économétriques suivants cadrent strictement la lecture anthropologique : "
+            f"verdict de stationnarité **{verdict}**, "
+            f"benchmark univarié **ARIMA{uni_order}**, "
+            f"et structure de long terme **{coint_choice}** (rang={coint_rank}). "
+            "Ces éléments ne constituent pas des conclusions anthropologiques, "
+            "mais définissent l’espace interprétatif admissible."
+        ),
+        "",
+        md_basic_to_tex(
+            "À partir de ces contraintes, la synthèse anthropologique vise à qualifier "
+            "l’état profond de la dynamique démographique française. "
+            "Elle ne cherche ni à prévoir quantitativement, ni à expliquer causalement, "
+            "mais à identifier des configurations sociales cohérentes "
+            "avec les régularités observées."
         ),
         "",
     ]
@@ -133,19 +189,25 @@ def render_sec_anthropology(
         ]
     else:
         lines += [
-            md_basic_to_tex("Aucune synthèse anthropologique disponible (métrique absente)."),
+            md_basic_to_tex(
+                "En l’absence de synthèse automatisée, la lecture anthropologique "
+                "repose exclusivement sur l’analyse conceptuelle développée dans cette section, "
+                "contrainte par les résultats économétriques et par le cadre méthodologique défini."
+            ),
             "",
-        ]
-
-    # optional: reference vecm meta if present
-    if vecm_meta:
-        lines += [narr_call("m.vecm.meta"), ""]
+            ]
 
     lines += [
         md_basic_to_tex("**Conclusion**"),
         md_basic_to_tex(
-            "Cette section enrichit l’interprétation sans sur-interprétation : elle reste strictement contrainte par les faits économétriques "
-            "matérialisés dans les figures, tables et métriques."
+            "Cette synthèse anthropologique augmentée apporte une plus-value interprétative "
+            "au projet économétrique en intégrant explicitement des dimensions non quantifiables "
+            "habituellement absentes des modèles statistiques. "
+            "Elle assume l’usage encadré de l’IA comme outil méthodologique, "
+            "sans remettre en cause la primauté des résultats économétriques. "
+            "L’approche proposée ne vise pas la prédiction, "
+            "mais la qualification rigoureuse des fragilités et inerties sociales "
+            "associées à la dynamique de la croissance naturelle française."
         ),
         "",
     ]
