@@ -186,12 +186,15 @@ class RunWriter:
 \begin{titlepage}
 \thispagestyle{empty}
 
-
+% -------------------------------------------------
+% ESPACE HAUT (centrage vertical)
+% -------------------------------------------------
+\vspace*{\fill}
 
 % -------------------------------------------------
-% BLOC CENTRAL (centrage visuel)
+% BLOC CENTRAL (centré au milieu de la page)
 % -------------------------------------------------
-\vfill
+
 
 \begin{center}
     {\Large Analyse économétrique automatisée}\\[0.3cm]
@@ -210,8 +213,11 @@ class RunWriter:
     Année universitaire 2025--2026
 \end{center}
 
+% -------------------------------------------------
+% ESPACE BAS (centrage vertical)
+% -------------------------------------------------
 
-\vfill
+\vspace*{\fill}
 
 % -------------------------------------------------
 % ENCADREMENT (bas à gauche)
