@@ -107,7 +107,7 @@ def render_sec_cointegration(
         "",
         r"\subsection*{Test de Johansen : cadre général}",
         md_basic_to_tex(
-            "La méthode de Johansen détermine le rang de cointégration $r$ dans un système multivarié via l’analyse spectrale de $\Pi$. "
+            "La méthode de Johansen détermine le rang de cointégration $r$ dans un système multivarié via l’analyse spectrale de $\\Pi$. "
             "Les conclusions dépendent du traitement de la constante et de la tendance (choix déterministe)."
         ),
         "",
@@ -141,8 +141,8 @@ def render_sec_cointegration(
         "",
         r"\subsection*{Vitesse d’ajustement}",
         md_basic_to_tex(
-            "Si un coefficient d’ajustement $\\alpha_i<0$ et significatif, la variable contribue au retour vers l’équilibre. "
-            "Une mesure intuitive du temps moyen de correction est $\\tau = 1/|\\alpha|$."
+            "Si un coefficient d’ajustement $\\alpha_i < 0$ et significatif, la variable contribue au retour vers l’équilibre. "
+            "Une mesure intuitive du temps moyen de correction est $\\tau = 1/\\lvert\\alpha_i\\rvert$."
         ),
         "",
         r"\begin{equation}",

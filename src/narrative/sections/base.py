@@ -107,7 +107,7 @@ def md_basic_to_tex(md: str) -> str:
     def _stash(m: re.Match) -> str:
         math_tokens.append(m.group(0))
         return f"@@MATH{len(math_tokens)-1}@@"
-
+    
     s = re.sub(r"\$\$.*?\$\$", _stash, s, flags=re.DOTALL)
     s = re.sub(r"\$.*?\$", _stash, s, flags=re.DOTALL)
 
@@ -122,7 +122,7 @@ def md_basic_to_tex(md: str) -> str:
 
     for i, tok in enumerate(math_tokens):
         s = s.replace(f"@@MATH{i}@@", tok)
-
+    s = re.sub(r'\\(alpha|beta|gamma|delta|epsilon|theta|lambda|mu|nu|pi|rho|sigma|tau|phi|psi|omega)\b', r'$\\\1$', s)
     return s
 
 

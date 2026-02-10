@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Callable, Any
 import pandas as pd
-import matplotlib.figure as mpl_fig
+import streamlit as st
 
 from src.utils.logger import get_logger
 from src.data_pipeline.loader import load_clean_dataset
@@ -62,7 +62,7 @@ def step1_load_and_profile(*, variables: list[str], y: str, **params: Any) -> di
     # --------------------------------------------------
     df = harmonize(load_clean_dataset())
 
-    requested = sorted(set([y] + VAR_COLS_CANON))
+    requested = sorted(set([y] + list(VAR_COLS_CANON)))
     present = [c for c in requested if c in df.columns]
     missing = [c for c in requested if c not in df.columns]
 
@@ -75,14 +75,24 @@ def step1_load_and_profile(*, variables: list[str], y: str, **params: Any) -> di
     # --------------------------------------------------
     # Méta-données et note d’audit
     # --------------------------------------------------
-    miss_rate = float(prof.missing.loc[y, "missing_rate"]) if y in prof.missing.index else None
+    miss_rate = float(prof.missing.loc[y, "missing_rate"]) if y in getattr(prof, "missing", pd.DataFrame()).index else None
 
-    meta = dict(prof.meta)
+    meta = dict(getattr(prof, "meta", {}) or {})
     meta["missing_rate"] = miss_rate
     meta["columns_available"] = list(map(str, df.columns))
     meta["requested_vars"] = requested
     meta["present_vars"] = present
     meta["missing_vars"] = missing
+
+    # start/end/nobs/freq (robuste)
+    meta.setdefault("nobs", int(meta.get("nobs", len(df))))
+    meta.setdefault("start", meta.get("start", str(df.index.min()) if len(df) else "NA"))
+    meta.setdefault("end", meta.get("end", str(df.index.max()) if len(df) else "NA"))
+    try:
+        if isinstance(df.index, pd.DatetimeIndex):
+            meta["freq"] = meta.get("freq") or (pd.infer_freq(df.index) or "NA")
+    except Exception:
+        meta["freq"] = meta.get("freq") or "NA"
 
     note = (
         f"**Étape 1 — Traitement des données** : `{y}` chargée. "
@@ -103,18 +113,24 @@ def step1_load_and_profile(*, variables: list[str], y: str, **params: Any) -> di
 
     # --------------------------------------------------
     # ÉCRITURE DES TABLES LaTeX + ENREGISTREMENT MANIFEST
+    # IMPORTANT: on écrit dans LE run courant de l'executor
     # --------------------------------------------------
-    state = get_state()
-    run_id = state.selected_run_id
+    run_id = st.session_state.get("run_id")  # source de vérité côté executor
+
+    # fallback: si ton UI gère un select de run
+    if not run_id:
+        try:
+            state = get_state()
+            run_id = getattr(state, "selected_run_id", None)
+        except Exception:
+            run_id = None
 
     if run_id:
-        rf = get_run_files(run_id)
-        run_root = Path(rf.root)
-        rw = RunWriter(base_runs_dir=run_root.parent, run_id=run_id)
+        # base_runs_dir cohérent avec AgentExecutor(runs_dir="app/outputs/runs")
+        base_runs_dir = Path("app/outputs/runs")
+        rw = RunWriter(base_runs_dir=base_runs_dir, run_id=run_id)
 
-
-        run_root = rw.paths.run_dir
-        tables_dir = rw.paths.tables_dir
+        tables_dir = rw.paths.tables_dir  # => run_root/artefacts/tables
 
         # --- Tableau 1 : Statistiques descriptives
         _, tex_desc = save_table_csv_and_tex(
@@ -160,21 +176,22 @@ def step1_load_and_profile(*, variables: list[str], y: str, **params: Any) -> di
             rel_path=f"artefacts/tables/{tex_vars.name}",
         )
 
-        # --------------------------------------------------
-        # Retour agent (inchangé)
-        # --------------------------------------------------
-        return {
-            "tables": {
-                "tbl.data.desc_stats": prof.desc,
-                "tbl.data.missing_report": prof.missing,
-                "tbl.data.coverage_report": cov,
-                "tbl.data.vars_audit": tbl_vars_audit,
-            },
-            "metrics": {
-                "m.data.dataset_meta": meta,
-                "m.note.step1": {"markdown": note},
-            },
-        }
+    # --------------------------------------------------
+    # Retour agent (pour persist_outputs)
+    # --------------------------------------------------
+    return {
+        "tables": {
+            "tbl.data.desc_stats": prof.desc,
+            "tbl.data.missing_report": prof.missing,
+            "tbl.data.coverage_report": cov,
+            "tbl.data.vars_audit": tbl_vars_audit,
+        },
+        "metrics": {
+            "m.data.dataset_meta": meta,
+            "m.note.step1": {"markdown": note},
+        },
+        "summary": f"Step1 OK: y={y} | present={len(present)} | missing={len(missing)}",
+    }
 
 @register("step2_descriptive")
 def step2_descriptive(*, variables: list[str], y: str, **params: Any) -> dict[str, Any]:

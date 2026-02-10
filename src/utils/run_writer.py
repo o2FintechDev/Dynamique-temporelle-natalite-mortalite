@@ -16,11 +16,14 @@ def sanitize_tex(text: str) -> str:
     """
     Nettoie les caractères invisibles et dangereux pour LaTeX.
     """
-    return (
-        text
-        .replace("\x07", "")  # BEL (^^G)
-        .replace("\x08", "")  # BACKSPACE (^^H)
-    )
+    if not text:
+        return ""
+    t = text.replace("\x07", "").replace("\x08", "")
+    # kill common mojibake sequences if they appear
+    t = t.replace("Ã©", "é").replace("Ã¨", "è").replace("Ãª", "ê").replace("Ã ", "à")
+    t = t.replace("Ã´", "ô").replace("Ã¹", "ù").replace("Ã¢", "â").replace("Ã®", "î")
+    t = t.replace("Ã§", "ç").replace("Â", "")
+    return t
 
 
 def _utc_ts() -> str:

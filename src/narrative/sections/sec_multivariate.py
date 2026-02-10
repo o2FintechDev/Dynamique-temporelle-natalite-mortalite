@@ -264,7 +264,7 @@ def render_sec_multivariate(
     if stable is False:
         lines += [
             md_basic_to_tex(
-                "Alerte : le VAR n’est pas stable (racines $\geq 1$). "
+                "Alerte : le VAR n’est pas stable (racines $\\geq 1$). "
                 "Les IRF/FEVD ne sont pas interprétables économiquement. "
                 "Priorité à la re-spécification : ordre $p$, transformations, choix des variables, traitement saisonnalité/ruptures."
             ),
