@@ -9,6 +9,11 @@ from statsmodels.tsa.api import VAR
 from statsmodels.tsa.stattools import coint
 from statsmodels.tsa.vector_ar.vecm import VECM, coint_johansen
 
+DISPLAY_NAME_MAP = {
+    "Croissance_Naturelle": "CN",
+    "Masse_monetaire": "M3",
+    "Nb_mariages": "Mariages",
+}
 
 def _safe_float(x: Any) -> Optional[float]:
     try:
@@ -18,6 +23,28 @@ def _safe_float(x: Any) -> Optional[float]:
         return v
     except Exception:
         return None
+
+def _disp(name: str) -> str:
+    return DISPLAY_NAME_MAP.get(name, name)
+
+
+def _rename_df_display(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return df
+    out = df.copy()
+    out.columns = [_disp(c) for c in out.columns]
+    out.index = [_disp(i) if isinstance(i, str) else i for i in out.index]
+    return out
+
+
+def _rename_cols_in_df(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
+    if df is None or df.empty:
+        return df
+    out = df.copy()
+    for c in cols:
+        if c in out.columns:
+            out[c] = out[c].map(lambda x: _disp(x) if isinstance(x, str) else x)
+    return out
 
 
 def _select_var_lag_aic(X: pd.DataFrame, maxlags: int) -> int:
@@ -510,5 +537,25 @@ def cointegration_pack(
             "johansen_error": joh_error,
         },
     }
+    # --------------------------------------------------
+    # DISPLAY ONLY — renommage des variables (UI / LaTeX)
+    # --------------------------------------------------
+
+    out["tables"]["tbl.coint.eg"] = _rename_cols_in_df(
+        out["tables"]["tbl.coint.eg"], ["x", "y"]
+    )
+
+    out["tables"]["tbl.coint.johansen"] = _rename_df_display(
+        out["tables"]["tbl.coint.johansen"]
+    )
+
+    out["tables"]["tbl.coint.var_vs_vecm_choice"] = _rename_df_display(
+        out["tables"]["tbl.coint.var_vs_vecm_choice"]
+    )
+
+    if "tbl.vecm.params" in out["tables"]:
+        out["tables"]["tbl.vecm.params"] = _rename_df_display(
+            out["tables"]["tbl.vecm.params"]
+        )
 
     return out

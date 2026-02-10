@@ -93,7 +93,7 @@ UI_LABELS: dict[str, str] = {
     "tbl.coint.eg": "Tests Engle-Granger",
     "tbl.coint.johansen": "Test de Johansen — détermination du rang",
     "tbl.coint.var_vs_vecm_choice": "Décision : VAR en différences ou VECM (règle explicite)",
-
+    "tbl.coint.input_window" : "Fenêtre temporelle d'estimation du VECM",
     "m.coint.meta": "Résumé cointégration ",
     "m.coint.audit": "Audit détaillé cointégration",
     "m.note.step6": "Note d'interprétation (Étape 6)",

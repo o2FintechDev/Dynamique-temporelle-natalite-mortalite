@@ -511,12 +511,101 @@ def step5_var_pack(
     out["tables"] = {"tbl.var.input_window": tbl_input, **out_tables}
     return out
 
-def step6_cointegration_pack(df: pd.DataFrame, *, y: str, vars_mode: str = "decomp", **params: Any) -> dict[str, Any]:
-    s = _series(df, y)
-    stl = STL(s.dropna(), period=12, robust=True).fit()
-    X = pd.DataFrame({
-        "level": s.loc[stl.trend.index],
-        "trend": stl.trend,
-        "seasonal": stl.seasonal,
-    }).dropna()
-    return cointegration_pack(X, det_order=0, k_ar_diff=1)
+def step6_cointegration_pack(
+    df: pd.DataFrame,
+    *,
+    y: str,
+    vars_mode: str = "decomp",   # gardé pour compat, mais on ne l'utilise plus ici
+    det_order: int = 0,
+    k_ar_diff: int = 1,
+    **params: Any,
+) -> dict[str, Any]:
+
+    _ = _series(df, y)  # garde la vérif existante
+
+    # --- normalisation noms colonnes (safe) ---
+    def _norm(c: str) -> str:
+        return (
+            str(c).strip()
+            .replace(" ", "_")
+            .replace("-", "_")
+            .replace("__", "_")
+        )
+
+    df0 = df.copy()
+    df0.columns = [_norm(c) for c in df0.columns]
+
+    wanted = {
+        "Croissance_Naturelle": ["Croissance_Naturelle", "CroissanceNaturelle", "croissance_naturelle"],
+        "Nb_mariages": ["Nb_mariages", "Nombres_mariages", "Mariages", "NbMariages", "nb_mariages"],
+        "IPC": ["IPC", "Indice_prix", "Indice_des_prix", "CPI", "ipc"],
+        "Masse_monetaire": ["Masse_monetaire", "Masse_monétaire", "MasseMonetaire", "M3", "m3"],
+    }
+
+    resolved: dict[str, str] = {}
+    missing: list[str] = []
+
+    cols_set = set(df0.columns)
+    for canonical, candidates in wanted.items():
+        found = next((c for c in candidates if _norm(c) in cols_set), None)
+        if found is None:
+            found = next((c for c in df0.columns if _norm(c) in {_norm(x) for x in candidates}), None)
+
+        if found is None:
+            missing.append(canonical)
+        else:
+            resolved[canonical] = found
+
+    tbl_input = pd.DataFrame([{
+        "status": "ok" if not missing else "missing_columns",
+        "missing": ", ".join(missing) if missing else "",
+        "resolved": ", ".join([f"{k}->{v}" for k, v in resolved.items()]),
+        "available_cols": ", ".join(list(df0.columns)[:30]) + (" ..." if len(df0.columns) > 30 else ""),
+    }]).set_index(pd.Index(["input"]))
+
+    if missing:
+        return {
+            "tables": {"tbl.coint.input_window": tbl_input},
+            "metrics": {
+                "m.note.step6": {
+                    "markdown": f"**Étape 6 — Cointégration** : colonnes manquantes: {missing}.",
+                    "key_points": {"missing": missing, "resolved": resolved},
+                }
+            },
+            "models": {},
+            "figures": {},
+        }
+
+    # mêmes colonnes que le VAR
+    C_COLS = [
+        resolved["Croissance_Naturelle"],
+        resolved["Nb_mariages"],
+        resolved["IPC"],
+        resolved["Masse_monetaire"],
+    ]
+    X4 = df0[C_COLS].copy()
+    X4.columns = ["Croissance_Naturelle", "Nb_mariages", "IPC", "Masse_monetaire"]  # canonical
+
+    for c in X4.columns:
+        X4[c] = pd.to_numeric(X4[c], errors="coerce")
+
+    if not isinstance(X4.index, pd.DatetimeIndex):
+        try:
+            X4.index = pd.to_datetime(X4.index)
+        except Exception:
+            pass
+
+    X4 = X4.dropna()
+
+    tbl_input.loc["input", "nobs_after_dropna"] = int(X4.shape[0])
+    tbl_input.loc["input", "start"] = str(X4.index.min()) if len(X4) else None
+    tbl_input.loc["input", "end"] = str(X4.index.max()) if len(X4) else None
+
+    out = cointegration_pack(X4, det_order=int(det_order), k_ar_diff=int(k_ar_diff))
+
+    # on garde la table input en plus (audit)
+    out_tables = (out.get("tables") or {})
+    out["tables"] = {"tbl.coint.input_window": tbl_input, **out_tables}
+    return out
+
+
