@@ -96,5 +96,5 @@ def harmonize(df_raw: pd.DataFrame) -> pd.DataFrame:
     df.index.name = "date"
     df = df.asfreq("MS")
 
-    log.info(f"Harmonized: n={len(df)} from {df.index.min()} to {df.index.max()} | cols={list(df.columns)}")
+    #log.info(f"Harmonized: n={len(df)} from {df.index.min()} to {df.index.max()} | cols={list(df.columns)}")
     return df
