@@ -183,14 +183,26 @@ class RunWriter:
 \begin{titlepage}
 \thispagestyle{empty}
 
-% Décalage initial pour éviter un démarrage trop haut
-\vspace*{2.5cm}
+% -------------------------------------------------
+% LOGOS (haut de page)
+% -------------------------------------------------
+\begin{minipage}{0.48\textwidth}
+    \raggedright
+    \includegraphics[width=0.70\textwidth]{image1.png}
+\end{minipage}
+\hfill
+\begin{minipage}{0.48\textwidth}
+    \raggedleft
+    \includegraphics[width=0.40\textwidth]{image2.png}
+\end{minipage}
 
-\vfill
+\vspace*{3cm}
 
 % -------------------------------------------------
 % BLOC CENTRAL (centrage visuel)
 % -------------------------------------------------
+\vfill
+
 \begin{center}
     {\Large Analyse économétrique automatisée}\\[0.3cm]
     {\Large par pipeline déterministe}\\[0.8cm]
