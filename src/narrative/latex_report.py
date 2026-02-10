@@ -358,44 +358,23 @@ def export_report_tex_from_manifest(
     return tex_path
 
 
-def try_compile_pdf(
-    *,
-    run_root: str | Path,
-    tex_path: str | Path,
-    runs: int = 1,
-) -> Tuple[Optional[Path], Optional[str]]:
+def build_pdf(tex_path: Path) -> Path:
     """
-    Compile avec pdflatex si dispo.
-    Retourne (pdf_path|None, log_text|None).
+    Compile un .tex en PDF (pdflatex x2).
+    Retourne le chemin du PDF.
     """
-    run_root = Path(run_root)
-    tex_path = Path(tex_path)
-    if not tex_path.is_absolute():
-        tex_path = (run_root / tex_path).resolve()
+    workdir = tex_path.parent
+    cmd = [
+        "pdflatex",
+        "-interaction=nonstopmode",
+        tex_path.name,
+    ]
 
-    if shutil.which("pdflatex") is None:
-        return None, None
+    subprocess.run(cmd, cwd=workdir, check=True)
+    subprocess.run(cmd, cwd=workdir, check=True)
 
-    work_dir = tex_path.parent
-    log_path = work_dir / (tex_path.stem + ".pdflatex.log")
-    cmd = ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", tex_path.name]
+    pdf_path = tex_path.with_suffix(".pdf")
+    if not pdf_path.exists():
+        raise RuntimeError("PDF non généré")
 
-    with log_path.open("w", encoding="utf-8") as logf:
-        rc = 0
-        for _ in range(max(1, runs)):
-            p = subprocess.run(cmd, cwd=str(work_dir), stdout=logf, stderr=logf, check=False)
-            rc = p.returncode
-            if rc != 0:
-                break
-
-    pdf_path = work_dir / (tex_path.stem + ".pdf")
-    log_text = None
-    try:
-        log_text = log_path.read_text(encoding="utf-8", errors="replace")
-    except Exception:
-        log_text = None
-
-    if rc != 0 or not pdf_path.exists():
-        return None, log_text
-
-    return pdf_path, log_text
+    return pdf_path

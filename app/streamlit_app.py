@@ -4,6 +4,7 @@ from pathlib import Path
 import os
 import json
 import requests
+import re
 import streamlit as st
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -30,6 +31,15 @@ STEP_TO_PAGE = {
     "step7_anthropology":     "5_Analyse_Anthropologique",
     "export_latex_pdf":       "6_Historique_Artefacts",
 }
+
+EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
+
+def _is_email(s: str) -> bool:
+    return bool(EMAIL_RE.fullmatch((s or "").strip()))
+
+def _extract_email(text: str) -> str | None:
+    m = EMAIL_RE.search(text or "")
+    return m.group(0) if m else None
 
 
 def run_step(step_name: str, params: dict) -> str:
@@ -173,7 +183,7 @@ def llm_route(user_text: str) -> dict:
         out["confidence"] = 0.40 if out["action"] else 0.0
         out["reason"] = "llm_error_fallback"
         return out
-    
+
 def _collect_run_context(run_id: str | None) -> str:
     if not run_id:
         return "Aucun run actif. Réponds en définitions générales."
@@ -237,8 +247,9 @@ def help_text() -> str:
         "- `Cointégration Johansen + VECM` → step6\n"
         "- `Analyse Todd` → step7\n"
         "- `Lance tout` → RUN_ALL\n"
-        "- `Export PDF` → export\n\n"
-        "Si `OPENAI_API_KEY` est définie, le parsing est LLM; sinon fallback mots-clés."
+        "- `Export PDF` → export\n"
+        "- `Export PDF vers prenom.nom@domaine.com` → export + envoi mail\n\n"
+        "Paramètres d’envoi mail configurables dans la sidebar."
     )
 
 # ---------------------------
@@ -270,7 +281,48 @@ with st.sidebar:
     else:
         state.selected_run_id = chosen
         st.caption(f"Run: {chosen}")
-        
+
+    st.divider()
+
+    # ---------------------------
+    # Export PDF + Email settings
+    # ---------------------------
+    st.header("Export PDF")
+
+    if "mail_send_enabled" not in st.session_state:
+        st.session_state.mail_send_enabled = False
+    if "mail_to_email" not in st.session_state:
+        st.session_state.mail_to_email = ""
+    if "mail_subject" not in st.session_state:
+        st.session_state.mail_subject = "Rapport économétrique – Croissance naturelle"
+    if "mail_body" not in st.session_state:
+        st.session_state.mail_body = "Veuillez trouver le rapport en pièce jointe."
+
+    st.session_state.mail_send_enabled = st.checkbox(
+        "Envoyer par mail après export",
+        value=bool(st.session_state.mail_send_enabled),
+    )
+    st.session_state.mail_to_email = st.text_input(
+        "Email destinataire",
+        value=st.session_state.mail_to_email,
+        placeholder="prenom.nom@domaine.com",
+        disabled=not st.session_state.mail_send_enabled,
+    )
+    st.session_state.mail_subject = st.text_input(
+        "Objet",
+        value=st.session_state.mail_subject,
+        disabled=not st.session_state.mail_send_enabled,
+    )
+    st.session_state.mail_body = st.text_area(
+        "Message",
+        value=st.session_state.mail_body,
+        height=90,
+        disabled=not st.session_state.mail_send_enabled,
+    )
+
+    if st.session_state.mail_send_enabled and not _is_email(st.session_state.mail_to_email):
+        st.warning("Email invalide: l’envoi sera bloqué tant qu’il n’est pas valide.")
+
 st.divider()
 st.subheader("Chat")
 
@@ -313,7 +365,6 @@ if user_msg:
         run_step("step7_anthropology", {"y": Y})
 
         append_assistant(f"RUN_ALL terminé. run_id={state.selected_run_id} (route={reason}, confidence={conf:.2f}).")
-        # afficher note step1 + step2 (tu peux étendre)
         show_note(state.selected_run_id, "m.note.step1")
         show_note(state.selected_run_id, "m.note.step2")
         append_assistant("Tu peux maintenant aller sur les pages 2→6 pour voir tables/figures, puis taper `export pdf`.")
@@ -324,8 +375,40 @@ if user_msg:
         if not rid:
             append_assistant("Export impossible: aucun run disponible. Exécute d’abord une étape (ex: « step1 »).")
             st.rerun()
-        rid2 = run_step("export_latex_pdf", {"run_id": rid})
-        append_assistant(f"Export demandé sur run_id={rid}. (route={reason}, confidence={conf:.2f})")
+
+        # --- email: (1) email dans le message (override), sinon (2) sidebar settings ---
+        email_in_msg = _extract_email(user_msg)
+        send_enabled = bool(st.session_state.get("mail_send_enabled", False))
+        to_email = (email_in_msg or st.session_state.get("mail_to_email", "")).strip()
+
+        params = {"run_id": rid}
+
+        if email_in_msg:
+            # si l'utilisateur a tapé un email dans le chat, on force l'envoi
+            send_enabled = True
+
+        if send_enabled:
+            if not _is_email(to_email):
+                append_assistant(
+                    "Envoi mail demandé mais adresse invalide. "
+                    "Renseigne un email valide dans la sidebar ou tape: `export pdf vers prenom.nom@domaine.com`."
+                )
+                st.rerun()
+
+            params["to_email"] = to_email
+            params["mail_subject"] = (st.session_state.get("mail_subject") or "Rapport économétrique (PDF)").strip()
+            params["mail_body"] = (st.session_state.get("mail_body") or "Veuillez trouver le rapport en pièce jointe.").strip()
+
+        rid2 = run_step("export_latex_pdf", params)
+
+        if send_enabled:
+            append_assistant(
+                f"Export + envoi mail demandé sur run_id={rid}. Destinataire={to_email}. "
+                f"(route={reason}, confidence={conf:.2f})"
+            )
+        else:
+            append_assistant(f"Export demandé sur run_id={rid}. (route={reason}, confidence={conf:.2f})")
+
         st.rerun()
 
     # Étapes 1..7

@@ -251,12 +251,17 @@ def step7_anthropology(*, variables: list[str], y: str, **params: Any) -> dict[s
 def export_latex_pdf(*, variables: list[str], run_id: str, **params: Any) -> dict[str, Any]:
     from pathlib import Path
     import time
+    import re
 
-    from src.narrative.latex_report import try_compile_pdf
+    from src.narrative.latex_report import build_pdf
     from src.narrative.latex_renderer import build_section_blocks_from_manifest
     from src.narrative.interpretation_engine import build_snippets_from_run
     from src.narrative.tex_snippets import write_snippets
     from src.utils.run_writer import RunWriter
+
+    # NEW: mailer (à créer dans src/utils/mailer.py)
+    # def send_pdf_mail(*, to: str, subject: str, body: str, pdf_path: Path) -> None: ...
+    from src.utils.mailer import send_pdf_mail
 
     rf = get_run_files(run_id)
     manifest = read_manifest(run_id)
@@ -264,6 +269,23 @@ def export_latex_pdf(*, variables: list[str], run_id: str, **params: Any) -> dic
         return {"metrics": {"m.report.export": {"ok": False, "error": "manifest introuvable", "run_id": run_id}}}
 
     run_root = Path(rf.root)
+
+    # ---- params email (optionnels, fournis par Streamlit) ----
+    to_email = (params.get("to_email") or "").strip()
+    mail_subject = (params.get("mail_subject") or "Rapport économétrique (PDF)").strip()
+    mail_body = (params.get("mail_body") or "Veuillez trouver le rapport en pièce jointe.").strip()
+
+    def _is_email(s: str) -> bool:
+        return bool(re.match(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$", s))
+
+    mail_requested = bool(to_email)
+    if mail_requested and not _is_email(to_email):
+        return {"metrics": {"m.report.export": {
+            "ok": False,
+            "error": "Adresse email invalide",
+            "run_id": run_id,
+            "to_email": to_email,
+        }}}
 
     # 0) Nettoyage legacy
     for p in [run_root / "narrative.json", run_root / "latex" / "report.tex"]:
@@ -296,10 +318,10 @@ def export_latex_pdf(*, variables: list[str], run_id: str, **params: Any) -> dic
         }}}
 
     t0 = time.time()
-    pdf_path, log_text = try_compile_pdf(run_root=run_root / "latex", tex_path=tex_master, runs=1)
+    pdf_path, log_text = build_pdf(run_root=run_root / "latex", tex_path=tex_master, runs=1)
     elapsed_s = round(time.time() - t0, 3)
 
-    export_audit = {
+    export_audit: dict[str, Any] = {
         "ok": True,
         "run_id": run_id,
         "master_tex": str(tex_master),
@@ -310,10 +332,32 @@ def export_latex_pdf(*, variables: list[str], run_id: str, **params: Any) -> dic
         "snippets_written": snippets_audit,
         "blocks": blocks_audit,
         "note": "Compilation sur latex/master.tex (blocks + snippets artefacts/text).",
+
+        # NEW: mail audit
+        "mail_requested": mail_requested,
+        "mail_sent": False,
+        "to_email": to_email or None,
     }
     if log_text:
         export_audit["pdflatex_log_head"] = log_text[:2000]
 
+    # 4) Envoi mail (si demandé et PDF OK)
+    if mail_requested:
+        if not pdf_path:
+            export_audit["mail_error"] = "PDF non généré => envoi impossible"
+        else:
+            try:
+                send_pdf_mail(
+                    to=to_email,
+                    subject=mail_subject,
+                    body=mail_body,
+                    pdf_path=Path(pdf_path),
+                )
+                export_audit["mail_sent"] = True
+            except Exception as e:
+                export_audit["mail_error"] = f"{type(e).__name__}: {e}"
+
+    # 5) Persist audit dans manifest
     base_runs_dir = run_root.parent
     try:
         rw = RunWriter(base_runs_dir=base_runs_dir, run_id=run_id)
