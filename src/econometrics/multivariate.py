@@ -521,14 +521,28 @@ def var_pack(
                 continue
             try:
                 test = res.test_causality(caused=caused, causing=causing, kind="f")
+                # --- ddl robustes (selon version statsmodels) ---
+                df_num = getattr(test, "df_num", None)
+                df_denom = getattr(test, "df_denom", None)
+
+                # fallback fréquent : test.df = (df_num, df_denom) ou test.df = df_denom
+                df_attr = getattr(test, "df", None)
+                if (df_num is None or df_denom is None) and df_attr is not None:
+                    if isinstance(df_attr, (tuple, list)) and len(df_attr) >= 2:
+                        df_num = df_num if df_num is not None else df_attr[0]
+                        df_denom = df_denom if df_denom is not None else df_attr[1]
+                    else:
+                        # parfois df est scalaire (souvent df_denom)
+                        df_denom = df_denom if df_denom is not None else df_attr
+
                 granger_rows.append(
                     {
                         "caused": caused,
                         "causing": causing,
                         "stat": _safe_float(getattr(test, "test_statistic", None)),
                         "pvalue": _safe_float(getattr(test, "pvalue", None)),
-                        "df_denom": _safe_float(getattr(test, "df_denom", None)),
-                        "df_num": _safe_float(getattr(test, "df_num", None)),
+                        "df_num": _safe_float(df_num),
+                        "df_denom": _safe_float(df_denom),
                     }
                 )
             except Exception as e:
