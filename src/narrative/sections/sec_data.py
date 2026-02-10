@@ -199,7 +199,7 @@ def render_sec_data(
     # --- Table 1: descriptives + analyse
     if t_desc:
         lines += [
-            r"\subsection*{Tableau 1 — Statistiques descriptives}",
+            r"\paragraph{Tableau 1 — Statistiques descriptives}",
             md_basic_to_tex(
                 "Lecture : contrôler l’ordre de grandeur, l’asymétrie et la dispersion. "
                 "Des extrêmes prononcés ou une distribution très dissymétrique sont cohérents avec des chocs (épidémiques, caniculaires) "
@@ -219,7 +219,7 @@ def render_sec_data(
     # --- Table 2: missing report + analyse
     if t_miss:
         lines += [
-            r"\subsection*{Tableau 2 — Valeurs manquantes}",
+            r"\paragraph{Tableau 2 — Valeurs manquantes}",
             md_basic_to_tex(
                 "Lecture : même un faible taux de manquants peut biaiser ADF/Ljung–Box si les trous sont concentrés temporellement "
                 "(rupture de collecte, anomalies de source). La règle est : documenter et éviter de lisser artificiellement."
@@ -238,7 +238,7 @@ def render_sec_data(
     # --- Table 3: coverage report + analyse
     if t_cov:
         lines += [
-            r"\subsection*{Tableau 3 — Couverture temporelle}",
+            r"\paragraph{Tableau 3 — Couverture temporelle}",
             md_basic_to_tex(
                 "Lecture : valider la continuité de l’index, la présence éventuelle de périodes incomplètes, et la cohérence du début/fin d’échantillon. "
                 "Toute discontinuité non traitée se répercute sur la dynamique (ACF/PACF), les résidus et la détection de ruptures."
