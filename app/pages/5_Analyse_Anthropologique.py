@@ -14,6 +14,7 @@ from src.utils.run_reader import get_run_files, read_manifest, read_metric_json,
 PAGE_ID = "5_Analyse_Anthropologique"
 PAGE_TITLE = "5 — Analyse anthropologique"
 
+TODD_METRIC_KEY = "m.anthro.todd_analysis"
 
 def _get_run_id() -> str | None:
     state = get_state()
@@ -49,34 +50,54 @@ def _render_analysis_block(run_id: str) -> None:
     else:
         st.json(payload)
 
-
 def _render_tables(run_id: str, items: List[Dict[str, Any]]) -> None:
     if not items:
-        st.info("Aucune table pour cette page.")
         return
 
-    for it in items:
-        key = it.get("key", "")
-        st.subheader(key or "table")
+    rendered_any = False
 
+    for it in items:
+        # On tente de lire la table ; si ça échoue, on skip sans afficher de bloc
         try:
             df = read_table_from_artefact(run_id, it)
-            st.dataframe(df, width="stretch")
-        except Exception as e:
-            st.error(f"Lecture table impossible: {it.get('path','')} ({e})")
+        except Exception:
+            continue
+
+        # Si dataframe vide / None, on skip aussi
+        if df is None or (hasattr(df, "empty") and df.empty):
+            continue
+
+        # À partir du moment où on a une table valide, on affiche
+        rendered_any = True
+        key = it.get("key", "")
+        st.subheader(key or "table")
+        st.dataframe(df, width="stretch")
+
+    # Si aucune table n'a pu être affichée, on ne montre rien (pas de "Aucune table…")
+    if not rendered_any:
+        return
 
 
 def _render_figures(run_id: str, items: List[Dict[str, Any]]) -> None:
-    if not items:
-        return
-    st.markdown("### Figures annexes")
+    # Garde uniquement les figures dont le fichier existe vraiment
+    existing: List[Dict[str, Any]] = []
     for it in items:
+        rel = it.get("path", "")
+        if not rel:
+            continue
+        p = _abs_path(run_id, rel)
+        if p.exists():
+            existing.append(it)
+
+    # Si aucune figure réelle, on n'affiche rien (pas de titre)
+    if not existing:
+        return
+
+    st.markdown("### Figures annexes")
+    for it in existing:
         st.subheader(it.get("key", "figure"))
         p = _abs_path(run_id, it.get("path", ""))
-        if p.exists():
-            st.image(str(p), width='stretch')
-        else:
-            st.error(f"Figure introuvable: {it.get('path')}")
+        st.image(str(p), width="stretch")
 
 
 def main() -> None:
@@ -98,6 +119,7 @@ def main() -> None:
     _render_tables(run_id, _filter_items(m, "tables"))
 
     mets = _filter_items(m, "metrics")
+    mets = [it for it in mets if it.get("key") != TODD_METRIC_KEY]
     if mets:
         st.markdown("### Métriques annexes")
         for it in mets:

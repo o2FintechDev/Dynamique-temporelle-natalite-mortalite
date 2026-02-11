@@ -49,16 +49,74 @@ def render_anthropology(*, facts: Dict[str, Any]) -> Dict[str, Any]:
     p_ct = tsds.get("adf_p_ct") or tsds.get("key_points", {}).get("adf_p_ct")
     p_pp = tsds.get("pp_p") or tsds.get("key_points", {}).get("pp_p")
 
+   
+
     # ---- Univarié ----
-    best = uni.get("best") if isinstance(uni, dict) else None
-    order = (best or {}).get("order")
-    aic = (best or {}).get("aic")
-    bic = (best or {}).get("bic")
+    # m.uni.best contient directement order/aic/bic (pas de champ "best")
+    best = uni if isinstance(uni, dict) else {}
+    order = best.get("order")
+    aic = best.get("aic")
+    bic = best.get("bic")
+    family = best.get("family")
 
     # ---- VAR ----
-    vars_ = var.get("vars")
-    p_var = var.get("selected_lag_aic")
-    nobs_var = var.get("nobs")
+    def _as_dict(x):
+        if isinstance(x, dict):
+            return x
+        if isinstance(x, str):
+            try:
+                return json.loads(x)
+            except Exception:
+                return {}
+        return {}
+
+    def _pick(*vals):
+        for v in vals:
+            if v is not None:
+                return v
+        return None
+
+    var = _as_dict(facts.get("m.var.meta") or {})
+    note5 = _as_dict(facts.get("m.note.step5") or {})
+    audit = _as_dict(facts.get("m.var.audit") or {})
+
+    kp5 = _as_dict(note5.get("key_points") or {})
+    audit_data = _as_dict(audit.get("data") or {})
+
+    # Vars: meta -> step5.key_points -> audit.data
+    vars_ = _pick(
+        var.get("vars"),
+        kp5.get("vars"),
+        var.get("variables"),
+        kp5.get("variables"),
+        audit_data.get("vars"),
+    )
+
+    # Lag: meta -> step5.key_points (noms alternatifs)
+    p_var = _pick(
+        var.get("selected_lag_aic"),
+        kp5.get("selected_lag_aic"),
+        var.get("lag_aic"),
+        kp5.get("lag_aic"),
+        var.get("p_aic"),
+        kp5.get("p_aic"),
+        var.get("selected_lag"),
+        kp5.get("selected_lag"),
+        var.get("lag"),
+        kp5.get("lag"),
+    )
+
+    # nobs: meta -> step5.key_points -> audit.data
+    nobs_var = _pick(
+        var.get("nobs"),
+        kp5.get("nobs"),
+        var.get("n_obs"),
+        kp5.get("n_obs"),
+        audit_data.get("nobs_stationary"),
+        audit_data.get("nobs_after_dropna"),
+        audit_data.get("nobs_raw"),
+    )
+
 
     # ---- Cointégration ----
     vars_c = coint.get("vars")
@@ -70,6 +128,7 @@ def render_anthropology(*, facts: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(coint, dict) and "rank" in coint:
             choice = "VECM" if int(coint.get("rank") or 0) > 0 else "VAR_diff"
 
+
     # ---- Narratif (Todd-like) ----
     lines = []
     lines.append(f"**Étape 7 — Lecture anthropologique (Todd) — {y}**")
@@ -78,7 +137,7 @@ def render_anthropology(*, facts: Dict[str, Any]) -> Dict[str, Any]:
     lines.append(f"- **Régime statistique (TS vs DS)** : **{verdict}**.")
     if p_c is not None and p_ct is not None:
         lines.append(f"  - ADF(c) p={float(p_c):.3g}, ADF(ct) p={float(p_ct):.3g}"
-                     + (f", PP p={float(p_pp):.3g}."))
+                     + (f", PP p={float(p_pp):.3g}." if p_pp is not None else ", PP indisponible."))
     lines.append(
         "- **Interprétation** : une série plutôt TS suggère un retour vers une trajectoire (chocs transitoires), "
         "alors qu’une DS suggère des ruptures/politiques/événements qui déplacent durablement la dynamique."
@@ -87,7 +146,7 @@ def render_anthropology(*, facts: Dict[str, Any]) -> Dict[str, Any]:
     lines.append("")
     lines.append("### 2) Dynamique courte (cycle) — lecture « conjoncturelle »")
     if order and aic is not None and bic is not None:
-        lines.append(f"- **ARIMA** : ordre={order}, AIC={float(aic):.2f}, BIC={float(bic):.2f}.")
+        lines.append(f"- **ARIMA** : famille={family}, ordre={order}, AIC={float(aic):.2f}, BIC={float(bic):.2f}.")
         lines.append(
             "- **Interprétation** : capte la persistance de court terme (inertie démographique), utile pour dater "
             "les phases de dégradation/amélioration de la croissance naturelle."
@@ -97,8 +156,10 @@ def render_anthropology(*, facts: Dict[str, Any]) -> Dict[str, Any]:
 
     lines.append("")
     lines.append("### 3) Système interne (niveau/tendance/saisonnalité) — lecture « mécanismes »")
-    if vars_ and p_var is not None:
-        lines.append(f"- **VAR** : variables={vars_}, lag AIC p={int(p_var)}, nobs={int(nobs_var or 0)}.")
+    if vars_ is not None and (p_var is not None or nobs_var is not None):
+        lag_txt = f"lag AIC p={int(p_var)}" if p_var is not None else "lag non renseigné"
+        nobs_txt = f"{int(nobs_var)}" if nobs_var is not None else "NA"
+        lines.append(f"- **VAR** : variables={vars_}, {lag_txt}, nobs={nobs_txt}.")
         lines.append(
             "- **Interprétation** : mesure la propagation des chocs entre composantes STL. "
             "Un choc de tendance peut contaminer le niveau; la saisonnalité est souvent plus « mécanique »."
@@ -107,7 +168,7 @@ def render_anthropology(*, facts: Dict[str, Any]) -> Dict[str, Any]:
             "- **Prudence** : Granger = dépendance prédictive, pas causalité sociologique."
         )
     else:
-        lines.append("- **VAR** : non disponible (étape 5 non exécutée ou meta absente).")
+        lines.append("- **VAR** : non disponible (étape 5 non exécutée ou métriques absentes).")
 
     lines.append("")
     lines.append("### 4) Long terme (régularités) — lecture « structure vs rupture »")
@@ -127,7 +188,7 @@ def render_anthropology(*, facts: Dict[str, Any]) -> Dict[str, Any]:
         lines.append("- **Cointégration/VECM** : non disponible (étape 6 non exécutée ou meta absente).")
 
     lines.append("")
-    lines.append("### 5) Ancrage historique (à compléter dans le rapport)")
+    lines.append("### 5) Ancrage historique")
     lines.append(
         "- **2008–2009** : choc macro → report des naissances, incertitude économique. "
         "- **2020–2021** : COVID → surmortalité + effets de calendrier sur naissances, puis rattrapages partiels. "
