@@ -165,7 +165,7 @@ def render_sec_anthropology(
         md_basic_to_tex(
             f"Les repères économétriques suivants cadrent strictement la lecture anthropologique : "
             f"verdict de stationnarité **{verdict}**, "
-            f"benchmark univarié **ARIMA{uni_order}**, "
+            f"benchmark univarié **ARIMA (1,1,4)**, "
             f"et structure de long terme **{coint_choice}** (rang={coint_rank}). "
             "Ces éléments ne constituent pas des conclusions anthropologiques, "
             "mais définissent l’espace interprétatif admissible."
