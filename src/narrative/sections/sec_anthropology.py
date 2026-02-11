@@ -181,21 +181,15 @@ def render_sec_anthropology(
         "",
     ]
 
-    if md:
-        lines += [
-            md_basic_to_tex(md),
-            narr_call("m.anthro.todd_analysis"),
-            "",
-        ]
-    else:
-        lines += [
-            md_basic_to_tex(
-                "En l’absence de synthèse automatisée, la lecture anthropologique "
-                "repose exclusivement sur l’analyse conceptuelle développée dans cette section, "
-                "contrainte par les résultats économétriques et par le cadre méthodologique défini."
-            ),
-            "",
-            ]
+    
+    lines += [
+        md_basic_to_tex(
+            "En l’absence de synthèse automatisée, la lecture anthropologique "
+            "repose exclusivement sur l’analyse conceptuelle développée dans cette section, "
+            "contrainte par les résultats économétriques et par le cadre méthodologique défini."
+        ),
+        "",
+    ]
 
     lines += [
         md_basic_to_tex("**Conclusion**"),
