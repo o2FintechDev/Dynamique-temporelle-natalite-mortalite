@@ -225,7 +225,7 @@ class RunWriter:
 \begin{flushleft}
 {\small Sous la supervision de :\\
 Monsieur Mestre Roman\\
-Monsieur Paraguette Maurice}
+Monsieur Parraguette Maurice}
 \end{flushleft}
 
 \end{titlepage}
@@ -248,7 +248,7 @@ Ses enseignements en économétrie, sa rigueur méthodologique et ses exigences 
 ont joué un rôle central dans la structuration de notre raisonnement empirique
 et dans la conduite de ce projet.
 
-Nous remercions également Monsieur \textbf{Paraguette Maurice}
+Nous remercions également Monsieur \textbf{Parraguette Maurice}
 pour ses interventions en tant que professionnel sur les thématiques liées à
 l'intelligence artificielle et aux modèles de langage (IA/LLM).
 Ses apports ont permis de mieux comprendre les enjeux actuels de l'automatisation
