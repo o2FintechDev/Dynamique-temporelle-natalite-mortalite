@@ -67,96 +67,180 @@ def render_sec_cointegration(
     lines: list[str] = []
 
     # ============================================================
-    # SECTION : Cadre théorique (cointégration / VECM)
+    # SECTION 1 : Cadre théorique (cointégration / VECM)
     # ============================================================
+
     lines += [
         r"\section{Cointégration et dynamique de long terme : le cadre VECM}",
         "",
         md_basic_to_tex(
-            "Les séries macroéconomiques et démographiques sont fréquemment non stationnaires mais évoluent néanmoins selon des relations "
-            "de long terme stables. La théorie de la cointégration concilie cette non-stationnarité avec l’existence d’équilibres structurels. "
-            "Dans le cadre de la croissance naturelle, la cointégration traduit l’existence d’un lien durable entre natalité, mortalité et facteurs "
-            "économiques, malgré des fluctuations de court terme."
+            "Les séries macroéconomiques et démographiques sont fréquemment caractérisées par une non-stationnarité "
+            "structurelle, résultant de tendances déterministes, de dérives stochastiques ou de ruptures de régime. "
+            "Dans ce contexte, une modélisation purement en différences, telle qu’un VAR stationnaire, "
+            "supprime l’information contenue dans les trajectoires de long terme.\n\n"
+
+            "La théorie de la cointégration permet de concilier cette non-stationnarité individuelle "
+            "avec l’existence éventuelle de relations d’équilibre structurelles. "
+            "Il peut être observé que plusieurs variables évoluent selon des tendances propres "
+            "tout en maintenant une combinaison linéaire stable au cours du temps.\n\n"
+
+            "Dans le système étudié — Croissance Naturelle, Nombre de Mariages, IPC et Masse Monétaire M3 — "
+            "des trajectoires de long terme sont observées. "
+            "Il convient dès lors de déterminer si ces trajectoires sont indépendantes "
+            "ou si elles sont liées par une ou plusieurs relations structurelles."
         ),
         "",
-        r"\subsection*{Motivation théorique de la cointégration}",
+
+        r"\subsection*{Motivation du passage du VAR au VECM}",
         md_basic_to_tex(
-            "Soient deux séries $X_t$ et $Y_t$ intégrées d’ordre 1. Individuellement, elles dérivent, mais il peut exister une combinaison "
-            "linéaire stationnaire $Z_t$ : dans ce cas, les séries sont cointégrées et un mécanisme de rappel empêche la divergence illimitée."
+            "Lorsque les variables sont intégrées d’ordre 1, un VAR estimé en différences "
+            "ne capture que la dynamique de court terme. "
+            "La composante de tendance est éliminée et toute relation d’équilibre potentielle disparaît.\n\n"
+
+            "Le modèle à correction d’erreurs (VECM) constitue une reformulation du VAR "
+            "permettant d’introduire explicitement un terme d’ajustement vers l’équilibre. "
+            "Il représente la limite théorique de la mémoire courte : "
+            "les déséquilibres de court terme sont corrigés par un mécanisme de rappel de long terme.\n\n"
+
+            "Ainsi, alors que le VAR modélise la propagation des chocs, "
+            "le VECM modélise également la force qui empêche une divergence illimitée."
+        ),
+        "",
+
+        r"\subsection*{Notion formelle de cointégration}",
+        md_basic_to_tex(
+            "Soient deux séries $X_t$ et $Y_t$ intégrées d’ordre 1. "
+            "Individuellement, ces séries présentent une dérive. "
+            "Il peut néanmoins exister une combinaison linéaire stationnaire :"
         ),
         "",
         r"\begin{equation}",
         r"Z_t = Y_t - \beta X_t \sim I(0)",
         r"\end{equation}",
         "",
-        r"\subsection*{Lien entre VAR et VECM}",
+
         md_basic_to_tex(
-            "Un VAR($p$) en variables $I(1)$ peut se réécrire en VECM, où la matrice $\Pi=\alpha\beta'$ concentre l’information de long terme : "
-            r"$\beta$ décrit les relations d’équilibre, $\alpha$ la vitesse d’ajustement."
+            "Dans ce cas, les séries sont dites cointégrées.\n\n"
+
+            "Il convient de distinguer strictement :\n"
+            "• Corrélation : co-mouvement instantané.\n"
+            "• Cointégration : relation d’équilibre de long terme.\n\n"
+
+            "La cointégration n’implique pas causalité. "
+            "Elle indique qu’un équilibre structurel contraint l’évolution conjointe des variables."
+        ),
+        "",
+
+        r"\subsection*{Approche d’Engle–Granger}",
+        md_basic_to_tex(
+            "Une première formalisation empirique de la cointégration a été proposée par Engle et Granger (1987). "
+            "La méthode repose sur une procédure en deux étapes.\n\n"
+
+            "1) Estimation par moindres carrés d’une relation de long terme en niveau.\n"
+            "2) Application d’un test de racine unitaire sur les résidus estimés.\n\n"
+
+            "Si les résidus sont stationnaires, une relation de cointégration est identifiée."
         ),
         "",
         r"\begin{equation}",
-        r"\Delta Y_t = \Pi Y_{t-1} + \sum_{i=1}^{p-1}\Gamma_i \Delta Y_{t-i} + \varepsilon_t",
+        r"Y_t = \beta_0 + \beta_1 X_t + u_t",
         r"\end{equation}",
         "",
-        r"\subsection*{Test d’Engle–Granger}",
+        
         md_basic_to_tex(
-            "Procédure en deux étapes : estimation de la relation de long terme (MCO), puis test de racine unitaire sur les résidus. "
-            "Limite : identification d’un seul vecteur de cointégration et biais de normalisation."
+            "La stationnarité de $u_t$ est alors testée.\n\n"
+
+            "Cette approche présente cependant des limites majeures :\n"
+            "• Identification d’un unique vecteur de cointégration.\n"
+            "• Sensibilité à la normalisation.\n"
+            "• Inadaptation aux systèmes multivariés.\n\n"
+
+            "Dans un cadre à quatre variables, une approche système complète s’impose."
         ),
         "",
-        r"\subsection*{Test de Johansen : cadre général}",
+
+        r"\subsection*{Approche de Johansen : analyse spectrale du système}",
         md_basic_to_tex(
-            "La méthode de Johansen détermine le rang de cointégration $r$ dans un système multivarié via l’analyse spectrale de $\\Pi$. "
-            "Les conclusions dépendent du traitement de la constante et de la tendance (choix déterministe)."
+            "La méthode de Johansen repose sur la décomposition spectrale de la matrice "
+            "issue de la représentation VAR en niveau. "
+            "Le rang de cointégration $r$ est déterminé à partir des valeurs propres estimées.\n\n"
+
+            "Tester la cointégration revient à déterminer le nombre de relations "
+            "de long terme indépendantes reliant les variables du système."
         ),
         "",
-        r"\subsection*{Statistiques de test}",
-        "",
+
         r"\begin{equation}",
         r"\lambda_{\text{trace}}(r) = -T\sum_{i=r+1}^{k}\ln(1-\hat{\lambda}_i)",
         r"\end{equation}",
+        "",
         r"\begin{equation}",
         r"\lambda_{\max}(r,r+1) = -T\ln(1-\hat{\lambda}_{r+1})",
         r"\end{equation}",
         "",
-        r"\subsection*{Choix de la composante déterministe}",
+
         md_basic_to_tex(
-            "Cinq cas standards (constante/tendance restreinte ou non). Un mauvais choix déforme le rang estimé. "
-            "La décision doit rester cohérente avec le profil des séries et les diagnostics amont."
+            "Ces statistiques reposent sur les valeurs propres $\hat{\lambda}_i$ de la matrice du système. "
+            "Plus ces valeurs sont élevées, plus l’existence d’un vecteur de cointégration est probable.\n\n"
+
+            "Une attention particulière doit être portée au choix de la composante déterministe "
+            "(constante libre, constante restreinte, tendance). "
+            "Une dérive mal spécifiée peut conduire à une mauvaise estimation du rang."
         ),
         "",
-        r"\subsection*{Interprétation du rang}",
-        md_basic_to_tex(
-            r"$r=0$ : pas de relation de long terme (VAR en différences). "
-            r"$r=1$ : équilibre unique (souvent plausible en démographie). "
-            r"$r>1$ : plusieurs équilibres structurels."
-        ),
-        "",
-        r"\subsection*{Estimation du VECM}",
+
+        r"\subsection*{Représentation VECM}",
         "",
         r"\begin{equation}",
-        r"\Delta Y_t = \alpha\beta'Y_{t-1} + \sum_{i=1}^{p-1}\Gamma_i\Delta Y_{t-i} + \varepsilon_t",
+        r"\Delta Y_t = \alpha \beta' Y_{t-1} + \sum_{i=1}^{p-1}\Gamma_i \Delta Y_{t-i} + \varepsilon_t",
         r"\end{equation}",
         "",
-        r"\subsection*{Vitesse d’ajustement}",
+
         md_basic_to_tex(
-            "Si un coefficient d’ajustement $\\alpha_i < 0$ et significatif, la variable contribue au retour vers l’équilibre. "
-            "Une mesure intuitive du temps moyen de correction est $\\tau = 1/\\lvert\\alpha_i\\rvert$."
+            "La matrice $\beta$ contient les vecteurs de cointégration "
+            "et décrit les relations d’équilibre.\n\n"
+
+            "La matrice $\alpha$ contient les coefficients d’ajustement. "
+            "Un coefficient $\alpha_i$ négatif et significatif indique "
+            "que la variable contribue au rétablissement de l’équilibre.\n\n"
+
+            "Le VECM est estimé à partir des séries en niveau "
+            "afin de préserver l’information de long terme."
         ),
         "",
+
+        r"\subsection*{Temps moyen d’ajustement}",
+        "",
         r"\begin{equation}",
-        r"\tau=\frac{1}{|\alpha|}",
+        r"\tau = \frac{1}{|\alpha|}",
         r"\end{equation}",
         "",
-        r"\subsection*{Implications économiques}",
         md_basic_to_tex(
-            "La cointégration implique une cohérence structurelle de long terme : absence de divergence illimitée, "
-            "et articulation explicite entre dynamique de court terme et équilibre démographique. "
-            "Le VECM est l’outil central pour formaliser cette articulation."
+            "Le paramètre $\tau$ fournit une approximation du temps moyen "
+            "nécessaire pour corriger un déséquilibre.\n\n"
+
+            "Un choc de court terme — sanitaire, géopolitique ou monétaire — "
+            "est ainsi inscrit dans une dynamique de long terme. "
+            "La correction vers l’équilibre structurel est progressive."
+        ),
+        "",
+
+        r"\subsection*{Interprétation économique du rang}",
+        md_basic_to_tex(
+        r"$r=0$ : absence de relation de long terme (VAR en différences). "
+            r"$r=1$ : existence d’un équilibre structurel unique. "
+            r"$r>1$ : présence de plusieurs équilibres imbriqués.\n\n"
+
+            "Dans un système à quatre variables, un rang strictement positif "
+            "signifie qu’une combinaison stable relie la dynamique démographique "
+            "aux variables économiques.\n\n"
+
+            "Le VECM constitue ainsi l’outil central permettant d’articuler "
+            "dynamique de court terme et équilibre de long terme."
         ),
         "",
     ]
+
 
     # ============================================================
     # SECTION 2 : Résultats empiriques (Step6)
