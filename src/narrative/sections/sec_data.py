@@ -230,19 +230,23 @@ def render_sec_data(
     if t_desc:
         lines += [
             r"\paragraph{Tableau 1 — Statistiques descriptives}",
-            md_basic_to_tex(
-                "Lecture : contrôler l’ordre de grandeur, l’asymétrie et la dispersion. "
-                "Des extrêmes prononcés ou une distribution très dissymétrique sont cohérents avec des chocs (épidémiques, caniculaires) "
-                "et imposent de vérifier la robustesse des tests et diagnostics."
-            ),
+            
             "",
             include_table_tex(
                 run_root=run_root,
                 tbl_rel=t_desc,
-                caption="tbl.data.desc_stats",
-                label="tab:tbl-data-desc-stats",
+                caption="Statistiques descriptives des variables étudiées",
+                label="tab:data_desc_stats",
             ),
-            narr_call("tbl.data.desc_stats"),
+            "",
+            md_basic_to_tex(
+                "Lecture : ce tableau permet de contrôler l’ordre de grandeur, "
+                "la dispersion (écart-type), ainsi que l’éventuelle asymétrie.\n\n"
+                "Des valeurs extrêmes ou une forte volatilité sont cohérentes "
+                "avec des chocs démographiques (épidémies, crises sanitaires, canicules).\n\n"
+                "Une dispersion élevée impose de vérifier la robustesse "
+                "des tests de stationnarité et des diagnostics ultérieurs."
+            ),
             "",
         ]
 
@@ -250,18 +254,23 @@ def render_sec_data(
     if t_miss:
         lines += [
             r"\paragraph{Tableau 2 — Valeurs manquantes}",
-            md_basic_to_tex(
-                "Lecture : même un faible taux de manquants peut biaiser ADF/Ljung–Box si les trous sont concentrés temporellement "
-                "(rupture de collecte, anomalies de source). La règle est : documenter et éviter de lisser artificiellement."
-            ),
+
             "",
             include_table_tex(
                 run_root=run_root,
                 tbl_rel=t_miss,
-                caption="tbl.data.missing_report",
-                label="tab:tbl-data-missing-report",
+                caption="Rapport des valeurs manquantes",
+                label="tab:data_missing_report",
             ),
-            narr_call("tbl.data.missing_report"),
+            "",
+            md_basic_to_tex(
+                "Lecture : même un faible taux de données manquantes peut biaiser "
+                "les tests ADF ou Ljung–Box si les absences sont concentrées temporellement.\n\n"
+                "Une discontinuité de collecte peut artificiellement créer "
+                "une rupture structurelle.\n\n"
+                "La règle méthodologique est de documenter précisément "
+                "et d’éviter toute interpolation arbitraire."
+            ),
             "",
         ]
 
@@ -269,50 +278,50 @@ def render_sec_data(
     if t_cov:
         lines += [
             r"\paragraph{Tableau 3 — Couverture temporelle}",
-            md_basic_to_tex(
-                "Lecture : valider la continuité de l’index, la présence éventuelle de périodes incomplètes, et la cohérence du début/fin d’échantillon. "
-                "Toute discontinuité non traitée se répercute sur la dynamique (ACF/PACF), les résidus et la détection de ruptures."
-            ),
+
             "",
             include_table_tex(
                 run_root=run_root,
                 tbl_rel=t_cov,
-                caption="tbl.data.coverage_report",
-                label="tab:tbl-data-coverage-report",
+                caption="Couverture temporelle de l’échantillon",
+                label="tab:data_coverage_report",
             ),
-            narr_call("tbl.data.coverage_report"),
+            "",
+            md_basic_to_tex(
+                "Lecture : validation de la continuité de l’index mensuel.\n\n"
+                "Toute rupture de périodicité affecte directement "
+                "la structure d’autocorrélation (ACF/PACF), "
+                "la détection de ruptures et la cohérence des modèles dynamiques.\n\n"
+                "La stabilité temporelle constitue un prérequis "
+                "à toute modélisation VAR ou VECM."
+            ),
             "",
         ]
-        # --- Table 4: vars audit + analyse
+
+    # --- Table 4: vars audit + analyse
     if t_vars:
         lines += [
             r"\paragraph{Tableau 4 — Audit des variables (présentes / manquantes)}",
-            md_basic_to_tex(
-                "Lecture : ce tableau documente la disponibilité effective des variables demandées. "
-                "Toute variable manquante doit être soit retirée du plan VAR/VECM, soit remplacée par un proxy cohérent."
-            ),
+
             "",
             include_table_tex(
                 run_root=run_root,
                 tbl_rel=t_vars,
-                caption="tbl.data.vars_audit",
-                label="tab:tbl-data-vars-audit",
+                caption="Audit de disponibilité des variables",
+                label="tab:data_vars_audit",
             ),
-            narr_call("tbl.data.vars_audit"),
             "",
-        ]
-    # --- Note Step1 (optionnelle)
-    if note_md.strip():
-        lines += [
-            r"\textbf{Synthèse automatisée}",
+
             md_basic_to_tex(
-                "Cette note sert d’audit : elle doit rester cohérente avec les trois diagnostics ci-dessus. "
-                "Toute mention de correction/interpolation doit être explicitée et traçable."
+                "Lecture : ce tableau documente la disponibilité effective "
+                "des variables requises pour le plan économétrique.\n\n"
+                "Toute variable absente impose soit une révision "
+                "du plan VAR/VECM, soit l’introduction d’un proxy économiquement cohérent.\n\n"
+                "La cohérence du système multivarié dépend directement "
+                "de cette validation initiale."
             ),
             "",
-            md_basic_to_tex(note_md),
-            narr_call("m.note.step1"),
-            "",
+
         ]
 
     # Conclusion
