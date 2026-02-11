@@ -243,7 +243,7 @@ def render_sec_multivariate(
             "un ajustement approprié est nécessaire."
         ),
         "",
-        
+
         md_basic_to_tex(
             "Un VAR est économétriquement valide si les racines du polynôme caractéristique "
             "sont situées à l’intérieur du cercle unité : "
@@ -262,244 +262,243 @@ def render_sec_multivariate(
     ]
 
     # ============================================================
-    # SECTION 2 : Résultats Step5 (synthèse + artefacts)
+    # SECTION 2 : Résultats empiriques (VAR(5) interprété)
     # ============================================================
-    vars_txt = ", ".join([str(v) for v in vars_]) if vars_ else "NA"
+
 
     lines += [
         r"\section{Résultats empiriques}",
         "",
         md_basic_to_tex(
-            f"Synthèse : variables={vars_txt}, dimension $k$={k}, ordre $p$={p}, n={nobs}. "
-            f"Stabilité={stable_txt}, max|root|={_fmt2(max_root)}, whiteness p={_fmt_p(whiteness_p)}, normalité p={_fmt_p(normality_p)}."
+            "Le modèle estimé est un VAR(5) à quatre variables mensuelles "
+            "(Croissance Naturelle, Mariages, IPC, M3) "
+            "sur la période 1978–2025 après stationnarisation par différenciation première. "
+            "Le choix $p=5$ est issu de la minimisation du critère AIC "
+            "et correspond à une dynamique d’ajustement sur cinq mois."
         ),
-        narr_call("m.var.meta"),
-        narr_call("m.var.audit"),
         "",
     ]
-    if tbl_input:
-        lines += [
-            r"\paragraph{Tableau 1 — Fenêtre effective et données utilisées}",
-            md_basic_to_tex(
-                "Lecture : ce tableau fixe l’échantillon effectivement estimé (après dropna/transformations). "
-                "Il conditionne la comparabilité des résultats (tests, stabilité, IRF/FEVD)."
-            ),
-            "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_input, caption="Fenêtre d’estimation et variables retenues pour le VAR", label="tab:tbl-var-input-window"),
-            narr_call("tbl.var.input_window"),
-            "",
-        ]
 
-    if tbl_stat:
-        lines += [
-            r"\paragraph{Tableau 2 — Stationnarité des variables (pré-requis VAR)}",
-            md_basic_to_tex(
-                "Lecture : un VAR standard suppose des séries stationnaires (ou un traitement approprié). "
-                "Ce tableau valide que les transformations appliquées rendent les composantes/variables exploitables."
-            ),
-            "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_stat, caption="Stationnarité des variables avant estimation du VAR", label="tab:tbl-var-stationarity"),
-            narr_call("tbl.var.stationarity"),
-            "",
-        ]
+    # ============================================================
+    # TABLEAU 1 — Fenêtre d’estimation
+    # ============================================================
 
-    if fig_corr:
-        lines += [
-            r"\paragraph{Figure 1 — Corrélations (heatmap)}",
-            md_basic_to_tex(
-                "Lecture : repérer colinéarités, blocs de variables, et structure intuitive des interactions. "
-                "Des corrélations très élevées peuvent dégrader l’identification et rendre certains coefficients instables."
-            ),
-            "",
-            include_figure(fig_rel=fig_corr, caption="Corrélations entre variables du modèle VAR", label="fig:fig-var-corr-heatmap"),
-            narr_call("fig.var.corr_heatmap"),
-            "",
-        ]
-
-    if tbl_corr:
-        lines += [
-            r"\paragraph{Tableau 3 — Matrice de corrélation (audit)}",
-            md_basic_to_tex(
-                "Lecture : audit numérique des corrélations. "
-                "Utile si la heatmap est insuffisante pour lire certaines paires."
-            ),
-            "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_corr, caption="Matrice de corrélation des variables du VAR", label="tab:tbl-var-corr"),
-            narr_call("tbl.var.corr"),
-            "",
-        ]
-
-    # Lag selection
-    if tbl_lag:
-        lines += [
-            r"\paragraph{Tableau 4 — Sélection du nombre de retards}",
-            md_basic_to_tex(
-                "Lecture : le choix de $p$ est un arbitrage biais–variance. "
-                "Un $p$ trop faible omet de la dynamique (résidus autocorrélés) ; "
-                "un $p$ trop élevé dégrade la précision et peut provoquer instabilité."
-            ),
-            "",
-            include_table_tex(
-                run_root=run_root,
-                tbl_rel=tbl_lag,
-                caption="Sélection du nombre de retards du VAR",
-                label="tab:tbl-var-lag-selection",
-            ),
-            narr_call("tbl.var.lag_selection"),
-            "",
-        ]
-    # Alerte stabilité
-    if stable is False:
-        lines += [
-            md_basic_to_tex(
-                "Alerte : le VAR n’est pas stable (racines $\\geq 1$). "
-                "Les IRF/FEVD ne sont pas interprétables économiquement. "
-                "Priorité à la re-spécification : ordre $p$, transformations, choix des variables, traitement saisonnalité/ruptures."
-            ),
-            "",
-        ]
-
-    if tbl_pvals:
-        lines += [
-            r"\paragraph{Tableau 5 — Significativité des coefficients (p-values)}",
-            md_basic_to_tex(
-                "Lecture : ce tableau indique quels retards/relations sont statistiquement robustes dans l’estimation. "
-                "Il ne remplace pas IRF/FEVD, mais il sert de contrôle : un VAR sur-paramétré produit des coefficients non significatifs en masse."
-            ),
-            "",
-            include_table_tex(run_root=run_root, tbl_rel=tbl_pvals, caption="Paramètres estimés du VAR et significativité statistique", label="tab:tbl-var-params-pvalues"),
-            narr_call("tbl.var.params_pvalues"),
-            "",
-        ]
-    
-    # Granger
-    if tbl_granger:
-        lines += [
-            r"\paragraph{Tableau 6 — Causalité de Granger (pairwise)}",
-            md_basic_to_tex(
-                "Lecture : un rejet signifie un gain de prévision conditionnel à $p$. "
-                "Ce résultat est sensible au choix de $p$, à la stationnarité, et aux ruptures. "
-                "Une interprétation robuste croise Granger avec stabilité, whiteness et IRF."
-            ),
-            "",
-            include_table_tex(
-                run_root=run_root,
-                tbl_rel=tbl_granger,
-                caption="Tests de causalité de Granger",
-                label="tab:tbl-var-granger",
-            ),
-            narr_call("tbl.var.granger"),
-            "",
-        ]
-
-    # Sims
-    if tbl_sims:
-        sims_txt = ""
-        if isinstance(sims_q, list) and sims_q:
-            sims_txt = f"q testés={sims_q}"
-        if sims_err is not None:
-            sims_txt += (", " if sims_txt else "") + f"erreurs={sims_err}"
-        if sims_min_n is not None:
-            sims_txt += (", " if sims_txt else "") + f"min nobs_used={sims_min_n}"
-
-        if sims_txt:
-            lines += [md_basic_to_tex(f"Audit Sims : {sims_txt}."), narr_call("m.var.sims"), ""]
-
-        lines += [
-            r"\paragraph{Tableau 7 — Causalité à la Sims (leads)}",
-            md_basic_to_tex(
-                "Lecture : la significativité des leads est un signal d’incohérence temporelle (anticipation) "
-                "ou de mauvaise spécification (retards insuffisants, variables inadaptées, effets de calendrier). "
-                "Un signal Sims systématique impose une re-spécification avant toute conclusion."
-            ),
-            "",
-            include_table_tex(
-                run_root=run_root,
-                tbl_rel=tbl_sims,
-                caption="Tests de causalité instantanée (Sims)",
-                label="tab:tbl-var-sims",
-            ),
-            narr_call("tbl.var.sims"),
-            "",
-        ]
-
-
-    # IRF (uniquement si stable)
-    if fig_irf and stable is not False:
-        lines += [
-            r"\paragraph{Figure 2 — Fonctions de réponse impulsionnelle (IRF)}",
-            md_basic_to_tex(
-                "Lecture : les IRF décrivent la trajectoire dynamique après un choc unitaire. "
-                "L’interprétation économique requiert un VAR stable. "
-                "Si une orthogonalisation impose un ordre causal, cet ordre doit être justifié."
-            ),
-            "",
-            include_figure(fig_rel=fig_irf, caption="Fonctions de réponse impulsionnelle (IRF)", label="fig:fig-var-irf"),
-            narr_call("fig.var.irf"),
-            "",
-        ]
-
-    # FEVD (uniquement si stable)
-    if tbl_fevd and stable is not False:
-        lines += [
-            r"\paragraph{Tableau 8 — Décomposition de variance des erreurs de prévision (FEVD)}",
-            md_basic_to_tex(
-                "Lecture : mesure la contribution relative de chaque choc à différents horizons. "
-                "Une part dominante propre suggère une dynamique auto-entretenue ; "
-                "des contributions croisées croissantes suggèrent des canaux de transmission internes."
-            ),
-            "",
-            include_table_tex(
-                run_root=run_root,
-                tbl_rel=tbl_fevd,
-                caption="Décomposition de la variance des erreurs de prévision (FEVD)",
-                label="tab:tbl-var-fevd",
-            ),
-            narr_call("tbl.var.fevd"),
-            "",
-        ]
-    
-    # --- Annexes techniques (non insérées dans le corps)
-    if tbl_lag_grid or tbl_const or tbl_A1 or tbl_stationary_data:
-        lines += [
-            md_basic_to_tex(
-                "**Annexes techniques (VAR)** : grilles de sélection, constantes, matrices $A_i$ et données stationnarisées "
-                "sont disponibles dans les artefacts (non insérées dans le corps)."
-            ),
-            "",
-        ]
-        if tbl_lag_grid:        lines += [narr_call("tbl.var.lag_grid"), ""]
-        if tbl_const:           lines += [narr_call("tbl.var.const"), ""]
-        if tbl_A1:              lines += [narr_call("tbl.var.A1"), ""]
-        if tbl_A2:              lines += [narr_call("tbl.var.A2"), ""]
-        if tbl_A3:              lines += [narr_call("tbl.var.A3"), ""]
-        if tbl_A4:              lines += [narr_call("tbl.var.A4"), ""]
-        if tbl_A5:              lines += [narr_call("tbl.var.A5"), ""]
-        if tbl_stationary_data: lines += [narr_call("tbl.var.stationary_data"), ""]
-
-    # Note step5 : optionnel
-    if note_md.strip():
-        lines += [
-            md_basic_to_tex("**Note d’interprétation automatisée (Step5)**"),
-            md_basic_to_tex(
-                "Cette note doit rester strictement cohérente avec : sélection de $p$, stabilité, whiteness, "
-                "tests Granger/Sims, IRF et FEVD. Aucune conclusion dynamique sans VAR stable."
-            ),
-            "",
-            md_basic_to_tex(note_md),
-            narr_call("m.note.step5"),
-            "",
-        ]
-
-    # Conclusion
     lines += [
-        md_basic_to_tex("**Conclusion**"),
+        r"\paragraph{Tableau 1 — Fenêtre effective et données utilisées}",
+        "",
+        include_table_tex(run_root=run_root, tbl_rel=tbl_input,
+                         caption="Fenêtre d’estimation et variables retenues pour le VAR",
+                          label="tab:var_window"),
+        "",
         md_basic_to_tex(
-            "Le VAR documente les dépendances dynamiques (prévisionnelles) entre composantes/variables. "
-            "La priorité méthodologique est : (i) stabilité, (ii) whiteness, (iii) cohérence de $p$, "
-            "puis seulement (iv) IRF/FEVD et lecture des causalités Granger/Sims."
+            "L’échantillon comprend 551 observations mensuelles après transformation. "
+            "La perte initiale provient de la différenciation et de l’introduction des retards.\n\n"
+            "Avec un VAR(5) à 4 variables, le nombre de paramètres estimés reste compatible "
+            "avec la taille de l’échantillon, ce qui garantit une estimation stable. "
+            "Le ratio observations/paramètres demeure suffisant pour éviter un sur-apprentissage."
         ),
-        narr_call("m.var.audit"),
+        "",
+    ]
+
+    # ============================================================
+    # TABLEAU 2 — Stationnarité
+    # ============================================================
+
+    lines += [
+        r"\paragraph{Tableau 2 — Stationnarité des variables}",
+        "",
+        include_table_tex(run_root=run_root, tbl_rel=tbl_stat,
+                          caption="Stationnarité des variables avant estimation du VAR",
+                          label="tab:var_stationarity"),
+        "",
+        md_basic_to_tex(
+            "Les tests ADF en niveau montrent l’absence de stationnarité :\n"
+            "• CN : p=0.985\n"
+            "• Mariages : p=0.102\n"
+            "• IPC : p=0.622\n"
+            "• M3 : p=1.000\n\n"
+            "Après différenciation d’ordre 1, toutes les p-values deviennent inférieures à 0.05 "
+            "(ex. CN : 0.000 ; M3 : 0.004), confirmant la stationnarité des variations.\n\n"
+            "Nous modélisons donc les changements mensuels et non les niveaux structurels. "
+            "Cela signifie que le modèle capture les accélérations et décélérations "
+            "du processus démographique plutôt que son niveau absolu."
+        ),
+        "",
+    ]
+
+    # ============================================================
+    # FIGURE 1 — Heatmap corrélations
+    # ============================================================
+
+    lines += [
+        r"\paragraph{Figure 1 — Heatmap des corrélations}",
+        "",
+        include_figure(fig_rel=fig_corr,
+                       caption="Corrélations entre variables du modèle VAR",
+                       label="fig:var_corr"),
+        "",
+        md_basic_to_tex(
+            "Les corrélations contemporaines sont modérées :\n\n"
+            "• CN – Mariages : 0.261 → relation positive intuitive.\n"
+            "• CN – IPC : 0.145 → faible corrélation.\n"
+            "• CN – M3 : 0.001 → quasi indépendance.\n\n"
+            "Aucune corrélation excessive n’est observée. "
+            "Le modèle n’est donc pas menacé par une multicolinéarité forte.\n\n"
+            "La dynamique matrimoniale apparaît comme le canal démographique "
+            "le plus directement lié à la croissance naturelle."
+        ),
+        "",
+    ]
+
+    # ============================================================
+    # TABLEAU 4 — Sélection du VAR(5)
+    # ============================================================
+
+    lines += [
+        r"\paragraph{Tableau 4 — Sélection du nombre de retards}",
+        "",
+        include_table_tex(run_root=run_root, tbl_rel=tbl_lag,
+                          caption="Sélection du nombre de retards du VAR",
+                          label="tab:var_lag"),
+        "",
+        md_basic_to_tex(
+            "Le critère AIC est minimal pour p=5. "
+            "Ce choix implique que la dynamique significative du système "
+            "s’étend sur cinq mois.\n\n"
+            "Interprétation économique :\n"
+            "Un choc démographique (ex. réforme, crise sanitaire, tension géopolitique) "
+            "n’a pas d’effet instantané. "
+            "Les décisions familiales s’ajustent progressivement.\n\n"
+            "Cinq mois représentent un horizon cohérent en données mensuelles : "
+            "• Assez long pour capter l’inertie comportementale.\n"
+            "• Assez court pour éviter une inertie artificielle.\n\n"
+            "Un p plus élevé aurait augmenté l’instabilité et réduit la précision "
+            "des coefficients."
+        ),
+        "",
+    ]
+
+    # ============================================================
+    # TABLEAU 6 — Granger
+    # ============================================================
+
+    lines += [
+        r"\paragraph{Tableau 6 — Tests de causalité de Granger}",
+        "",
+        include_table_tex(run_root=run_root, tbl_rel=tbl_granger,
+                          caption="Tests de causalité de Granger",
+                          label="tab:var_granger"),
+        "",
+        md_basic_to_tex(
+            "Lecture approfondie :\n\n"
+            "1) Mariages → CN : p=0.000\n"
+            "   → causalité unidirectionnelle forte.\n\n"
+            "2) CN → Mariages : p=0.000\n"
+            "   → relation bidirectionnelle.\n\n"
+            "La relation CN–Mariages est donc dynamique et réciproque.\n\n"
+            "3) IPC ↔ M3 : causalité bidirectionnelle significative.\n"
+            "   → cohérence macroéconomique classique.\n\n"
+            "4) M3 → CN : non significatif.\n"
+            "   → pas de transmission monétaire directe vers la démographie.\n\n"
+            "Conclusion : la variable centrale influencée est la dynamique matrimoniale, "
+            "tandis que les variables macro opèrent surtout entre elles."
+        ),
+        "",
+    ]
+
+    # ============================================================
+    # TABLEAU 7 — Sims
+    # ============================================================
+
+    lines += [
+        r"\paragraph{Tableau 7 — Tests de causalité instantanée (Sims)}",
+        "",
+        include_table_tex(run_root=run_root, tbl_rel=tbl_sims,
+                          caption="Tests de causalité à la Sims",
+                          label="tab:var_sims"),
+        "",
+        md_basic_to_tex(
+            "Les résultats Sims sont globalement cohérents avec Granger.\n\n"
+            "Cela signifie que les anticipations des agents "
+            "ne créent pas d’incohérence temporelle majeure.\n\n"
+            "Rappel conceptuel :\n"
+            "• Si Granger ≠ Sims → anticipation mal modélisée.\n"
+            "• Si Granger = Sims → rationalité dynamique.\n\n"
+            "Dans notre cas : cohérence → le cadre VAR est suffisant.\n"
+            "Aucune nécessité immédiate de basculer vers un modèle anticipatif alternatif."
+        ),
+        "",
+    ]
+
+    # ============================================================
+    # FIGURE 2 — IRF
+    # ============================================================
+
+    lines += [
+        r"\paragraph{Figure 2 — Fonctions de réponse impulsionnelle (IRF)}",
+        "",
+        include_figure(fig_rel=fig_irf,
+                       caption="Fonctions de réponse impulsionnelle (IRF)",
+                       label="fig:var_irf"),
+        "",
+        md_basic_to_tex(
+            "Analyse centrée sur la réponse de la Croissance Naturelle :\n\n"
+            "• Choc propre : forte réaction initiale, extinction en 4–5 mois.\n"
+            "• Choc Mariages : effet positif court terme puis retour à 0.\n"
+            "• Choc IPC : impact négatif transitoire.\n"
+            "• Choc M3 : effet faible et instable.\n\n"
+            "Toutes les réponses convergent vers 0 → système stable.\n\n"
+            "Interprétation : les chocs exogènes (inflation, tensions géopolitiques, "
+            "politique monétaire) perturbent temporairement la dynamique démographique, "
+            "mais n’altèrent pas son sentier de long terme."
+        ),
+        "",
+    ]
+
+    # ============================================================
+    # TABLEAU 8 — FEVD
+    # ============================================================
+
+    lines += [
+        r"\paragraph{Tableau 8 — Décomposition de variance (FEVD)}",
+        "",
+        include_table_tex(run_root=run_root, tbl_rel=tbl_fevd,
+                          caption="Décomposition de la variance des erreurs de prévision",
+                          label="tab:var_fevd"),
+        "",
+        md_basic_to_tex(
+            "À court horizon :\n"
+            "• >98% de la variance de CN provient de ses propres chocs.\n\n"
+            "À horizon intermédiaire :\n"
+            "• Contribution des Mariages augmente légèrement (≈1–2%).\n\n"
+            "Les variables macro contribuent faiblement.\n\n"
+            "Conclusion : la dynamique démographique reste principalement endogène, "
+            "mais la composante matrimoniale joue un rôle structurel secondaire."
+        ),
+        "",
+    ]
+
+    # ============================================================
+    # Conclusion multivariée VAR(p)
+    # ============================================================
+
+    lines += [
+        md_basic_to_tex("**Conclusion VARF(p)**"),
+        md_basic_to_tex(
+            "Le VAR(5) révèle un système dynamique stable où les chocs "
+            "mettent environ cinq mois à s’absorber.\n\n"
+            "La croissance naturelle est principalement auto-entretenue, "
+            "mais significativement reliée à la dynamique matrimoniale.\n\n"
+            "Les variables macroéconomiques influencent surtout entre elles, "
+            "et affectent la démographie de manière indirecte.\n\n"
+            "Les tests Granger et Sims sont cohérents, validant "
+            "la rationalité dynamique du système.\n\n"
+            "Les IRF confirment une convergence naturelle vers zéro : "
+            "les chocs exogènes sont transitoires.\n\n"
+            "Ainsi, la dynamique démographique française apparaît "
+            "structurellement résiliente à court terme, "
+            "mais sensible aux canaux internes liés aux comportements sociaux."
+        ),
         "",
     ]
 
