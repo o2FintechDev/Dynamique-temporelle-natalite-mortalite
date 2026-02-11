@@ -130,45 +130,133 @@ def render_sec_multivariate(
     lines: list[str] = []
 
     # ============================================================
-    # SECTION: Cadre VAR (théorie + conditions)
+    # SECTION 1 : Cadre VAR (théorie + périmètre + conditions)
     # ============================================================
+
     lines += [
         r"\section{Analyse multivariée : modèles VAR et dépendances dynamiques}",
         "",
         md_basic_to_tex(
-            "L’analyse univariée décrit la dynamique propre de la série cible, mais ne permet pas de caractériser "
-            "les interactions internes entre composantes (tendance, saisonnalité, résidu) ou variables liées. "
-            "Le modèle VAR (Vector AutoRegression) fournit un cadre standard pour capturer ces dépendances dynamiques "
-            "sans imposer de restrictions structurelles a priori."
+            "L’analyse univariée permet de caractériser la dynamique propre de la croissance naturelle, "
+            "mais elle ne capture pas les interactions potentielles entre variables économiques et sociales "
+            "susceptibles d’influencer cette dynamique. "
+            "L’approche multivariée vise précisément à modéliser ces interdépendances."
         ),
         "",
-        r"\subsection*{5.1 Spécification du modèle VAR}",
+        md_basic_to_tex(
+            "Le périmètre de l’étude est ici ajusté à la période 1978–2025 en fréquence mensuelle, "
+            "afin de garantir la disponibilité homogène de l’ensemble des variables retenues. "
+            "L’analyse repose désormais sur un système à quatre variables :"
+        ),
+        "",
+
+        md_basic_to_tex(
+            r"$Y_1$ : croissance naturelle (CN); "
+            r"$Y_2$ : nombre de mariages ; "
+            r"$Y_3$ : indice des prix à la consommation (IPC) ; "
+            r"$Y_4$ : masse monétaire M3."
+        ),
+        "",
+
+        md_basic_to_tex(
+            "Le choix de ces variables répond à une logique économique et démographique cohérente. "
+            "Le nombre de mariages constitue un indicateur avancé des dynamiques familiales, "
+            "potentiellement liées à la fécondité. "
+            "L’IPC capte les tensions inflationnistes susceptibles d’affecter les décisions de consommation "
+            "et d’investissement des ménages, y compris les décisions liées à la natalité. "
+            "La masse monétaire M3 reflète les conditions monétaires et financières de long terme, "
+            "susceptibles d’influencer indirectement l’environnement macroéconomique et social."
+        ),
+        "",
+    ]
+
+    # -----------------------------
+    # Spécification du VAR
+    # -----------------------------
+
+    lines += [
+        r"\subsection*{Spécification du modèle VAR}",
         "",
         r"\begin{equation}",
         r"Y_t = c + A_1 Y_{t-1} + A_2 Y_{t-2} + \cdots + A_p Y_{t-p} + \varepsilon_t",
         r"\end{equation}",
         "",
         md_basic_to_tex(
-            "où $Y_t$ est un vecteur de dimension $k$ et $p$ l’ordre du VAR. "
-            "Les coefficients sont rarement interprétés individuellement ; l’analyse se concentre sur : "
-            "(i) causalité de Granger, (ii) réponses impulsionnelles (IRF), (iii) décomposition de variance (FEVD)."
+            "Un VAR(p) à $k$ variables — ici $k=4$ — est un vecteur auto-régressif "
+            "dans lequel chaque variable est expliquée par ses propres retards "
+            "et par les retards des autres variables du système. "
+            "Le vecteur des résidus $\\varepsilon_t$ contient un choc par équation : "
+            "il s’agit de chocs spécifiques à chaque variable, supposés non autocorrélés "
+            "et contemporanément corrélés de manière contrôlée."
         ),
         "",
-        r"\subsection*{5.2 Conditions de validité et diagnostics}",
+
         md_basic_to_tex(
-            "Un VAR exploitable économétriquement doit satisfaire au minimum : "
-            "(i) stabilité (racines strictement à l’intérieur du cercle unité), "
-            "(ii) résidus raisonnablement non autocorrélés (whiteness), "
-            "(iii) cohérence de l’ordre $p$ (arbitrage biais–variance). "
-            "Sans stabilité, IRF/FEVD ne sont pas interprétables."
+            "La question de savoir « qui choque en premier » dépend de l’intuition économique "
+            "et de l’ordonnancement retenu pour l’identification des chocs (décomposition de Cholesky). "
+            "Le VAR réduit ne permet pas d’identifier une causalité structurelle, "
+            "mais uniquement des relations dynamiques internes au système."
         ),
         "",
-        r"\subsection*{5.3 Statut des tests de causalité}",
+    ]
+
+    # -----------------------------
+    # Choix de l’ordre p
+    # -----------------------------
+
+    lines += [
+        r"\subsection*{Choix de l’ordre $p$}",
         md_basic_to_tex(
-            "Causalité de Granger : dépendance prédictive (gain de prévision). "
-            "Causalité à la Sims (leads) : test de robustesse anticipatif ; un signal sur des valeurs futures peut révéler "
-            "une mauvaise spécification (retards insuffisants, variables mal choisies, transformations inadéquates) "
-            "ou des effets de calendrier/mesure. Aucun de ces tests n’établit une causalité structurelle."
+            "Le choix du nombre de retards $p$ est crucial. "
+            "Plus $p$ est élevé, plus le nombre de paramètres à estimer augmente rapidement, "
+            "ce qui dégrade la précision des estimations et peut introduire des coefficients non significatifs."
+        ),
+        "",
+        md_basic_to_tex(
+            "En données annuelles, un VAR(3) signifierait qu’un choc met trois ans à s’absorber, "
+            "ce qui représenterait une inertie extrêmement forte. "
+            "En données mensuelles, un VAR(6) correspondrait à un horizon d’ajustement de six mois : "
+            "cela peut paraître élevé, mais demeure plausible en présence de chocs macroéconomiques "
+            "ou de changements de régime."
+        ),
+        "",
+        md_basic_to_tex(
+            "L’objectif est de retenir le VAR(p) le plus parcimonieux possible, "
+            "minimisant le critère d’information (notamment l’AIC) "
+            "tout en conservant des paramètres significatifs et économiquement cohérents."
+        ),
+        "",
+    ]
+
+    # -----------------------------
+    # Conditions de validité
+    # -----------------------------
+
+    lines += [
+        r"\subsection*{Conditions de validité économétrique}",
+        md_basic_to_tex(
+            "Avant toute estimation VAR, la nature des tendances doit être correctement identifiée. "
+            "Les variables doivent être stationnaires. "
+            "Si certaines séries sont intégrées d’ordre un (DS), "
+            "elles doivent être différenciées ; "
+            "si elles sont stationnaires autour d’une tendance déterministe (TS), "
+            "un ajustement approprié est nécessaire."
+        ),
+        "",
+        
+        md_basic_to_tex(
+            "Un VAR est économétriquement valide si les racines du polynôme caractéristique "
+            "sont situées à l’intérieur du cercle unité : "
+            "cette condition garantit la stabilité du système. "
+            "Sans stabilité, les fonctions de réponse impulsionnelle (IRF) "
+            "et les décompositions de variance (FEVD) ne sont pas interprétables."
+        ),
+        "",
+
+        md_basic_to_tex(
+            "Les diagnostics incluent également la vérification de l’absence "
+            "d’autocorrélation résiduelle et la cohérence globale du modèle. "
+            "Le compromis biais–variance guide la sélection finale."
         ),
         "",
     ]
