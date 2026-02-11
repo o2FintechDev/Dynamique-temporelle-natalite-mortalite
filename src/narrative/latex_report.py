@@ -32,7 +32,6 @@ def _escape_tex(s: str) -> str:
         .replace("\\", r"\textbackslash{}")
         .replace("&", r"\&")
         .replace("%", r"\%")
-        .replace("$", r"\$")
         .replace("#", r"\#")
         .replace("_", r"\_")
         .replace("{", r"\{")

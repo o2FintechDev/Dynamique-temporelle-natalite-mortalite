@@ -8,7 +8,7 @@ import re
 
 import pandas as pd
 import matplotlib.figure as mpl_fig
-
+from src.narrative.sections.base import md_basic_to_tex
 from src.utils.run_writer import RunWriter
 from src.utils.logger import get_logger
 from src.visualization.tables import save_table_csv_and_tex
@@ -47,7 +47,6 @@ def _escape_tex(s: Any) -> str:
         .replace("\\", r"\textbackslash{}")
         .replace("&", r"\&")
         .replace("%", r"\%")
-        .replace("$", r"\$")
         .replace("#", r"\#")
         .replace("_", r"\_")
         .replace("{", r"\{")
@@ -109,15 +108,6 @@ def _write_latex_block(
     outputs: Dict[str, Any],
     saved: Dict[str, Any],
 ) -> Optional[Path]:
-    r"""
-    Génère un bloc LaTeX auto: latex/blocks/<step_name>.tex
-
-    IMPORTANT (Overleaf stable):
-    - On écrit des chemins RELATIFS À LA RACINE DU PROJET (run folder).
-      Donc dans les blocs:
-        artefacts/figures/<file>.png
-        artefacts/tables/<file>.tex
-    """
     blocks_dir = rw.paths.latex_dir / "blocks"
     blocks_dir.mkdir(parents=True, exist_ok=True)
     block_path = blocks_dir / f"{_safe_filename(step_name)}.tex"
@@ -132,9 +122,15 @@ def _write_latex_block(
         lines.append(r"\textit{Page: " + _escape_tex(page) + r"}\\")
     lines.append("")
 
+    # NOTE (render, pas verbatim)
     if note_md:
-        # verbatim mais en texte normalisé (évite U+2212)
-        lines += [r"\begin{verbatim}", note_md, r"\end{verbatim}", ""]
+        # IMPORTANT: la note doit passer par md_basic_to_tex (pare-feu $ orphelins)
+        note_tex = md_basic_to_tex(note_md)
+        lines += [
+            r"\subsection*{Note d’audit}",
+            note_tex,
+            "",
+        ]
 
     # FIGURES
     figs = saved.get("figures") or []
@@ -144,14 +140,11 @@ def _write_latex_block(
             fname = Path(f.get("path", "")).name
             caption = f.get("key") or fname
             lab_id = _latex_safe_label_id(f"fig:{caption}")
-
-            rel_fig = f"artefacts/figures/{fname}"  # ROOT-RELATIVE
+            rel_fig = f"artefacts/figures/{fname}"
 
             lines += [
                 r"\begin{figure}[H]",
-                r"\includegraphics[width=0.95\linewidth]{"
-                + r"\detokenize{" + rel_fig + r"}"
-                + r"}",
+                r"\includegraphics[width=0.95\linewidth]{\detokenize{" + rel_fig + r"}}",
                 r"\caption{" + _escape_tex(caption) + r"}",
                 r"\label{" + lab_id + r"}",
                 r"\end{figure}",
@@ -166,15 +159,14 @@ def _write_latex_block(
             tname = Path(t.get("path", "")).name
             caption = t.get("key") or tname
             lab_id = _latex_safe_label_id(f"tab:{caption}")
-
-            rel_input = f"artefacts/tables/{tname}"  # ROOT-RELATIVE
+            rel_input = f"artefacts/tables/{tname}"
 
             lines += [
                 r"\begin{table}[H]",
                 r"\caption{" + _escape_tex(caption) + r"}",
                 r"\label{" + lab_id + r"}",
                 r"\begin{adjustbox}{max width=\linewidth,center}",
-                r"\input{" + r"\detokenize{" + rel_input + r"}" + r"}",
+                r"\input{\detokenize{" + rel_input + r"}}",
                 r"\end{adjustbox}",
                 r"\end{table}",
                 "",
@@ -189,7 +181,8 @@ def _write_latex_block(
             lines.append(r"\texttt{" + _escape_tex(p) + r"}\\")
         lines.append("")
 
-    block_path.write_text("\n".join(lines), encoding="utf-8")
+    tex = "\n".join(lines)
+    block_path.write_text(tex, encoding="utf-8")
     return block_path
 
 

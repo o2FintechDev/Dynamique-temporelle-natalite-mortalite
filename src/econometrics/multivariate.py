@@ -696,10 +696,10 @@ def var_pack(
 
     note5 = (
         f"**VAR(p)** : estimation d'un VAR sur les variables rendues stationnaires "
-        f"(stationnarité via ADF, α={alpha_stationarity}).\n\n"
+        f"(stationnarité via ADF, \\alpha ={alpha_stationarity}).\n\n"
 
         f"La sélection de l'ordre retient **p={p_selected}** (IC utilisé : **{ic_col}**, "
-        f"p_cap={p_cap}, contrainte de stabilité={require_stable}, test de blancheur des résidus au seuil α={whiteness_alpha}).\n\n"
+        f"p_cap={p_cap}, contrainte de stabilité={require_stable}, test de blancheur des résidus au seuil \\alpha ={whiteness_alpha}).\n\n"
 
         f"L'estimation est réalisée sur **{int(Y.shape[0])}** observations, "
         f"sur la période **{m_stat.get('start')} → {m_stat.get('end')}**.\n\n"

@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from src.narrative.sections.base import SectionSpec, lookup, read_json, md_basic_to_tex
+from src.narrative.sections.base import SectionSpec, lookup, read_json
 from src.narrative.sections.spec import default_spec
 
 from src.narrative.sections.sec_data import render_sec_data
@@ -34,12 +34,29 @@ _CTRL = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
 def _sanitize_tex(s: str) -> str:
     if s is None:
         return ""
-    # supprime BOM + contrôles invisibles
+
     s = s.replace("\ufeff", "")
     s = _CTRL.sub("", s)
-    # normalise grecs unicode fréquents -> LaTeX
+
+    # stop $$ accidents
+    while "$$" in s:
+        s = s.replace("$$", "$")
+    
+    # unicode grecs -> latex cmds
     s = s.replace("α", r"\alpha").replace("β", r"\beta")
-    return s
+
+    # 1) remplacer les patterns dangereux "$\alpha" ou "\alpha$" isolés
+    s = s.replace(r"$\alpha", r"\alpha").replace(r"\alpha$", r"\alpha")
+    s = s.replace(r"$\beta", r"\beta").replace(r"\beta$", r"\beta")
+
+    # 2) corriger les cas "=$\alpha $$\beta$'" -> "=\alpha\beta'"
+    s = s.replace(r"= $\\alpha $$\\beta$'", r"= \\alpha\\beta'")
+    s = s.replace(r"= $\\alpha $$\\beta$' ", r"= \\alpha\\beta' ")
+
+    s = (s.replace("Ã©","é").replace("Ã¨","è").replace("Ãª","ê").replace("Ã ","à")
+       .replace("Ã´","ô").replace("Ã¹","ù").replace("Ã¢","â").replace("Ã®","î")
+       .replace("Ã§","ç").replace("Â",""))
+    
 
 def render_all_section_blocks(
     run_root: Path,

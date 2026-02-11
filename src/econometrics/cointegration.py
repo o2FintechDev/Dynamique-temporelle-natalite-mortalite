@@ -510,8 +510,8 @@ def cointegration_pack(
             f"avec det_order={det_order} et k_ar_diff={k_ar_diff}.\n\n "
             + (
                 "Le VECM est estimé afin de modéliser conjointement les équilibres de long terme "
-                "via les vecteurs de cointégration (β) et les mécanismes d'ajustement vers ces équilibres "
-                "à court terme (α).\n\n"
+                "via les vecteurs de cointégration (\\beta) et les mécanismes d'ajustement vers ces équilibres "
+                "à court terme (\\alpha).\n\n"
                 if use_vecm
                 else
                 "L'absence de cointégration conduit à privilégier un VAR en différences, "

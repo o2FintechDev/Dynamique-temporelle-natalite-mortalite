@@ -4,7 +4,7 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Match
 
 from src.narrative.tex_snippets import normalize_key
 
@@ -44,7 +44,6 @@ def escape_tex(s: Any) -> str:
     s = (
         s.replace("&", r"\&")
          .replace("%", r"\%")
-         .replace("$", r"\$")
          .replace("#", r"\#")
          .replace("{", r"\{")
          .replace("}", r"\}")
@@ -101,28 +100,36 @@ def lookup(manifest: Dict[str, Any], kind: str, key: str) -> Optional[str]:
 def md_basic_to_tex(md: str) -> str:
     s = normalize_unicode((md or "").strip())
 
-    # stash maths
+    # 0) Si on a des $ orphelins => on neutralise plutôt que casser la compilation
+    #    (ça évite: Missing $ inserted / accents interprétés en math mode)
+    if s.count("$") % 2 == 1:
+        s = s.replace("$", r"\$")
+    # 1) stash maths (d'abord $$...$$ puis $...$)
     math_tokens: list[str] = []
 
-    def _stash(m: re.Match) -> str:
+    def _stash(m: Match[str]) -> str:
         math_tokens.append(m.group(0))
         return f"@@MATH{len(math_tokens)-1}@@"
-    
-    s = re.sub(r"\$\$.*?\$\$", _stash, s, flags=re.DOTALL)
-    s = re.sub(r"\$.*?\$", _stash, s, flags=re.DOTALL)
 
+    # stash display math en premier
+    s = re.sub(r"\$\$(.+?)\$\$", _stash, s, flags=re.DOTALL)
+
+    # stash inline math ensuite (interdit les $ vides et évite de traverser des sauts trop longs)
+    # - interdit $$ (déjà traité)
+    # - autorise du contenu non-$
+    s = re.sub(r"\$(?!\$)([^$\n]+?)\$", _stash, s)
+
+    # 2) escape texte normal
     s = escape_tex(s)
 
-    # bold / ital
+    # 3) markdown minimal (bold + inline code)
     s = re.sub(r"\*\*(.+?)\*\*", r"\\textbf{\1}", s)
-    s = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"\\emph{\1}", s)
-
-    # inline code -> \texttt{}
     s = re.sub(r"`([^`]+)`", r"\\texttt{\1}", s)
 
+    # 4) restore maths (inchangés)
     for i, tok in enumerate(math_tokens):
         s = s.replace(f"@@MATH{i}@@", tok)
-    s = re.sub(r'\\(alpha|beta|gamma|delta|epsilon|theta|lambda|mu|nu|pi|rho|sigma|tau|phi|psi|omega)\b', r'$\\\1$', s)
+
     return s
 
 

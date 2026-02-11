@@ -78,7 +78,7 @@ def render_anthropology(*, facts: Dict[str, Any]) -> Dict[str, Any]:
     lines.append(f"- **Régime statistique (TS vs DS)** : **{verdict}**.")
     if p_c is not None and p_ct is not None:
         lines.append(f"  - ADF(c) p={float(p_c):.3g}, ADF(ct) p={float(p_ct):.3g}"
-                     + (f", PP p={float(p_pp):.3g}." if p_pp is not None else ", PP indisponible."))
+                     + (f", PP p={float(p_pp):.3g}."))
     lines.append(
         "- **Interprétation** : une série plutôt TS suggère un retour vers une trajectoire (chocs transitoires), "
         "alors qu’une DS suggère des ruptures/politiques/événements qui déplacent durablement la dynamique."
