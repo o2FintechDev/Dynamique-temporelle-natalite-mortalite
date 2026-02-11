@@ -389,6 +389,65 @@ O38 (Technological Change – Automation and AI)
 
 \input{blocks/sec_conclusion.tex}
 
+% -----------------------------
+% BIBLIOGRAPHIE (non numérotée)
+% -----------------------------
+\clearpage
+\chapter*{Bibliographie}
+\addcontentsline{toc}{chapter}{Bibliographie}
+
+\begin{flushleft}
+
+Box, G. E. P., Jenkins, G. M., Reinsel, G. C., & Ljung, G. M. (2015). 
+\textit{Time series analysis: Forecasting and control} (5th ed.). Wiley.
+
+Bourbonnais, R. (2018). 
+\textit{Économétrie} (10e éd.). Dunod.
+
+Engle, R. F., & Granger, C. W. J. (1987). 
+Co-integration and error correction: Representation, estimation, and testing. 
+\textit{Econometrica, 55}(2), 251–276.
+
+Fuller, W. A. (1996). 
+\textit{Introduction to statistical time series} (2nd ed.). Wiley.
+
+Granger, C. W. J. (1969). 
+Investigating causal relations by econometric models and cross-spectral methods. 
+\textit{Econometrica, 37}(3), 424–438.
+
+Hamilton, J. D. (1994). 
+\textit{Time series analysis}. Princeton University Press.
+
+Johansen, S. (1988). 
+Statistical analysis of cointegration vectors. 
+\textit{Journal of Economic Dynamics and Control, 12}(2–3), 231–254.
+
+Lütkepohl, H. (2005). 
+\textit{New introduction to multiple time series analysis}. Springer.
+
+Phillips, P. C. B., & Perron, P. (1988). 
+Testing for a unit root in time series regression. 
+\textit{Biometrika, 75}(2), 335–346.
+
+Sims, C. A. (1980). 
+Macroeconomics and reality. 
+\textit{Econometrica, 48}(1), 1–48.
+
+Terraza, M. (1999). 
+\textit{Modèles économétriques dynamiques}. Economica.
+
+Todd, E. (1976). 
+\textit{La chute finale: Essai sur la décomposition de la sphère soviétique}. Robert Laffont.
+
+Hurst, H. E. (1951). 
+Long-term storage capacity of reservoirs. 
+\textit{Transactions of the American Society of Civil Engineers, 116}, 770–808.
+
+Beran, J. (1994). 
+\textit{Statistics for long-memory processes}. Chapman & Hall.
+
+\end{flushleft}
+
 \end{document}
 """
 
