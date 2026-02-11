@@ -436,22 +436,35 @@ def render_sec_univariate(
     ]
 
     # ============================================================
-    # SECTION : Mémoire longue (cadre)
+    # SECTION 3 : Mémoire longue ARFIMA (cadre théorique et perspectives)
     # ============================================================
+
     lines += [
-        r"\section{Analyse de la mémoire longue}",
+       r"\section{Analyse de la mémoire longue}",
         "",
         md_basic_to_tex(
-            "L’analyse de la mémoire longue vise à caractériser la persistance temporelle des chocs au-delà du cadre classique des modèles ARMA. "
-            "Dans de nombreuses séries macroéconomiques et démographiques, la dépendance temporelle ne décroît pas de manière exponentielle "
-            "mais selon une loi hyperbolique, traduisant une inertie structurelle profonde. Cette propriété remet en cause l’hypothèse de mémoire "
-            "courte implicite des modèles ARMA et justifie le recours à des outils spécifiques."
+            "L’analyse de la mémoire longue vise à caractériser la persistance des chocs "
+            "au-delà du cadre standard des modèles ARMA et ARIMA. "
+            "Dans certaines séries macroéconomiques et démographiques, "
+            "la dépendance temporelle ne décroît pas de manière exponentielle "
+            "mais selon une loi hyperbolique, traduisant une inertie structurelle profonde. "
+            "Cette propriété remet en cause l’hypothèse de mémoire courte implicite "
+            "des modèles ARMA classiques."
         ),
         "",
+    ]
+
+    # -----------------------------
+    # Mémoire courte vs mémoire longue
+    # -----------------------------
+
+    lines += [
         r"\subsection*{Mémoire courte versus mémoire longue}",
         md_basic_to_tex(
-            "Mémoire courte : la somme des autocorrélations est absolument convergente. "
-            "Mémoire longue : la somme diverge et l’autocorrélation décroît selon une loi hyperbolique."
+            "Un processus à mémoire courte vérifie la convergence absolue de la somme des autocorrélations : "
+            "la dépendance décroît rapidement et les chocs s’estompent de manière exponentielle. "
+            "À l’inverse, un processus à mémoire longue se caractérise par une décroissance hyperbolique "
+            "des autocorrélations : les effets des chocs persistent sur des horizons très éloignés."
         ),
         "",
         r"\begin{equation}",
@@ -465,16 +478,35 @@ def render_sec_univariate(
         r"\rho(h) \sim C h^{2H-2}\quad \text{lorsque } h\to\infty",
         r"\end{equation}",
         "",
-        r"\subsection*{Fondements théoriques de la mémoire longue}",
+    ]
+
+    # -----------------------------
+    # Fondements théoriques
+    # -----------------------------
+
+    lines += [
+        r"\subsection*{Fondements théoriques}",
         md_basic_to_tex(
-            "La mémoire longue traduit des mécanismes d’agrégation et des rigidités institutionnelles générant une persistance de long terme. "
-            "En démographie : structures familiales stables, politiques publiques durables, inerties biologiques et sociales. "
-            "Économétriquement, elle peut être confondue avec une racine unitaire, d’où la nécessité de diagnostics robustes."
+            "La mémoire longue peut résulter de mécanismes d’agrégation, "
+            "de rigidités institutionnelles ou de structures sociales stables. "
+            "En démographie, elle peut refléter des phénomènes d’inertie générationnelle, "
+            "de structure d’âge ou de politiques publiques durables. "
+            "Un événement de court terme s’inscrit alors dans un processus de long terme : "
+            "les effets ne disparaissent pas immédiatement, mais sont absorbés progressivement "
+            "dans une dynamique plus profonde."
         ),
         "",
+    ]
+
+    # -----------------------------
+    # Statistique R/S
+    # -----------------------------
+
+    lines += [
         r"\subsection*{Statistique du Rescaled Range (R/S)}",
         md_basic_to_tex(
-            "L’approche R/S (Hurst) examine la croissance de l’amplitude cumulée des écarts à la moyenne."
+            "L’approche de Hurst (R/S) évalue la croissance de l’amplitude cumulée "
+            "des écarts à la moyenne, afin d’estimer l’exposant de persistance."
         ),
         "",
         r"\begin{equation}",
@@ -483,32 +515,65 @@ def render_sec_univariate(
         r"\begin{equation}",
         r"R(n)=\max_{1\le k\le n}X_k-\min_{1\le k\le n}X_k",
         r"\end{equation}",
-        r"\begin{equation}",
-        r"\frac{R(n)}{S(n)}",
-        r"\end{equation}",
-        "",
+
         r"\begin{equation}",
         r"\mathbb{E}\left[\frac{R(n)}{S(n)}\right]=C n^{H}",
         r"\end{equation}",
         "",
+    ]
+
+    # -----------------------------
+    # Interprétation Hurst
+    # -----------------------------
+
+    lines += [
         r"\subsection*{Exposant de Hurst : interprétation}",
         md_basic_to_tex(
-            "H=0,5 : absence de mémoire longue (bruit blanc/ARMA). "
-            "H>0,5 : persistance (les chocs tendent à se prolonger). "
-            "H<0,5 : antipersistence (retour rapide vers la moyenne)."
+            "$H=0{,}5$ correspond à l’absence de mémoire longue (processus ARMA classique). "
+            "$H>0{,}5$ indique une persistance : les chocs tendent à se prolonger. "
+            "$H<0{,}5$ traduit une antipersistence : retour rapide vers la moyenne."
         ),
         "",
-        r"\subsection*{Lien entre Hurst et intégration fractionnaire}",
+    ]
+
+    # -----------------------------
+    # Lien avec intégration fractionnaire
+    # -----------------------------
+
+    lines += [
+        r"\subsection*{Lien entre mémoire longue et intégration fractionnaire}",
         "",
         r"\begin{equation}",
         r"H=d+\frac{1}{2}",
         r"\end{equation}",
         "",
         md_basic_to_tex(
-            "d=0 : ARMA ; 0<d<0,5 : mémoire longue stationnaire ; d≥0,5 : non-stationnarité. "
-            "Ce lien conduit naturellement aux modèles ARFIMA."
+            "Les modèles ARFIMA(p,d,q) constituent une généralisation des modèles ARMA "
+            "et ARIMA. "
+            "Si $d=0$, on retrouve un ARMA classique. "
+            "Si $d=1$, on est dans le cas ARIMA avec différenciation simple, "
+            "ce qui correspond précisément à la situation étudiée précédemment "
+            "lors du test de racine unitaire. "
+            "Si $d$ est fractionnaire (0<d<1), le processus présente une mémoire longue : "
+            "la dépendance décroît lentement et les chocs persistent sur de longues périodes."
         ),
         "",
+        md_basic_to_tex(
+            "Plus $d$ est élevé, plus la dépendance intertemporelle est forte. "
+            "Dans un cadre fractionnaire, un événement de court terme peut produire "
+            "des effets diffus à très long horizon. "
+            "Il ne s’agit pas d’un impact constant, mais d’une trace résiduelle "
+            "qui s’amortit très lentement. "
+            "Cette propriété illustre l’idée que le court terme est imbriqué dans le long terme."
+        ),
+        "",
+    ]
+
+    # -----------------------------
+    # Modèles ARFIMA
+    # -----------------------------
+
+    lines += [
         r"\subsection*{Modèles ARFIMA(p,d,q)}",
         "",
         r"\begin{equation}",
@@ -516,23 +581,69 @@ def render_sec_univariate(
         r"\end{equation}",
         "",
         md_basic_to_tex(
-            "Le paramètre d capture l’intensité de la mémoire longue : persistance intermédiaire entre stationnarité et non-stationnarité."
-        ),
-        "",
-        r"\subsection*{Pièges et limites}",
-        md_basic_to_tex(
-            "Risques : confusion entre mémoire longue et ruptures, sensibilité aux erreurs de mesure, instabilité en échantillon fini. "
-            "Les diagnostics doivent être confrontés aux tests de racine unitaire et à l’analyse des ruptures."
-        ),
-        "",
-        r"\subsection*{Implications économétriques et économiques}",
-        md_basic_to_tex(
-            "Une mémoire longue implique des effets persistants à très long horizon : "
-            "les modèles ARMA sous-estiment la persistance, et les politiques publiques peuvent produire des effets différés durables. "
-            "Cela justifie une extension multivariée pour analyser les canaux dynamiques."
+            "Le paramètre $d$ capture l’intensité de la mémoire longue. "
+            "Pour que le processus soit économétriquement valide, "
+            "il doit rester stationnaire et inversible. "
+            "L’ARFIMA est ainsi une généralisation couvrant l’ensemble "
+            "des dynamiques ARMA possibles, avec un degré de persistance ajustable."
         ),
         "",
     ]
+
+    # -----------------------------
+    # Positionnement méthodologique (important)
+    # -----------------------------
+
+    lines += [
+        r"\subsection*{Positionnement dans cette étude}",
+        md_basic_to_tex(
+            "Dans le cadre du présent travail, les modèles ARFIMA n’ont pas été implémentés "
+            "dans l’automate économétrique. "
+            "Le choix méthodologique a consisté à privilégier une modélisation ARIMA classique, "
+            "cohérente avec les diagnostics de stationnarité et la structure des ACF/PACF observées. "
+            "L’exploration fractionnaire constitue une piste de recherche ultérieure, "
+            "mais dépasserait le périmètre technique retenu pour cet automate déterministe."
+        ),
+        "",
+        md_basic_to_tex(
+            "L’analyse précédente a montré que la série de croissance naturelle "
+            "est intégrée d’ordre un, ce qui justifie la différenciation simple ($d=1$). "
+            "Rien ne permet à ce stade d’affirmer qu’un paramètre fractionnaire "
+            "serait plus approprié qu’une différenciation entière. "
+            "L’introduction d’un ARFIMA nécessiterait des tests spécifiques "
+            "et une procédure d’estimation adaptée."
+        ),
+        "",
+    ]
+
+    # -----------------------------
+    # Lien avec la démographie
+    # -----------------------------
+
+    lines += [
+        r"\subsection*{Lien avec la dynamique démographique}",
+        md_basic_to_tex(
+            "Dans une perspective démographique, la mémoire longue signifierait "
+            "qu’un choc — sanitaire, institutionnel ou économique — "
+            "laisserait une empreinte durable sur la trajectoire de long terme. "
+            "Toutefois, les événements récents, notamment la pandémie de Covid-19, "
+            "illustrent que le processus démographique peut être perturbé brutalement "
+            "et que ces perturbations ne s’inscrivent pas nécessairement "
+            "dans une dynamique stationnaire stable de très long terme."
+        ),
+        "",
+        
+        md_basic_to_tex(
+            "Ainsi, si la notion de mémoire longue offre un cadre conceptuel puissant "
+            "pour penser l’imbrication du court et du long terme, "
+            "les résultats obtenus dans cette étude restent compatibles "
+            "avec une dynamique intégrée classique modélisée par ARIMA. "
+            "La question d’une mémoire fractionnaire demeure ouverte "
+            "et constitue une perspective de recherche future."
+        ),
+        "",
+    ]
+
 
     # ==== FAIRE CONCLU MAYBE ====
     return "\n".join(lines).strip() + "\n"
